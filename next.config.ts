@@ -7,6 +7,12 @@ const nextConfig: NextConfig = {
   },
   cacheComponents: true,
   partialPrefetching: true,
+  outputFileTracingIncludes: {
+    "/api/stockfish/*": [
+      "./node_modules/stockfish/bin/stockfish-19-lite-single.js",
+      "./node_modules/stockfish/bin/stockfish-19-lite-single.wasm",
+    ],
+  },
   turbopack: {
     rules: {
       "*.css": {

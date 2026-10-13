@@ -1,51 +1,87 @@
-// Run with: npx tsx scripts/testFlagEngine.ts <username>
-// Runs Step 2 -> Step 3 -> Step 4 in sequence and prints flag engine output.
+import type {
+  GameEval,
+  MoveFeature,
+  PlayerProfile,
+  WeaknessProfile,
+} from "../types";
+import { flagMoves } from "../lib/flags/flagEngine";
 
-import { fetchGames } from "../lib/lichess/fetchGames";
-import { parseGames } from "../lib/lichess/parseGame";
-import { extractAllMoveFeatures, buildPlayerProfile } from "../lib/features/extractFeatures";
-import { flagMoves, checkProfileWarnings } from "../lib/flags/flagEngine";
+const profile: PlayerProfile = {
+  username: "test-player",
+  gamesAnalyzed: 1,
+  avgMoveTimeSecByPhase: { opening: 10, middlegame: 10, endgame: 10 },
+  premoveRate: 0,
+  mostCommonOpenings: [],
+  avgOpponentRating: 1500,
+};
 
-async function main() {
-  const username = process.argv[2];
-  if (!username) {
-    console.error("Usage: npx tsx scripts/testFlagEngine.ts <username>");
-    process.exit(1);
-  }
+const weaknessProfile: WeaknessProfile = {
+  username: "test-player",
+  patterns: [],
+  evaluatedGameIds: [],
+  gamesEvaluated: 1,
+  gamesFetched: 1,
+  confidence: "low",
+  builtAt: Date.now(),
+};
 
-  const raw = await fetchGames({ username, max: 5, rated: true, perfType: "rapid" });
-  const games = parseGames(raw, username);
-  console.log(`Parsed ${games.length} games.`);
-
-  const allFeatures = extractAllMoveFeatures(games);
-  console.log(`Extracted ${allFeatures.length} total move features.`);
-
-  const premoves = allFeatures.filter((f) => f.likelyPremove).length;
-  console.log(`likelyPremove flagged: ${premoves} (${((premoves / allFeatures.length) * 100).toFixed(1)}%)`);
-
-  const forcing = allFeatures.filter((f) => f.isForcing).length;
-  console.log(`isForcing flagged: ${forcing} (${((forcing / allFeatures.length) * 100).toFixed(1)}%)`);
-
-  const profile = buildPlayerProfile(username, games, allFeatures);
-  console.log("\nPlayer profile:");
-  console.log(profile);
-
-  // --- Step 4 additions ---
-  const warnings = checkProfileWarnings(profile);
-  console.log("\nWARNINGS:", warnings);
-
-  const flagged = flagMoves(allFeatures, profile);
-  console.log(`\nFLAGGED: ${flagged.length}`);
-
-  const bySeverity = { high: 0, medium: 0, low: 0 };
-  flagged.forEach((f) => bySeverity[f.severity]++);
-  console.log("By severity:", bySeverity);
-
-  console.log("\nFirst 10 flagged moves:");
-  console.log(flagged.slice(0, 10));
+function feature(ply: number, color: "white" | "black"): MoveFeature {
+  return {
+    gameId: "test-game",
+    ply,
+    moveNumber: 1,
+    color,
+    san: color === "white" ? "e4" : "e5",
+    timeSpentSec: 1,
+    clockRemainingSec: 60,
+    likelyPremove: false,
+    isCapture: false,
+    isCheck: false,
+    isForcing: false,
+    gamePhase: "middlegame",
+  };
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+function evalForBlunder(ply: number, playerColor: "white" | "black"): GameEval {
+  const points = Array.from({ length: 4 }, (_, index) => {
+    const moverColor = index % 2 === 0 ? "white" : "black";
+    const playerJustBlundered = index === ply;
+    const cpAfter = playerJustBlundered
+      ? -150
+      : moverColor === playerColor
+        ? -200
+        : 200;
+
+    return {
+      ply: index,
+      cpBefore: playerJustBlundered ? 50 : cpAfter,
+      cpAfter,
+      mateBefore: null,
+      mateAfter: null,
+      depth: 14,
+    };
+  });
+
+  return {
+    gameId: "test-game",
+    points,
+    evaluatedAt: Date.now(),
+    engineVersion: "test",
+  };
+}
+
+for (const [ply, color] of [[0, "white"], [1, "black"]] as const) {
+  const result = flagMoves(
+    [feature(ply, color)],
+    profile,
+    weaknessProfile,
+    evalForBlunder(ply, color),
+    color
+  );
+
+  if (result.length !== 1 || result[0].flagType !== "collapse" || result[0].cpLoss !== 200) {
+    throw new Error(`Expected a 200cp collapse flag for ${color}; got ${JSON.stringify(result)}`);
+  }
+
+  console.log(`PASS: ${color} blunder produces a collapse flag with 200cp loss`);
+}

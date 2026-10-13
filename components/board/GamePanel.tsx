@@ -11,6 +11,11 @@ import { useMaiaWorker } from "@/lib/maia/useMaiaWorker";
 import { rerankMoves } from "@/lib/maia/rerank";
 import { useOpponentFeatures } from "@/lib/useOpponentFeatures";
 import { eloToBucket } from "@/lib/maia/eloBuckets";
+import { extractAllMoveFeatures, buildPlayerProfile } from "@/lib/features/extractFeatures";
+import { flagMoves } from "@/lib/flags/flagEngine";
+import { runBackgroundEval } from "@/lib/onboarding/backgroundEval";
+import { getCachedEval } from "@/lib/eval/evalCache";
+import { emptyProfile, getProfile } from "@/lib/profile/profileCache";
  
 
 import { appendAttempt, loadAttempts } from "@/lib/attemptLog";
@@ -30,10 +35,12 @@ import type { OpponentFeatures } from "@/lib/lichess/opponentFeatures";
  
 
 type GameData = CachedGameDataShape;
+type IncomingGameData = Pick<GameData, "games"> &
+  Partial<Pick<GameData, "flagged" | "warnings">>;
 
-function isGameData(value: unknown): value is GameData {
+function isGameData(value: unknown): value is IncomingGameData {
   if (!value || typeof value !== "object") return false;
-  const candidate = value as Partial<GameData>;
+  const candidate = value as Partial<IncomingGameData>;
   return (
     Array.isArray(candidate.games) &&
     candidate.games.every(
@@ -43,10 +50,19 @@ function isGameData(value: unknown): value is GameData {
         Array.isArray(game.moves) &&
         (game.playerColor === "white" || game.playerColor === "black")
     ) &&
-    Array.isArray(candidate.flagged) &&
-    Array.isArray(candidate.warnings) &&
-    candidate.warnings.every((warning) => typeof warning === "string")
+    (candidate.flagged === undefined || Array.isArray(candidate.flagged)) &&
+    (candidate.warnings === undefined ||
+      (Array.isArray(candidate.warnings) &&
+        candidate.warnings.every((warning) => typeof warning === "string")))
   );
+}
+
+function normalizeGameData(value: IncomingGameData): GameData {
+  return {
+    ...value,
+    flagged: value.flagged ?? [],
+    warnings: value.warnings ?? [],
+  };
 }
 
 const SEVERITY_ORDER: Record<FlaggedMove["severity"], number> = { high: 0, medium: 1, low: 2 };
@@ -73,6 +89,8 @@ export default function GamePanel() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [flagAnalysisStatus, setFlagAnalysisStatus] = useState<string | null>(null);
+  const [flagAnalysisError, setFlagAnalysisError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
 
@@ -124,11 +142,12 @@ export default function GamePanel() {
 
     const cached = loadCachedGameData(username);
     if (cached && isGameData(cached) && Number.isFinite(cached.fetchedAt)) {
+      const normalizedCache = normalizeGameData(cached);
       // Serve the cache immediately, no network call, no loading spinner —
       // this is the actual "skip the intake" behavior. isStale() just
       // controls whether we show a nudge to refresh, not whether we show
       // anything at all.
-      setData(cached);
+      setData(normalizedCache);
       setDataFetchedAt(cached.fetchedAt);
       setGameIdx(0);
       setPly(0);
@@ -168,8 +187,9 @@ export default function GamePanel() {
         }
         if (requestId !== fetchRequestIdRef.current) return;
 
-        setData(payload);
-        saveCachedGameData(forUsername, payload);
+        const normalizedData = normalizeGameData(payload);
+        setData(normalizedData);
+        saveCachedGameData(forUsername, normalizedData);
         const fetchedAt = Date.now();
         setDataFetchedAt(fetchedAt);
         setGameIdx(0);
@@ -243,6 +263,68 @@ export default function GamePanel() {
   useEffect(() => {
     if (game?.opponentUsername) loadOpponentFeatures(game.opponentUsername);
   }, [game?.opponentUsername, loadOpponentFeatures]);
+
+  useEffect(() => {
+    if (!username || !data?.games.length) return;
+
+    const games = data.games;
+    let cancelled = false;
+    const allMoveFeatures = extractAllMoveFeatures(games);
+    const playerProfile = buildPlayerProfile(username, games, allMoveFeatures);
+    setFlagAnalysisError(null);
+    setFlagAnalysisStatus("Preparing game evaluations…");
+
+    void (async () => {
+      try {
+        await runBackgroundEval(username, games, (progress) => {
+          if (cancelled || progress.total === 0) return;
+          setFlagAnalysisStatus(
+            `Evaluating game ${Math.min(progress.done + 1, progress.total)} of ${progress.total}…`
+          );
+        });
+        if (cancelled) return;
+
+        setFlagAnalysisStatus("Generating flags…");
+        const weaknessProfile = (await getProfile(username)) ?? emptyProfile(username);
+        const flagged: FlaggedMove[] = [];
+
+        for (const evaluatedGame of games) {
+          const gameEval = await getCachedEval(evaluatedGame.id);
+          if (!gameEval) continue;
+          const gameFeatures = allMoveFeatures.filter((feature) => feature.gameId === evaluatedGame.id);
+          flagged.push(
+            ...flagMoves(
+              gameFeatures,
+              playerProfile,
+              weaknessProfile,
+              gameEval,
+              evaluatedGame.playerColor
+            )
+          );
+        }
+
+        if (cancelled) return;
+        flagged.sort((a, b) => b.cpLoss - a.cpLoss);
+        setData((current) => {
+          if (!current || current.games !== games) return current;
+          const updated = { ...current, flagged };
+          saveCachedGameData(username, updated);
+          return updated;
+        });
+        setFlagAnalysisStatus(null);
+      } catch (error) {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : String(error);
+        setFlagAnalysisError(message);
+        setFlagAnalysisStatus(null);
+        console.error("Flag analysis failed:", error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [username, data?.games]);
 
   function jumpToFlag(flag: FlaggedMove) {
     if (!data) return;
@@ -492,6 +574,12 @@ export default function GamePanel() {
             </span>
           )}
           {loadError && <span style={{ color: "#b00020", marginLeft: 8 }}>Refresh failed: {loadError}</span>}
+          {flagAnalysisStatus && <span style={{ marginLeft: 8 }}>{flagAnalysisStatus}</span>}
+          {flagAnalysisError && (
+            <span style={{ color: "#b00020", marginLeft: 8 }}>
+              Flag analysis failed: {flagAnalysisError}
+            </span>
+          )}
           {attemptCount > 0 && (
             <span style={{ marginLeft: 12 }}>
               You have {attemptCount} past attempt{attemptCount === 1 ? "" : "s"} logged.
