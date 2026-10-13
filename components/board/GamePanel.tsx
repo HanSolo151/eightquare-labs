@@ -11,16 +11,42 @@ import { useMaiaWorker } from "@/lib/maia/useMaiaWorker";
 import { rerankMoves } from "@/lib/maia/rerank";
 import { useOpponentFeatures } from "@/lib/useOpponentFeatures";
 import { eloToBucket } from "@/lib/maia/eloBuckets";
+ 
 
-import { appendAttempt } from "@/lib/attemptLog";
+import { appendAttempt, loadAttempts } from "@/lib/attemptLog";
 import AttemptSummary from "./AttemptSummary";
+import { clearLastUsername, loadLastUsername, saveLastUsername } from "@/lib/lastUsername";
+import {
+  loadCachedGameData,
+  saveCachedGameData,
+  isStale,
+  type GameData as CachedGameDataShape,
+} from "@/lib/gameDataCache";
+
+ 
 import type { ParsedGame, FlaggedMove } from "@/types";
 import type { OpponentFeatures } from "@/lib/lichess/opponentFeatures";
 
-interface GameData {
-  games: ParsedGame[];
-  flagged: FlaggedMove[];
-  warnings: string[];
+ 
+
+type GameData = CachedGameDataShape;
+
+function isGameData(value: unknown): value is GameData {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<GameData>;
+  return (
+    Array.isArray(candidate.games) &&
+    candidate.games.every(
+      (game) =>
+        !!game &&
+        typeof game.id === "string" &&
+        Array.isArray(game.moves) &&
+        (game.playerColor === "white" || game.playerColor === "black")
+    ) &&
+    Array.isArray(candidate.flagged) &&
+    Array.isArray(candidate.warnings) &&
+    candidate.warnings.every((warning) => typeof warning === "string")
+  );
 }
 
 const SEVERITY_ORDER: Record<FlaggedMove["severity"], number> = { high: 0, medium: 1, low: 2 };
@@ -45,7 +71,17 @@ export default function GamePanel() {
   const [gameIdx, setGameIdx] = useState(0);
   const [ply, setPly] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+
+
+  const [dataFetchedAt, setDataFetchedAt] = useState<number | null>(null);
+  const [attemptCount, setAttemptCount] = useState(0);
+  const [initialUsernameChecked, setInitialUsernameChecked] = useState(false);
+  const fetchRequestIdRef = useRef(0);
+
+
 
   // --- Step 10: replay state ---
   const [replay, setReplay] = useState(false);
@@ -71,19 +107,108 @@ export default function GamePanel() {
 
   const { infer } = useMaiaWorker();
 
+  // --- Step 12: auto-load last-used username on mount, skipping the intake form ---
+  useEffect(() => {
+    const last = loadLastUsername();
+    if (last) setUsername(last);
+    setInitialUsernameChecked(true);
+  }, []);
+
   useEffect(() => {
     if (!username) return;
-    setLoading(true);
+    
     setDismissed(loadDismissed(username));
-    fetch(`/api/games?username=${encodeURIComponent(username)}`)
-      .then((r) => r.json())
-      .then((d) => {
-        setData(d);
+ 
+    setAttemptCount(loadAttempts(username).length);
+    saveLastUsername(username);
+
+    const cached = loadCachedGameData(username);
+    if (cached && isGameData(cached) && Number.isFinite(cached.fetchedAt)) {
+      // Serve the cache immediately, no network call, no loading spinner —
+      // this is the actual "skip the intake" behavior. isStale() just
+      // controls whether we show a nudge to refresh, not whether we show
+      // anything at all.
+      setData(cached);
+      setDataFetchedAt(cached.fetchedAt);
+      setGameIdx(0);
+      setPly(0);
+      setLoadError(null);
+      setLoading(false);
+      if (isStale(cached)) fetchLive(username, false);
+      return;
+    }
+
+    // No cache (first-ever visit for this username, or it was cleared) — fall
+    // back to the original live-fetch path from Step 5.
+    fetchLive(username);
+
+  }, [username]);
+
+  function fetchLive(forUsername: string, showLoading = true) {
+    const requestId = ++fetchRequestIdRef.current;
+    setLoadError(null);
+    setLoading(showLoading);
+    setRefreshing(!showLoading);
+
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/games?username=${encodeURIComponent(forUsername)}`
+        );
+        const payload: unknown = await response.json();
+        if (!response.ok) {
+          const message =
+            payload && typeof payload === "object" && "error" in payload
+              ? String(payload.error)
+              : `Request failed (${response.status})`;
+          throw new Error(message);
+        }
+        if (!isGameData(payload)) {
+          throw new Error("The games API returned an invalid response.");
+        }
+        if (requestId !== fetchRequestIdRef.current) return;
+
+        setData(payload);
+        saveCachedGameData(forUsername, payload);
+        const fetchedAt = Date.now();
+        setDataFetchedAt(fetchedAt);
         setGameIdx(0);
         setPly(0);
-        setLoading(false);
-      });
-  }, [username]);
+      } catch (err) {
+        if (requestId !== fetchRequestIdRef.current) return;
+        const message = err instanceof Error ? err.message : String(err);
+        setLoadError(message);
+        console.error("Failed to fetch games:", err);
+      } finally {
+        if (requestId === fetchRequestIdRef.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      }
+    })();
+  }
+
+  function refreshData() {
+    if (!username) return;
+    fetchLive(username, false);
+  }
+
+  function switchAccount() {
+    fetchRequestIdRef.current++;
+    clearLastUsername();
+    setUsername(null);
+    setData(null);
+    setDataFetchedAt(null);
+    setAttemptCount(0);
+    setDismissed(new Set());
+    setGameIdx(0);
+    setPly(0);
+    setLoading(false);
+    setRefreshing(false);
+    setLoadError(null);
+    exitReplay();
+  }
+
 
   const game = data?.games[gameIdx];
 
@@ -324,9 +449,26 @@ export default function GamePanel() {
     replayStartedAtRef.current = null;
   }
 
+  
+  if (!initialUsernameChecked) return null; // avoid a flash of the form before we've checked localStorage
   if (!username) return <UsernameForm onSubmit={setUsername} />;
-  if (loading) return <div>Loading games…</div>;
-  if (!data || data.games.length === 0) return <div>No games found.</div>;
+  if (loading) {
+    return (
+      <div>
+        Loading games… <button type="button" onClick={switchAccount}>Switch account</button>
+      </div>
+    );
+  }
+
+  if (!data || data.games.length === 0) {
+    return (
+      <div>
+        {loadError ? `Could not load games: ${loadError}` : "No games found."}{" "}
+        {loadError && <button type="button" onClick={() => fetchLive(username)}>Retry</button>}{" "}
+        <button type="button" onClick={switchAccount}>Switch account</button>
+      </div>
+    );
+  }
 
   const userColor = game?.playerColor;
   const liveChess = chessRef.current;
@@ -335,6 +477,27 @@ export default function GamePanel() {
   return (
     <div style={{ display: "flex", gap: 24 }}>
       <div>
+         <div style={{ fontSize: 12, color: "#666", marginBottom: 6 }}>
+          {dataFetchedAt && (
+            <span>
+              {username} · last updated{" "}
+              {Math.max(0, Math.round((Date.now() - dataFetchedAt) / 60000))}m ago
+              {dataFetchedAt && isStale({ ...data, fetchedAt: dataFetchedAt })
+                ? " (stale)"
+                : ""}{" "}
+              — <button type="button" onClick={refreshData} disabled={refreshing}>
+                {refreshing ? "Refreshing…" : "Refresh"}
+              </button>{" "}
+              <button type="button" onClick={switchAccount}>Switch account</button>
+            </span>
+          )}
+          {loadError && <span style={{ color: "#b00020", marginLeft: 8 }}>Refresh failed: {loadError}</span>}
+          {attemptCount > 0 && (
+            <span style={{ marginLeft: 12 }}>
+              You have {attemptCount} past attempt{attemptCount === 1 ? "" : "s"} logged.
+            </span>
+          )}
+        </div>
         <select
           value={gameIdx}
           onChange={(e) => {
