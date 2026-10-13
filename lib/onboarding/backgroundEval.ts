@@ -6,13 +6,12 @@ import { extractMoveFeatures } from "../features/extractFeatures";
 
 export type EvalProgress = { done: number; total: number; currentGameId: string | null };
 let evaluationBatchQueue: Promise<void> = Promise.resolve();
+const GAMES_IN_FLIGHT = 2;
 
 /**
- * Evaluates every not-yet-cached game for this player, one at a time
- * (Stockfish is a single worker instance — no point parallelizing against
- * one engine), folding each into the persisted weakness profile as it
- * finishes. Safe to call every session: already-evaluated games are skipped
- * via the cache, so a returning player only pays for their new games.
+ * Evaluates games in small batches matched to the Stockfish worker pool,
+ * folding results into the persisted weakness profile in order. Safe to call
+ * every session: already-evaluated games are skipped via the cache.
  *
  * Saves the profile after EVERY game, not just at the end — if the tab
  * closes mid-batch, progress already made is not lost.
@@ -40,19 +39,30 @@ async function runEvaluationBatch(
   }
   profile.gamesFetched = games.length;
 
-  for (let i = 0; i < games.length; i++) {
-    const game = games[i];
-    let gameEval = await getCachedEval(game.id);
-    if (!gameEval) {
-      onProgress?.({ done: i, total: games.length, currentGameId: game.id });
-      gameEval = await evalGame(game.id, game.moves);
+  let completed = 0;
+  for (let start = 0; start < games.length; start += GAMES_IN_FLIGHT) {
+    const batch = games.slice(start, start + GAMES_IN_FLIGHT);
+    const evaluatedBatch = await Promise.all(
+      batch.map(async (game) => {
+        onProgress?.({ done: completed, total: games.length, currentGameId: game.id });
+        const cached = await getCachedEval(game.id);
+        return {
+          game,
+          gameEval: cached ?? await evalGame(game.id, game.moves),
+        };
+      })
+    );
+
+    // Keep profile writes sequential; IndexedDB profile updates must not race.
+    for (const { game, gameEval } of evaluatedBatch) {
+      completed++;
+      if (!profile.evaluatedGameIds.includes(game.id)) {
+        const moveFeatures: MoveFeature[] = extractMoveFeatures(game);
+        profile = updateWeaknessProfile(profile, game.id, gameEval, moveFeatures, game.playerColor);
+        await saveProfile(profile); // persist incrementally, not just at the end
+      }
+      onProgress?.({ done: completed, total: games.length, currentGameId: game.id });
     }
-    if (profile.evaluatedGameIds.includes(game.id)) continue;
-
-    const moveFeatures: MoveFeature[] = extractMoveFeatures(game);
-    profile = updateWeaknessProfile(profile, game.id, gameEval, moveFeatures, game.playerColor);
-
-    await saveProfile(profile); // persist incrementally, not just at the end
   }
 
   onProgress?.({ done: games.length, total: games.length, currentGameId: null });

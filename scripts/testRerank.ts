@@ -144,8 +144,8 @@ async function main() {
     // Here it's BLACK to move with white knight having just captured on f7
     // (a real capture already happened). Instead, give black a recapture:
     // Nxf7 is already played; black can play Kxf7 (a capture) or ignore it.
-    const logitsCapture = await fakeLogits(["e8f7"]); // Kxf7 — recapture, "isCapture" true
-    const logitsQuiet = await fakeLogits(["g8e7"]); // quiet-ish alternative, not a capture
+    const logitsCapture = await fakeLogits(["e1f2"]); // mirrored Kxf7 — recapture, "isCapture" true
+    const logitsQuiet = await fakeLogits(["g1e2"]); // mirrored quiet-ish alternative, not a capture
 
     const aggressiveOpponent = fakeOpponent({ aggressionIndex: 0.9, queenTradeRate: 0.5 });
     const passiveOpponent = fakeOpponent({ aggressionIndex: 0.05, queenTradeRate: 0.5 });
@@ -153,7 +153,7 @@ async function main() {
     // Give BOTH candidate moves equal base logit, so any difference in
     // final ranking comes ONLY from the aggression boost, not from the
     // fake logits themselves.
-    const equalLogits = await fakeLogits(["e8f7", "g8e7"], 5);
+    const equalLogits = await fakeLogits(["e1f2", "g1e2"], 5);
 
     const aggressiveResult = await rerankMoves({
       fen: fenKnownCapture,
@@ -234,6 +234,22 @@ async function main() {
     const result = await rerankMoves({ fen, logitsMaia: logits, opponentFeatures: opponent });
     const pass = result.openingBoostApplied === false;
     console.log(`${pass ? "PASS" : "FAIL"} — openingBoostApplied === false even with opening data present on OpponentFeatures`);
+    if (!pass) process.exitCode = 1;
+  }
+
+  console.log("\n=== Test 7: Black-to-move logits map back from Maia's canonical orientation ===");
+  {
+    const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1";
+    // Maia sees this as the mirrored starting position and predicts e2e4;
+    // on the real board that is e7e5.
+    const logits = await fakeLogits(["e2e4"], 10);
+    const result = await rerankMoves({
+      fen,
+      logitsMaia: logits,
+      opponentFeatures: fakeOpponent({}),
+    });
+    const pass = result.baseTopMove?.uci === "e7e5";
+    console.log(`${pass ? "PASS" : "FAIL"} — canonical e2e4 is mapped to legal Black move e7e5`);
     if (!pass) process.exitCode = 1;
   }
 

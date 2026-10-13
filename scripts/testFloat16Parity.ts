@@ -11,7 +11,7 @@
 // NOTE: this test file is unaffected by the row-indexing bug below — it only
 // checks fp16 round-trip losslessness, not placement correctness. See the
 // boardToTensor.ts fix delivered alongside this for the actual bug.
-import { boardToTensor } from "../lib/maia/boardToTensor";
+import { boardToTensor, mirrorFen, mirrorUci } from "../lib/maia/boardToTensor";
 
 // --- duplicated from maia.worker.ts so this can run standalone in Node ---
 function float32ToFloat16Bits(val: number): number {
@@ -61,6 +61,11 @@ const REFERENCE_FENS: Record<string, string> = {
   "endgame (K+R)": "8/8/4k3/8/8/4K3/8/4R3 w - - 0 1",
   "developed midgame": "r2qkb1r/ppp2ppp/2np1n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 4 6",
 };
+
+const STARTING_FEN_BLACK = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1";
+const STARTING_FEN_WHITE = REFERENCE_FENS["starting position"];
+const ASYMMETRIC_BLACK_FEN = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+const ASYMMETRIC_MIRRORED_FEN = "rnbqkbnr/pppp1ppp/8/4p3/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 let allPassed = true;
 
@@ -132,6 +137,39 @@ for (const [label, fen] of Object.entries(REFERENCE_FENS)) {
   } else {
     console.log("  PASS: exact round-trip (expected, since inputs are only 0.0/1.0)");
   }
+}
+
+console.log("\n=== Maia canonical orientation: Black to move ===");
+const mirroredBlackFen = mirrorFen(STARTING_FEN_BLACK);
+if (mirroredBlackFen !== STARTING_FEN_WHITE) {
+  console.error(`FAIL: mirrored start FEN mismatch: ${mirroredBlackFen}`);
+  allPassed = false;
+} else if (boardToTensor(STARTING_FEN_BLACK).some((value, i) => value !== boardToTensor(STARTING_FEN_WHITE)[i])) {
+  console.error("FAIL: Black-to-move starting tensor does not match Maia's canonical White-to-move tensor");
+  allPassed = false;
+} else {
+  console.log("PASS: Black-to-move starting board mirrors to Maia's canonical starting tensor");
+}
+
+const asymmetricMirror = mirrorFen(ASYMMETRIC_BLACK_FEN);
+const blackTensor = boardToTensor(ASYMMETRIC_BLACK_FEN);
+const expectedCanonicalTensor = boardToTensor(ASYMMETRIC_MIRRORED_FEN);
+if (
+  asymmetricMirror !== ASYMMETRIC_MIRRORED_FEN ||
+  blackTensor.some((value, i) => value !== expectedCanonicalTensor[i]) ||
+  mirrorFen(asymmetricMirror) !== ASYMMETRIC_BLACK_FEN
+) {
+  console.error(`FAIL: asymmetric Black-to-move mirror mismatch: ${asymmetricMirror}`);
+  allPassed = false;
+} else {
+  console.log("PASS: asymmetric Black-to-move board, tensor, and inverse mirror all match");
+}
+
+if (mirrorUci("e7e5") !== "e2e4" || mirrorUci(mirrorUci("e7e5")) !== "e7e5") {
+  console.error("FAIL: UCI rank-mirror conversion is incorrect");
+  allPassed = false;
+} else {
+  console.log("PASS: Black UCI moves map to canonical coordinates and back");
 }
 
 console.log(`\n${allPassed ? "ALL CHECKS PASSED" : "SOME CHECKS FAILED"}`);

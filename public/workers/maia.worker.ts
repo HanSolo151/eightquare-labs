@@ -1,8 +1,8 @@
 /// <reference lib="webworker" />
 import * as ort from "onnxruntime-web";
-import { boardToTensor } from "../../lib/maia/boardToTensor";
+import { boardToTensor, mirrorUci } from "../../lib/maia/boardToTensor";
 import { eloToBucket } from "../../lib/maia/eloBuckets";
-import { indexToUci } from "../../lib/maia/moveVocab";
+import { indexToUci, loadMoveVocab } from "../../lib/maia/moveVocab";
 
 type InferenceRequest = {
   id: string;
@@ -66,11 +66,18 @@ self.onmessage = async (e: MessageEvent<InferenceRequest>) => {
       }
     }
     
+    const modelTopMoveUci = await indexToUci(topIdx);
+    const blackToMove = fen.split(" ")[1] === "b";
+    const topMoveUci = blackToMove ? mirrorUci(modelTopMoveUci) : modelTopMoveUci;
+    const topMoveIndex = blackToMove
+      ? (await loadMoveVocab()).indexOf(topMoveUci)
+      : topIdx;
+
     const response: InferenceResponse = {
       id,
       ok: true,
-      topMoveIndex: topIdx,
-      topMoveUci: await indexToUci(topIdx),
+      topMoveIndex,
+      topMoveUci,
       logitsMaia,
     }; 
 

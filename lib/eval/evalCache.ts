@@ -39,24 +39,30 @@ export async function evalGame(gameId: string, moves: string[]): Promise<GameEva
 
   const chess = new Chess();
   const points: EvalPoint[] = [];
+  let evalBefore = await evalFen(chess.fen());
 
   for (let ply = 0; ply < moves.length; ply++) {
-    const fenBefore = chess.fen();
-    const before = await evalFen(fenBefore);
-    chess.move(moves[ply]);
+    const move = chess.move(moves[ply]);
+    if (!move) {
+      throw new Error(`Invalid SAN "${moves[ply]}" at ply ${ply} in game ${gameId}`);
+    }
     const fenAfter = chess.fen();
-    const after = await evalFen(fenAfter);
+    const evalAfter = await evalFen(fenAfter);
 
     // Normalize to the mover's POV (Stockfish reports from side-to-move's POV,
     // so "after" needs sign-flipping since it's now the opponent to move).
     points.push({
       ply,
-      cpBefore: before.cp,
-      cpAfter: after.cp !== null ? -after.cp : null,
-      mateBefore: before.mate,
-      mateAfter: after.mate !== null ? -after.mate : null,
-      depth: Math.min(before.depth, after.depth),
+      cpBefore: evalBefore.cp,
+      cpAfter: evalAfter.cp !== null ? -evalAfter.cp : null,
+      mateBefore: evalBefore.mate,
+      mateAfter: evalAfter.mate !== null ? -evalAfter.mate : null,
+      depth: Math.min(evalBefore.depth, evalAfter.depth),
     });
+
+    // This position is the next ply's "before" position too. Reuse its raw
+    // side-to-move score rather than searching it again.
+    evalBefore = evalAfter;
   }
 
   const result: GameEval = { gameId, points, evaluatedAt: Date.now(), engineVersion: ENGINE_VERSION };

@@ -61,7 +61,15 @@ function analyzeGame(
   for (let ply = 0; ply < game.moves.length; ply++) {
     const san = game.moves[ply];
     const moverColor = ply % 2 === 0 ? "white" : "black";
-    const moveResult = chess.move(san, { strict: false } as any);
+    let moveResult;
+    try {
+      moveResult = chess.move(san, { strict: false } as any);
+    } catch {
+      // Some exported/aborted games contain SAN that cannot be replayed from
+      // the initial board. Stop this game's contribution instead of failing
+      // the whole opponent-profile request.
+      break;
+    }
     if (!moveResult) {
       // Malformed/unparseable move — stop analyzing this game rather than
       // guess. Mirrors Step 3's "defensive, don't trust SAN blindly" stance.

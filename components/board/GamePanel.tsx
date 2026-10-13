@@ -412,17 +412,44 @@ export default function GamePanel() {
     try {
       setReplayStatus("maia-thinking");
 
-      const selfRating = g.playerColor === "white" ? g.opponentRating : g.playerRating;
-      const oppRating = g.playerColor === "white" ? g.playerRating : g.opponentRating;
+      // Maia is always playing the original game's opponent, regardless of
+      // whether that person was White or Black in the Lichess game. Maia2's
+      // `elo_self` is the side-to-move/player being modeled, not board color.
+      const selfRating = g.opponentRating;
+      const oppRating = g.playerRating;
 
-      const { logitsMaia } = await infer(chess.fen(), selfRating, oppRating);
+      const inferenceFen = chess.fen();
+      const { logitsMaia } = await infer(inferenceFen, selfRating, oppRating);
+
+      // The hook retains its previous result while fetching another opponent.
+      // Never let a prior game's/account's profile influence this game's move.
+      const matchingOpponentFeatures =
+        opponentFeatures?.username.trim().toLowerCase() === g.opponentUsername.trim().toLowerCase()
+          ? opponentFeatures
+          : NEUTRAL_OPPONENT_FEATURES;
 
       const result = await rerankMoves({
-        fen: chess.fen(),
+        fen: inferenceFen,
         logitsMaia,
-        opponentFeatures: opponentFeatures ?? NEUTRAL_OPPONENT_FEATURES,
+        opponentFeatures: matchingOpponentFeatures,
       });
-      let uci: string | null = result.topMove?.uci ?? null;
+      // Replay the model's own legal top choice. The profile-based reranker
+      // intentionally boosts captures/checks, but it has no tactical safety
+      // check and can promote a poisoned capture above Maia's baseline.
+      const uci: string | null = result.baseTopMove?.uci ?? null;
+
+      console.info("Maia replay choice", {
+        gameId: g.id,
+        playerColor: g.playerColor,
+        maiaColor: g.playerColor === "white" ? "black" : "white",
+        selfRating,
+        oppRating,
+        usedOpponentProfile: matchingOpponentFeatures !== NEUTRAL_OPPONENT_FEATURES,
+        opponentProfileUsername: matchingOpponentFeatures.username,
+        baseTopMove: result.baseTopMove?.uci,
+        adjustedTopMove: result.topMove?.uci,
+        selectedMove: uci,
+      });
 
       const delay = MAIA_DELAY_MIN_MS + Math.random() * (MAIA_DELAY_MAX_MS - MAIA_DELAY_MIN_MS);
       await new Promise((res) => setTimeout(res, delay));

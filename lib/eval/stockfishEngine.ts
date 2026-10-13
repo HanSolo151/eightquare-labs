@@ -2,23 +2,45 @@
 // no COOP/COEP requirement. Do NOT import anything from lib/maia/* here —
 // keeping these fully decoupled is intentional, per the scope boundary.
 
-let enginePromise: Promise<Worker> | null = null;
+interface EngineSlot {
+  workerPromise: Promise<Worker> | null;
+  queue: Promise<void>;
+  pending: number;
+}
 
-function getEngine(): Promise<Worker> {
-  if (!enginePromise) {
-    enginePromise = new Promise((resolve) => {
+// The lite engine is memory-light, but two isolated WASM instances provide
+// useful parallelism without spawning one engine per game/search request.
+const ENGINE_POOL_SIZE = 2;
+const engineSlots: EngineSlot[] = Array.from({ length: ENGINE_POOL_SIZE }, () => ({
+  workerPromise: null,
+  queue: Promise.resolve(),
+  pending: 0,
+}));
+
+function getWorker(slot: EngineSlot): Promise<Worker> {
+  if (!slot.workerPromise) {
+    slot.workerPromise = new Promise((resolve, reject) => {
       const worker = new Worker("/api/stockfish/stockfish-19-lite-single.js");
-      const onReady = (e: MessageEvent) => {
-        if (e.data === "uciok") {
+      const onReady = (event: MessageEvent) => {
+        if (event.data === "uciok") {
           worker.removeEventListener("message", onReady);
+          worker.removeEventListener("error", onError);
           resolve(worker);
         }
       };
+      const onError = (event: ErrorEvent) => {
+        worker.removeEventListener("message", onReady);
+        worker.removeEventListener("error", onError);
+        worker.terminate();
+        slot.workerPromise = null;
+        reject(new Error(event.message || "Stockfish worker failed to start"));
+      };
       worker.addEventListener("message", onReady);
+      worker.addEventListener("error", onError);
       worker.postMessage("uci");
     });
   }
-  return enginePromise;
+  return slot.workerPromise;
 }
 
 export interface EvalResult {
@@ -28,16 +50,20 @@ export interface EvalResult {
 }
 
 const SEARCH_DEPTH = 14; // tunable — depth vs latency tradeoff, not validated against anything yet
-let evaluationQueue: Promise<void> = Promise.resolve();
 
 export function evalFen(fen: string): Promise<EvalResult> {
-  const result = evaluationQueue.then(() => runEvaluation(fen));
-  evaluationQueue = result.then(() => undefined, () => undefined);
+  const slot = engineSlots.reduce((leastBusy, candidate) =>
+    candidate.pending < leastBusy.pending ? candidate : leastBusy
+  );
+  slot.pending++;
+  const result = slot.queue.then(() => runEvaluation(slot, fen));
+  slot.queue = result.then(() => undefined, () => undefined);
+  void result.finally(() => { slot.pending--; }).catch(() => undefined);
   return result;
 }
 
-async function runEvaluation(fen: string): Promise<EvalResult> {
-  const worker = await getEngine();
+async function runEvaluation(slot: EngineSlot, fen: string): Promise<EvalResult> {
+  const worker = await getWorker(slot);
   return new Promise((resolve) => {
     let best: EvalResult = { cp: null, mate: null, depth: 0 };
     const onMessage = (e: MessageEvent) => {

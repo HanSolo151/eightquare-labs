@@ -27,6 +27,7 @@
 
 import { Chess } from "chess.js";
 import { loadMoveVocab } from "./moveVocab";
+import { mirrorUci } from "./boardToTensor";
 import type { OpponentFeatures } from "../lichess/opponentFeatures";
 
 export interface RerankedMove {
@@ -92,6 +93,7 @@ export async function rerankMoves(params: {
   }
 
   const chess = new Chess(fen);
+  const mirrorMoves = chess.turn() === "b";
   const legalMoves = chess.moves({ verbose: true });
 
   if (legalMoves.length === 0) {
@@ -107,7 +109,9 @@ export async function rerankMoves(params: {
   const legalByUci = new Map<string, (typeof legalMoves)[number]>();
   for (const m of legalMoves) {
     const uci = m.from + m.to + (m.promotion ?? "");
-    legalByUci.set(uci, m);
+    // logits are indexed from Maia-2's canonical White-to-move perspective.
+    // Convert real-board legal moves to that vocabulary orientation.
+    legalByUci.set(mirrorMoves ? mirrorUci(uci) : uci, m);
   }
 
   const probs = softmax(logitsMaia);
@@ -129,9 +133,11 @@ export async function rerankMoves(params: {
   const results: RerankedMove[] = [];
 
   for (let i = 0; i < vocab.length; i++) {
-    const uci = vocab[i];
-    const m = legalByUci.get(uci);
+    const modelUci = vocab[i];
+    const m = legalByUci.get(modelUci);
     if (!m) continue; // illegal move, excluded entirely
+
+    const uci = m.from + m.to + (m.promotion ?? "");
 
     const baseProbability = probs[i] / legalProbSum;
 
