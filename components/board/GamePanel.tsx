@@ -261,7 +261,9 @@ export default function GamePanel() {
   // it the instant the user makes their first move, not after a click.
   const { features: opponentFeatures, load: loadOpponentFeatures } = useOpponentFeatures();
   useEffect(() => {
-    if (game?.opponentUsername) loadOpponentFeatures(game.opponentUsername);
+    if (game?.opponentUsername && game.opponentUsername.toLowerCase() !== "anonymous") {
+      loadOpponentFeatures(game.opponentUsername);
+    }
   }, [game?.opponentUsername, loadOpponentFeatures]);
 
   useEffect(() => {

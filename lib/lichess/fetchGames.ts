@@ -12,6 +12,29 @@ export interface FetchGamesOptions {
  * and returns them as an array of raw game objects.
  * Docs: https://lichess.org/api#tag/Games/operation/apiGamesUser
  */
+export class LichessFetchError extends Error {
+  constructor(
+    public readonly status: number,
+    statusText: string
+  ) {
+    super(`Lichess fetch failed: ${status} ${statusText}`);
+    this.name = "LichessFetchError";
+  }
+}
+export interface FetchGamesOptions {
+  username: string;
+  max?: number;
+  rated?: boolean;
+  perfType?: "rapid" | "blitz" | "bullet" | "classical";
+  since?: number; // ms timestamp
+  until?: number; // ms timestamp
+}
+
+/**
+ * Streams a user's games from the Lichess public API as NDJSON
+ * and returns them as an array of raw game objects.
+ * Docs: https://lichess.org/api#tag/Games/operation/apiGamesUser
+ */
 export async function fetchGames(opts: FetchGamesOptions): Promise<any[]> {
   const { username, max = 20, rated = true, perfType = "rapid", since, until } = opts;
 
@@ -35,7 +58,7 @@ export async function fetchGames(opts: FetchGamesOptions): Promise<any[]> {
   });
 
   if (!res.ok) {
-    throw new Error(`Lichess fetch failed: ${res.status} ${res.statusText}`);
+    throw new LichessFetchError(res.status, res.statusText);
   }
   if (!res.body) {
     throw new Error("Lichess response had no body (streaming not supported)");

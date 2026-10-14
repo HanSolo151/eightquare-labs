@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { extractOpponentFeatures } from "../../../lib/lichess/opponentFeatures";
+import { extractOpponentFeatures, emptyOpponentFeatures } from "../../../lib/lichess/opponentFeatures";
+import { LichessFetchError } from "../../../lib/lichess/fetchGames";
 
 /**
  * GET /api/opponent?username=...
@@ -26,6 +27,11 @@ export async function GET(req: NextRequest) {
     const features = await extractOpponentFeatures(username);
     return NextResponse.json(features);
   } catch (err) {
+    if (err instanceof LichessFetchError && err.status === 404) {
+      // Opponents can delete accounts, change names, or have unavailable
+      // profiles. Their game shouldn't fail just because a profile can't load.
+      return NextResponse.json(emptyOpponentFeatures(username));
+    }
     console.error("opponent feature extraction failed:", err);
     return NextResponse.json(
       { error: "failed to extract opponent features" },

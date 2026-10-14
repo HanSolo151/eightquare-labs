@@ -19,6 +19,18 @@ export interface OpponentFeatures {
   fetchedAt: number; // epoch ms, for cache TTL in the API route
 }
 
+export function emptyOpponentFeatures(username: string): OpponentFeatures {
+  return {
+    username,
+    gamesAnalyzed: 0,
+    mostCommonOpenings: [],
+    queenTradeRate: 0,
+    aggressionIndex: 0,
+    avgRating: null,
+    fetchedAt: Date.now(),
+  };
+}
+
 const QUEEN_TRADE_CUTOFF_PLY = 50; // move 25 full-move == ply 50
 const AGGRESSION_EARLY_QUEEN_PLY_CUTOFF = 30; // move 15 full-move == ply 30
 
@@ -127,15 +139,7 @@ export async function extractOpponentFeatures(
   const games = parseGames(raw, opponentUsername);
 
   if (games.length === 0) {
-    return {
-      username: opponentUsername,
-      gamesAnalyzed: 0,
-      mostCommonOpenings: [],
-      queenTradeRate: 0,
-      aggressionIndex: 0,
-      avgRating: null,
-      fetchedAt: Date.now(),
-    };
+    return emptyOpponentFeatures(opponentUsername);
   }
 
   const openingCounts = new Map<string, { name: string; eco: string; count: number }>();
