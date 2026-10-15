@@ -49,20 +49,6 @@ export interface PlayerProfile {
 }
 
 
-export interface FlaggedMove {
-  gameId: string;
-  ply: number;
-  moveNumber: number;
-  san: string;
-  timeSpentSec: number;
-  phaseAvgSec: number;
-  ratio: number;
-  clockRemainingSec: number;
-  gamePhase: MoveFeature["gamePhase"];
-  severity: "low" | "medium" | "high";
-}
-
-
 // --- Evaluation -------------------------------------------------------------
 
 export interface EvalPoint {
@@ -94,6 +80,18 @@ export interface CausalityVerdict {
 
 export type FlagType = "collapse" | "pattern_repeat" | "tilt_cascade" | "time_paradox";
 
+// --- Pivot-move attribution (Phase 3) ---------------------------------------
+// Populated starting in Phase 3. Until then every FlaggedMove.pivotMove is null.
+
+export interface PivotMoveAttribution {
+  ply: number;                    // the opponent move being attributed as the pivot
+  san: string;
+  evalShiftCp: number;            // swing in the position's eval caused by this move
+  wasTopEngineChoice: boolean;    // true if this was Stockfish's top line
+  wasInTopN: boolean;             // true if within Stockfish's top-3 lines (requires multiPV)
+  complexityDelta: number;        // change in position complexity (forcing-reply-count based) across this move
+}
+
 export interface FlaggedMove {
   gameId: string;
   ply: number;
@@ -101,15 +99,52 @@ export interface FlaggedMove {
   san: string;
   color: "white" | "black";
   flagType: FlagType;
+
+  // Time-pressure fields (ratio/timeRatio and phaseAvgSec/timeSpentSec are
+  // duplicates kept from two historical shapes of this type that TS was
+  // silently merging — both are populated by flagEngine.buildFlag, collapsing
+  // them is a later cleanup, not a Phase 1 concern).
   timeSpentSec: number;
   phaseAvgSec: number;
   timeRatio: number;
+  ratio: number;
+  clockRemainingSec: number;
+  gamePhase: MoveFeature["gamePhase"];
+
   cpLoss: number;                 // objective eval swing caused by this move
   causality: CausalityVerdict;
   matchedWeaknessId: string | null; // set only for pattern_repeat
   styleDeviationScore: number;     // 0-1, how far this move sits from the player's OWN baseline
   absoluteAnomalyScore: number;    // 0-1, how unusual regardless of baseline
+
+  // Stored severity bucket. UI components (VerdictCard etc.) branch on this
+  // string today — keep it a plain "low"|"medium"|"high", don't restructure.
   severity: "low" | "medium" | "high";
+  // Inspectable inputs behind `severity`. Phase 1 adds the field; Phase 2's
+  // multi-factor formula is what actually populates patternMatchBonus/rushBonus/
+  // tiltBonus with non-zero values. Until then this just mirrors cpLoss so the
+  // shape is already in place for Phase 2 to write into.
+  severityBreakdown: {
+    evalLoss: number;
+    patternMatchBonus: number;
+    rushBonus: number;
+    tiltBonus: number;
+  };
+
+  // Set once Phase 3's pivot-move attribution exists. Null until then.
+  pivotMove: PivotMoveAttribution | null;
+
+  // Set once Phase 2's tilt-cascade detector exists. Null until then (and
+  // null for every flag that isn't flagType "tilt_cascade").
+  cascadeMeta: { sequenceLength: number; depthCp: number; startPly: number } | null;
+
+  // How much to trust the eval backing this flag. Every flag built today
+  // passed flagEngine's `cpAfter !== null` filter, so this is always "full"
+  // right now. "mate_only" is the Phase 0 gap (mate-after plies currently
+  // never reach buildFlag at all — see flagEngine.ts line 23); "degraded" is
+  // reserved for a future lower-depth or structurally-incomplete eval read.
+  evalConfidence: "full" | "mate_only" | "degraded";
+
   explanation: string;            // human-readable, built from the above (feeds VerdictCard)
 }
 

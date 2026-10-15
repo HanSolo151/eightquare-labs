@@ -60,14 +60,32 @@ function buildFlag(
   causality: ReturnType<typeof checkCausality>, flagType: FlaggedMove["flagType"], weaknessId: string | null
 ): FlaggedMove {
   const severity = cpLoss > 300 ? "high" : cpLoss > 150 ? "medium" : "low";
+  const roundedCpLoss = Math.round(cpLoss);
   return {
     gameId: move.gameId, ply: move.ply, moveNumber: move.moveNumber, san: move.san, color: move.color,
     ratio: Number(timeRatio.toFixed(2)), clockRemainingSec: move.clockRemainingSec!, gamePhase: move.gamePhase,
     flagType, timeSpentSec: move.timeSpentSec!, phaseAvgSec: phaseAvg, timeRatio: Number(timeRatio.toFixed(2)),
-    cpLoss: Math.round(cpLoss), causality, matchedWeaknessId: weaknessId,
+    cpLoss: roundedCpLoss, causality, matchedWeaknessId: weaknessId,
     styleDeviationScore: Math.min(1, Math.abs(1 - timeRatio)),
     absoluteAnomalyScore: Math.min(1, cpLoss / 500),
     severity,
+    // Phase 1 schema fields. Values below are placeholders that preserve
+    // today's behavior (severity is still driven purely by cpLoss) — Phase 2
+    // replaces severityBreakdown's bonuses with the real multi-factor formula,
+    // Phase 3 populates pivotMove, Phase 2's cascade detector populates
+    // cascadeMeta for tilt_cascade flags.
+    severityBreakdown: {
+      evalLoss: roundedCpLoss,
+      patternMatchBonus: 0,
+      rushBonus: 0,
+      tiltBonus: 0,
+    },
+    pivotMove: null,
+    cascadeMeta: null,
+    // Always "full" today: this function is only reached for moves that
+    // passed the `cpAfter !== null` check in flagMoves() above. Phase 2's
+    // mate-only handling is what will introduce "mate_only" here.
+    evalConfidence: "full",
     explanation: explain(flagType, move, timeRatio, cpLoss, causality),
   };
 }

@@ -712,6 +712,15 @@ export default function GamePanel() {
 
             </div>
 
+            {/* Reserved for Phase 3: pivot-move context (activeFlag.pivotMove),
+                shown while replay is in progress, not just at game-over. Null
+                until Phase 3's attribution logic exists — render nothing until then. */}
+            {activeFlag?.pivotMove && (
+              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
+                Pivot: {activeFlag.pivotMove.san} (ply {activeFlag.pivotMove.ply})
+              </div>
+            )}
+
             {replayStatus === "game-over" && activeFlag && (
               <AttemptSummary
                 flag={activeFlag}
