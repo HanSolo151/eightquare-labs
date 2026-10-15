@@ -49,6 +49,19 @@ export interface EvalResult {
   depth: number;
 }
 
+/** Parse one UCI info line. `score cp` is already expressed in centipawns. */
+export function parseStockfishInfoLine(line: string, current: EvalResult): EvalResult {
+  if (!line.startsWith("info")) return current;
+  const depthMatch = line.match(/\bdepth (\d+)/);
+  const cpMatch = line.match(/\bscore cp (-?\d+)/);
+  const mateMatch = line.match(/\bscore mate (-?\d+)/);
+  return {
+    cp: cpMatch ? Number.parseInt(cpMatch[1], 10) : mateMatch ? null : current.cp,
+    mate: mateMatch ? Number.parseInt(mateMatch[1], 10) : cpMatch ? null : current.mate,
+    depth: depthMatch ? Number.parseInt(depthMatch[1], 10) : current.depth,
+  };
+}
+
 const SEARCH_DEPTH = 14; // tunable — depth vs latency tradeoff, not validated against anything yet
 
 export function evalFen(fen: string): Promise<EvalResult> {
@@ -68,14 +81,7 @@ async function runEvaluation(slot: EngineSlot, fen: string): Promise<EvalResult>
     let best: EvalResult = { cp: null, mate: null, depth: 0 };
     const onMessage = (e: MessageEvent) => {
       const line: string = e.data;
-      if (line.startsWith("info") && line.includes("score")) {
-        const cpMatch = line.match(/score cp (-?\d+)/);
-        const mateMatch = line.match(/score mate (-?\d+)/);
-        const depthMatch = line.match(/depth (\d+)/);
-        if (depthMatch) best.depth = parseInt(depthMatch[1], 10);
-        if (cpMatch) { best.cp = parseInt(cpMatch[1], 10); best.mate = null; }
-        if (mateMatch) { best.mate = parseInt(mateMatch[1], 10); best.cp = null; }
-      }
+      best = parseStockfishInfoLine(line, best);
       if (line.startsWith("bestmove")) {
         worker.removeEventListener("message", onMessage);
         resolve(best);

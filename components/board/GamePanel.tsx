@@ -14,7 +14,7 @@ import { eloToBucket } from "@/lib/maia/eloBuckets";
 import { extractAllMoveFeatures, buildPlayerProfile } from "@/lib/features/extractFeatures";
 import { flagMoves } from "@/lib/flags/flagEngine";
 import { runBackgroundEval } from "@/lib/onboarding/backgroundEval";
-import { getCachedEval } from "@/lib/eval/evalCache";
+import { getCachedEval, inspectGameEval } from "@/lib/eval/evalCache";
 import { emptyProfile, getProfile } from "@/lib/profile/profileCache";
  
 
@@ -289,11 +289,48 @@ export default function GamePanel() {
         setFlagAnalysisStatus("Generating flags…");
         const weaknessProfile = (await getProfile(username)) ?? emptyProfile(username);
         const flagged: FlaggedMove[] = [];
+        const evalQualityIssues: ReturnType<typeof inspectGameEval>[] = [];
+        let expectedPlies = 0;
+        let cpComparablePlies = 0;
+        let mateOnlyPlies = 0;
+        let unscoredPlies = 0;
+        const moveFeatureCoverageIssues: { gameId: string; parsedMoves: number; features: number }[] = [];
 
         for (const evaluatedGame of games) {
-          const gameEval = await getCachedEval(evaluatedGame.id);
-          if (!gameEval) continue;
+          const gameEval = await getCachedEval(evaluatedGame.id, evaluatedGame.moves.length);
+          if (!gameEval) {
+            evalQualityIssues.push({
+              gameId: evaluatedGame.id,
+              expectedPlyCount: evaluatedGame.moves.length,
+              actualPointCount: 0,
+              missingPlies: Array.from({ length: evaluatedGame.moves.length }, (_, ply) => ply),
+              duplicatePlies: [], invalidPlies: [], extraPlies: [], invalidScorePlies: [],
+              invalidDepthPlies: [], mateOnlyPlies: [], cpComparablePlies: [],
+              structurallyComplete: false,
+            });
+            expectedPlies += evaluatedGame.moves.length;
+            unscoredPlies += evaluatedGame.moves.length;
+            continue;
+          }
+          const quality = inspectGameEval(gameEval, evaluatedGame.moves.length);
+          expectedPlies += quality.expectedPlyCount;
+          cpComparablePlies += quality.cpComparablePlies.length;
+          mateOnlyPlies += quality.mateOnlyPlies.length;
+          unscoredPlies += quality.invalidScorePlies.length;
+          if (
+            !quality.structurallyComplete || quality.invalidScorePlies.length > 0 ||
+            quality.invalidDepthPlies.length > 0 || quality.mateOnlyPlies.length > 0
+          ) {
+            evalQualityIssues.push(quality);
+          }
           const gameFeatures = allMoveFeatures.filter((feature) => feature.gameId === evaluatedGame.id);
+          if (gameFeatures.length !== evaluatedGame.moves.length) {
+            moveFeatureCoverageIssues.push({
+              gameId: evaluatedGame.id,
+              parsedMoves: evaluatedGame.moves.length,
+              features: gameFeatures.length,
+            });
+          }
           flagged.push(
             ...flagMoves(
               gameFeatures,
@@ -303,6 +340,24 @@ export default function GamePanel() {
               evaluatedGame.playerColor
             )
           );
+        }
+
+        console.info("Flagging evaluation coverage", {
+          username,
+          games: games.length,
+          expectedPlies,
+          cpComparablePlies,
+          cpComparableRate: expectedPlies > 0 ? Number((cpComparablePlies / expectedPlies).toFixed(4)) : 0,
+          mateOnlyPlies,
+          unscoredPlies,
+          moveFeatureCoverageIssues: moveFeatureCoverageIssues.length,
+          flaggedMoves: flagged.length,
+        });
+        if (evalQualityIssues.length > 0) {
+          console.warn("Flagging skipped or encountered incomplete evaluation data", evalQualityIssues);
+        }
+        if (moveFeatureCoverageIssues.length > 0) {
+          console.warn("Parsed moves missing extracted move features", moveFeatureCoverageIssues);
         }
 
         if (cancelled) return;

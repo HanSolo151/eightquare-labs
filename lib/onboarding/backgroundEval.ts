@@ -45,7 +45,7 @@ async function runEvaluationBatch(
     const evaluatedBatch = await Promise.all(
       batch.map(async (game) => {
         onProgress?.({ done: completed, total: games.length, currentGameId: game.id });
-        const cached = await getCachedEval(game.id);
+        const cached = await getCachedEval(game.id, game.moves.length);
         return {
           game,
           gameEval: cached ?? await evalGame(game.id, game.moves),
