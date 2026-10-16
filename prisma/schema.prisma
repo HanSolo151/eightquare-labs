@@ -1,0 +1,143 @@
+// Step 0/1 of the plan: persistence + auth foundation.
+// Mirrors types/index.ts shapes as closely as possible — this is a
+// transcription of existing in-memory/IndexedDB shapes into durable
+// per-account storage, not a redesign.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// --- Auth -------------------------------------------------------------
+
+model User {
+  id                String   @id @default(cuid())
+  lichessId         String   @unique // Lichess account id — stable, unlike username
+  username          String // Lichess username — display only, can change
+  plan              String   @default("free")
+  accessToken       String? // encrypted at the application layer before write
+  refreshToken      String?
+  tokenExpiresAt    DateTime?
+  lastSyncedAt      DateTime?
+  lastGameCreatedAt DateTime? // watermark for incremental sync
+  createdAt         DateTime @default(now())
+
+  games           Game[]
+  profile         PlayerProfile?
+  weaknessProfile WeaknessProfileRow?
+  biasProfile     BiasProfile?
+}
+
+// --- Games --------------------------------------------------------------
+
+model Game {
+  id               String   @id // Lichess game id — globally unique, used as PK directly
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  playerColor      String
+  opponentUsername String
+  opponentRating   Int?
+  playerRating     Int?
+  moves            Json
+  clocks           Json?
+  openingName      String?
+  openingEco       String?
+  result           String
+  rated            Boolean
+  speed            String?
+  lichessCreatedAt DateTime?
+
+  eval             GameEval?
+  flags            FlaggedMove[]
+
+  createdAt        DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, lichessCreatedAt])
+}
+
+model GameEval {
+  gameId        String   @id
+  game          Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  points        Json
+  engineVersion String
+  evaluatedAt   DateTime @default(now())
+}
+
+model FlaggedMove {
+  id                   String   @id @default(cuid())
+  gameId               String
+  game                 Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  ply                  Int
+  moveNumber           Int
+  san                  String
+  color                String
+  flagType             String
+
+  timeSpentSec         Float
+  phaseAvgSec          Float
+  timeRatio            Float
+  clockRemainingSec    Float
+  gamePhase            String
+
+  cpLoss               Float
+  causality            Json
+  matchedWeaknessId    String?
+  styleDeviationScore  Float
+  absoluteAnomalyScore Float
+
+  severity             String
+  severityBreakdown    Json
+
+  pivotMove            Json?
+  cascadeMeta          Json?
+  evalConfidence       String
+
+  explanation          String
+
+  @@index([gameId])
+  @@index([matchedWeaknessId])
+}
+
+model PlayerProfile {
+  userId                String   @id
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gamesAnalyzed         Int      @default(0)
+  avgMoveTimeSecByPhase Json
+  premoveRate           Float    @default(0)
+  mostCommonOpenings    Json
+  avgOpponentRating     Int?
+  updatedAt             DateTime @updatedAt
+}
+
+model WeaknessProfileRow {
+  userId           String   @id
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patterns         Json
+  evaluatedGameIds Json
+  gamesEvaluated   Int      @default(0)
+  gamesFetched     Int      @default(0)
+  confidence       String   @default("low")
+  builtAt          DateTime @default(now())
+}
+
+// New engine surface from the DeepSeek doc — rank/file/diagonal bias.
+// Schema home only; engine work is a later phase.
+model BiasProfile {
+  userId     String   @id
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rankBias   Json
+  fileBias   Json
+  diagonalBias Json
+  sampleSize Int      @default(0)
+  confidence String   @default("low")
+  builtAt    DateTime @default(now())
+}
