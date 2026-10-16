@@ -20,6 +20,34 @@ export class LichessFetchError extends Error {
     super(`Lichess fetch failed: ${status} ${statusText}`);
     this.name = "LichessFetchError";
   }
+
+  /** True when Lichess returned 404 for a missing or renamed account. */
+  get isNotFound(): boolean {
+    return this.status === 404;
+  }
+}
+
+const GAME_CACHE_TTL_MS = 5 * 60 * 1000;
+const MIN_REQUEST_GAP_MS = 1000;
+const RATE_LIMIT_WAIT_MS = 60 * 1000;
+const MAX_429_RETRIES = 1;
+const gameCache = new Map<string, { expiresAt: number; games: any[] }>();
+const inFlight = new Map<string, Promise<any[]>>();
+let requestQueue: Promise<void> = Promise.resolve();
+let nextRequestAt = 0;
+let rateLimitedUntil = 0;
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function retryAfterMs(response: Response): number {
+  const retryAfter = response.headers.get("Retry-After");
+  if (!retryAfter) return RATE_LIMIT_WAIT_MS;
+  const seconds = Number(retryAfter);
+  if (Number.isFinite(seconds)) return Math.max(RATE_LIMIT_WAIT_MS, seconds * 1000);
+  const date = Date.parse(retryAfter);
+  return Number.isFinite(date) ? Math.max(RATE_LIMIT_WAIT_MS, date - Date.now()) : RATE_LIMIT_WAIT_MS;
 }
 export interface FetchGamesOptions {
   username: string;
@@ -35,7 +63,7 @@ export interface FetchGamesOptions {
  * and returns them as an array of raw game objects.
  * Docs: https://lichess.org/api#tag/Games/operation/apiGamesUser
  */
-export async function fetchGames(opts: FetchGamesOptions): Promise<any[]> {
+async function fetchGamesRequest(opts: FetchGamesOptions): Promise<any[]> {
   const { username, max = 20, rated = true, perfType = "rapid", since, until } = opts;
 
   const params = new URLSearchParams({
@@ -53,12 +81,22 @@ export async function fetchGames(opts: FetchGamesOptions): Promise<any[]> {
     username
   )}?${params.toString()}`;
 
-  const res = await fetch(url, {
-    headers: { Accept: "application/x-ndjson" },
-  });
+  let res: Response | null = null;
+  for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
+    const pauseUntil = Math.max(nextRequestAt, rateLimitedUntil);
+    if (pauseUntil > Date.now()) await wait(pauseUntil - Date.now());
+    nextRequestAt = Date.now() + MIN_REQUEST_GAP_MS;
+    res = await fetch(url, { headers: { Accept: "application/x-ndjson" } });
+    if (res.status !== 429) break;
 
-  if (!res.ok) {
-    throw new LichessFetchError(res.status, res.statusText);
+    const backoffMs = retryAfterMs(res);
+    rateLimitedUntil = Math.max(rateLimitedUntil, Date.now() + backoffMs);
+    await res.body?.cancel().catch(() => undefined);
+    if (attempt === MAX_429_RETRIES) throw new LichessFetchError(res.status, res.statusText);
+  }
+
+  if (!res || !res.ok) {
+    throw new LichessFetchError(res?.status ?? 0, res?.statusText ?? "No response");
   }
   if (!res.body) {
     throw new Error("Lichess response had no body (streaming not supported)");
@@ -89,4 +127,39 @@ export async function fetchGames(opts: FetchGamesOptions): Promise<any[]> {
   if (trimmed) games.push(JSON.parse(trimmed));
 
   return games;
+}
+
+/**
+ * Fetches recent games with same-query coalescing, a short in-memory cache,
+ * and a process-local serial queue. Lichess asks API clients to send one
+ * request at a time and wait a full minute after HTTP 429 responses.
+ */
+export function fetchGames(opts: FetchGamesOptions): Promise<any[]> {
+  const key = JSON.stringify({
+    username: opts.username.trim().toLowerCase(),
+    max: opts.max ?? 20,
+    rated: opts.rated ?? true,
+    perfType: opts.perfType ?? "rapid",
+    since: opts.since ?? null,
+    until: opts.until ?? null,
+  });
+  const cached = gameCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return Promise.resolve(cached.games);
+  if (cached) gameCache.delete(key);
+  const pending = inFlight.get(key);
+  if (pending) return pending;
+
+  const request = requestQueue.then(() => fetchGamesRequest(opts));
+  requestQueue = request.then(() => undefined, () => undefined);
+  inFlight.set(key, request);
+  void request.then((games) => {
+    gameCache.set(key, { expiresAt: Date.now() + GAME_CACHE_TTL_MS, games });
+    if (gameCache.size > 50) {
+      const oldestKey = gameCache.keys().next().value;
+      if (oldestKey) gameCache.delete(oldestKey);
+    }
+  }).finally(() => {
+    inFlight.delete(key);
+  }).catch(() => undefined);
+  return request;
 }

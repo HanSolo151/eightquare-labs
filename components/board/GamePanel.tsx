@@ -8,7 +8,8 @@ import UsernameForm from "./UsernameForm";
 import VerdictCard from "./VerdictCard";
 import { dismissalId, isDismissed, loadDismissed, saveDismissed } from "@/lib/dismissals";
 import { useMaiaWorker } from "@/lib/maia/useMaiaWorker";
-import { rerankMoves } from "@/lib/maia/rerank";
+import { rerankMoves, gamePhaseFromFen } from "@/lib/maia/rerank";
+import type { RerankedMove } from "@/lib/maia/rerank";
 import { useOpponentFeatures } from "@/lib/useOpponentFeatures";
 import { eloToBucket } from "@/lib/maia/eloBuckets";
 import { extractAllMoveFeatures, buildPlayerProfile } from "@/lib/features/extractFeatures";
@@ -18,9 +19,12 @@ import { runBackgroundEval } from "@/lib/onboarding/backgroundEval";
 import { getCachedEval, inspectGameEval } from "@/lib/eval/evalCache";
 import { emptyProfile, getProfile } from "@/lib/profile/profileCache";
 import { buildOpponentPieceActivityProfile } from "@/lib/profile/opponentPieceActivity";
+import { buildOpponentOpeningTree } from "@/lib/profile/opponentOpeningTree";
+import { buildOpponentTimePressureProfile } from "@/lib/profile/opponentTimePressure";
+import { LichessFetchError } from "@/lib/lichess/fetchGames";
 import { emptyPieceActivityProfile, updatePieceActivityProfile } from "@/lib/profile/pieceActivityProfile";
 import { getPieceActivityProfile, savePieceActivityProfile } from "@/lib/profile/pieceActivityProfileCache";
-import type { PieceActivityProfile } from "@/types";
+import type { PieceActivityProfile, OpeningTree, OpponentTimePressureProfile, GamePhase } from "@/types";
  
 
 import { appendAttempt, loadAttempts } from "@/lib/attemptLog";
@@ -75,6 +79,49 @@ const SEVERITY_ORDER: Record<FlaggedMove["severity"], number> = { high: 0, mediu
 // how long Maia "thinks" before playing its move — matches the plan's 1-3s human-like delay
 const MAIA_DELAY_MIN_MS = 1000;
 const MAIA_DELAY_MAX_MS = 3000;
+const MAIA_INFER_TIMEOUT_MS = 60_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Maia inference timed out after ${ms}ms`)), ms);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (err) => { clearTimeout(timer); reject(err); }
+    );
+  });
+}
+
+function maiaRatingsFor(g: ParsedGame): { selfRating: number | null; oppRating: number | null } {
+  return { selfRating: g.opponentRating, oppRating: g.playerRating };
+}
+
+function sameUser(a: string | null | undefined, b: string | null | undefined): boolean {
+  return !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+function tryPlayUci(chess: Chess, uci: string): boolean {
+  try {
+    return !!chess.move({
+      from: uci.slice(0, 2),
+      to: uci.slice(2, 4),
+      promotion: uci.length > 4 ? uci.slice(4) : undefined,
+    });
+  } catch {
+    return false;
+  }
+}
+
+function weightedSample(moves: RerankedMove[]): RerankedMove | null {
+  if (moves.length === 0) return null;
+  const total = moves.reduce((sum, move) => sum + move.adjustedProbability, 0);
+  if (total <= 0) return moves[0];
+  let random = Math.random() * total;
+  for (const move of moves) {
+    random -= move.adjustedProbability;
+    if (random <= 0) return move;
+  }
+  return moves[moves.length - 1];
+}
 
 const NEUTRAL_OPPONENT_FEATURES: OpponentFeatures = {
   username: "",
@@ -109,7 +156,7 @@ export default function GamePanel() {
   // --- Step 10: replay state ---
   const [replay, setReplay] = useState(false);
   const [replayStatus, setReplayStatus] = useState<
-    "idle" | "your-turn" | "maia-thinking" | "game-over"
+    "idle" | "your-turn" | "maia-thinking" | "maia-error" | "game-over"
   >("idle");
   const [replayResult, setReplayResult] = useState<string | null>(null); // e.g. "Checkmate — you win"
   const chessRef = useRef<Chess | null>(null); // the live, mutable replay game — separate from the read-only `fen` memo below
@@ -119,11 +166,27 @@ export default function GamePanel() {
    
   const [activeFlag, setActiveFlag] = useState<FlaggedMove | null>(null);
   const [opponentPieceActivityProfile, setOpponentPieceActivityProfile] = useState<PieceActivityProfile | null>(null);
+  const [opponentOpeningTree, setOpponentOpeningTree] = useState<OpeningTree | null>(null);
+  const [opponentTimePressureProfile, setOpponentTimePressureProfile] = useState<OpponentTimePressureProfile | null>(null);
   const [replayFirstMoveSan, setReplayFirstMoveSan] = useState<string | null>(null);
   const [replayFirstMoveTimeSec, setReplayFirstMoveTimeSec] = useState<number | null>(null);
+  const replaySessionRef = useRef(0);
+  const maiaTurnSessionRef = useRef<number | null>(null);
+  const attemptRef = useRef<{ flag: FlaggedMove | null; firstSan: string | null; firstTimeSec: number | null }>({
+    flag: null,
+    firstSan: null,
+    firstTimeSec: null,
+  });
   const replayStartedAtRef = useRef<number | null>(null); // wall-clock ms when the board became interactive
   const attemptLoggedRef = useRef(false); // guards against double-logging if checkGameOver fires more than once
   const pivotMoveCache = useRef(new Map<string, PivotMoveAttribution | null>());
+  const pivotMoveLoads = useRef(new Map<string, Promise<void>>());
+  // Step 3: same cache backs both the replay inline display (activeFlag.pivotMove)
+  // and VerdictCard's on-demand pivot section (pivotByKey, looked up by any
+  // flag, list or active). One in-flight fetch per key either way.
+  const [pivotByKey, setPivotByKey] = useState<Record<string, PivotMoveAttribution | null>>({});
+  const [pivotStatusByKey, setPivotStatusByKey] = useState<Record<string, "loading" | "unavailable">>({});
+  const pivotKey = (flag: Pick<FlaggedMove, "gameId" | "ply">) => `${flag.gameId}:${flag.ply}`;
 
   function mergePivotIntoActiveFlag(flag: FlaggedMove, pivotMove: PivotMoveAttribution) {
     setActiveFlag((prev) => prev && prev.gameId === flag.gameId && prev.ply === flag.ply
@@ -132,11 +195,26 @@ export default function GamePanel() {
   }
 
   function loadPivotMove(flag: FlaggedMove, g: ParsedGame) {
-    if (flag.ply < 1) return;
-    const key = `${flag.gameId}:${flag.ply}`;
+    const key = pivotKey(flag);
     if (pivotMoveCache.current.has(key)) {
       const cached = pivotMoveCache.current.get(key) ?? null;
+      setPivotByKey((prev) => key in prev ? prev : { ...prev, [key]: cached });
+      setPivotStatusByKey((prev) => ({ ...prev, [key]: "unavailable" }));
+      if (cached) {
+        setPivotStatusByKey((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+      }
       if (cached) mergePivotIntoActiveFlag(flag, cached);
+      return;
+    }
+    if (pivotMoveLoads.current.has(key)) return;
+    if (flag.ply < 1) {
+      pivotMoveCache.current.set(key, null);
+      setPivotByKey((prev) => ({ ...prev, [key]: null }));
+      setPivotStatusByKey((prev) => ({ ...prev, [key]: "unavailable" }));
       return;
     }
     const pivotPly = flag.ply - 1;
@@ -147,16 +225,52 @@ export default function GamePanel() {
       positionBeforePivot.move(san);
     }
     const pivotSan = g.moves[pivotPly];
-    if (!pivotSan) return;
-    void computePivotMove(positionBeforePivot, pivotPly, pivotSan)
+    if (!pivotSan) {
+      pivotMoveCache.current.set(key, null);
+      setPivotByKey((prev) => ({ ...prev, [key]: null }));
+      setPivotStatusByKey((prev) => ({ ...prev, [key]: "unavailable" }));
+      return;
+    }
+    setPivotStatusByKey((prev) => ({ ...prev, [key]: "loading" }));
+    const load = computePivotMove(positionBeforePivot, pivotPly, pivotSan)
       .then((result) => {
         pivotMoveCache.current.set(key, result);
+        setPivotByKey((prev) => ({ ...prev, [key]: result }));
+        setPivotStatusByKey((prev) => {
+          if (result) {
+            const next = { ...prev };
+            delete next[key];
+            return next;
+          }
+          return { ...prev, [key]: "unavailable" };
+        });
         if (result) mergePivotIntoActiveFlag(flag, result);
       })
       .catch((err) => {
         console.error("Pivot-move attribution failed:", err);
         pivotMoveCache.current.set(key, null);
+        setPivotByKey((prev) => ({ ...prev, [key]: null }));
+        setPivotStatusByKey((prev) => ({ ...prev, [key]: "unavailable" }));
+      })
+      .finally(() => {
+        pivotMoveLoads.current.delete(key);
       });
+    pivotMoveLoads.current.set(key, load);
+  }
+
+  // Step 3: VerdictCard-driven loader for the flagged-moves list. Distinct
+  // entry point from replayFromFlag's loadPivotMove call — this one resolves
+  // the ParsedGame from `data` (replay already has `g` in hand), and is only
+  // invoked when a card is expanded, not for every visible flag up front:
+  // computePivotMove runs a real multiPV Stockfish search per call, and the
+  // list can hold many flags, so eager-loading all of them was rejected as
+  // needlessly expensive for a feature that's opt-in per card.
+  function loadPivotForListFlag(flag: FlaggedMove) {
+    const key = pivotKey(flag);
+    if (key in pivotByKey || pivotMoveLoads.current.has(key)) return;
+    const g = data?.games.find((game) => game.id === flag.gameId);
+    if (!g) return;
+    loadPivotMove(flag, g);
   }
 
 
@@ -302,22 +416,80 @@ export default function GamePanel() {
   // it the instant the user makes their first move, not after a click.
   const { features: opponentFeatures, load: loadOpponentFeatures } = useOpponentFeatures();
   useEffect(() => {
-    if (game?.opponentUsername && game.opponentUsername.toLowerCase() !== "anonymous") {
-      loadOpponentFeatures(game.opponentUsername);
-      setOpponentPieceActivityProfile(null);
-      void buildOpponentPieceActivityProfile(game.opponentUsername)
-        .then((profile) => {
-          setOpponentPieceActivityProfile(profile);
-          console.info("Opponent piece-activity profile updated", {
-            opponent: game.opponentUsername,
-            gamesEvaluated: profile.gamesEvaluated,
-            confidence: profile.confidence,
-          });
-        })
-        .catch((err) => {
-          console.error("Opponent piece-activity profile build failed:", err);
+    const opponentName = game?.opponentUsername;
+    if (!opponentName || opponentName.toLowerCase() === "anonymous") return;
+    let cancelled = false;
+
+    setOpponentPieceActivityProfile(null);
+    setOpponentOpeningTree(null);
+    setOpponentTimePressureProfile(null);
+
+    // Lichess asks clients to make one API request at a time. These loaders
+    // each need the same recent game list, so keep the requests sequential;
+    // fetchGames coalesces/caches matching requests across the profile builds.
+    void (async () => {
+      await loadOpponentFeatures(opponentName);
+      if (cancelled) return;
+
+      try {
+        const profile = await buildOpponentPieceActivityProfile(opponentName);
+        if (cancelled) return;
+        setOpponentPieceActivityProfile(profile);
+        console.info("Opponent piece-activity profile updated", {
+          opponent: opponentName,
+          gamesEvaluated: profile.gamesEvaluated,
+          confidence: profile.confidence,
         });
-    }
+      } catch (err) {
+        if (err instanceof LichessFetchError && err.isNotFound) {
+          console.info("Opponent account no longer exists on Lichess:", opponentName);
+        } else {
+          console.error("Opponent piece-activity profile build failed:", err);
+        }
+      }
+      if (cancelled) return;
+
+      try {
+        const tree = await buildOpponentOpeningTree(opponentName);
+        if (cancelled) return;
+        setOpponentOpeningTree(tree);
+        console.info("Opponent opening tree updated", {
+          opponent: opponentName,
+          gamesEvaluated: tree.gamesEvaluated,
+          positionsSeen: Object.keys(tree.positions).length,
+        });
+      } catch (err) {
+        if (err instanceof LichessFetchError && err.isNotFound) {
+          console.info("Opponent account no longer exists on Lichess:", opponentName);
+        } else {
+          console.error("Opponent opening-tree build failed:", err);
+        }
+      }
+      if (cancelled) return;
+
+      try {
+        const timePressure = await buildOpponentTimePressureProfile(opponentName);
+        if (cancelled) return;
+        setOpponentTimePressureProfile(timePressure);
+        console.info("Opponent time-pressure profile updated", {
+          opponent: opponentName,
+          gamesAnalyzed: timePressure.gamesAnalyzed,
+          byPhase: timePressure.byPhase,
+        });
+      } catch (err) {
+        if (err instanceof LichessFetchError && err.isNotFound) {
+          console.info("Opponent account no longer exists on Lichess:", opponentName);
+        } else {
+          console.error("Opponent time-pressure profile build failed:", err);
+        }
+      }
+    })().catch((err) => {
+      console.error("Opponent feature load failed:", err);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [game?.opponentUsername, loadOpponentFeatures]);
 
   useEffect(() => {
@@ -502,6 +674,8 @@ export default function GamePanel() {
     setLastMove(undefined);
     setReplayFen(chess.fen());
 
+    replaySessionRef.current += 1;
+    attemptRef.current = { flag, firstSan: null, firstTimeSec: null };
     setActiveFlag(flag);
     setReplayFirstMoveSan(null);
     setReplayFirstMoveTimeSec(null);
@@ -533,41 +707,45 @@ export default function GamePanel() {
   }
 
 
-  const maiaTurnInProgress = useRef(false); // add this near your other useRef/useState declarations
-
   async function runMaiaTurn(chess: Chess, g: ParsedGame) {
-    if (maiaTurnInProgress.current) return; // reject duplicate/overlapping calls
-    maiaTurnInProgress.current = true;
+    const session = replaySessionRef.current;
+    if (maiaTurnSessionRef.current === session) return;
+    maiaTurnSessionRef.current = session;
+    const stale = () => replaySessionRef.current !== session;
+
     try {
       setReplayStatus("maia-thinking");
 
-      // Maia is always playing the original game's opponent, regardless of
-      // whether that person was White or Black in the Lichess game. Maia2's
-      // `elo_self` is the side-to-move/player being modeled, not board color.
-      const selfRating = g.opponentRating;
-      const oppRating = g.playerRating;
-
+      const { selfRating, oppRating } = maiaRatingsFor(g);
       const inferenceFen = chess.fen();
-      const { logitsMaia } = await infer(inferenceFen, selfRating, oppRating);
+      const { logitsMaia } = await withTimeout(infer(inferenceFen, selfRating, oppRating), MAIA_INFER_TIMEOUT_MS);
+      if (stale()) return;
 
-      // The hook retains its previous result while fetching another opponent.
-      // Never let a prior game's/account's profile influence this game's move.
-      const matchingOpponentFeatures =
-        opponentFeatures?.username.trim().toLowerCase() === g.opponentUsername.trim().toLowerCase()
-          ? opponentFeatures
-          : NEUTRAL_OPPONENT_FEATURES;
+      const matchingOpponentFeatures = sameUser(opponentFeatures?.username, g.opponentUsername)
+        ? opponentFeatures!
+        : NEUTRAL_OPPONENT_FEATURES;
+      const pieceActivityProfile = sameUser(opponentPieceActivityProfile?.username, g.opponentUsername)
+        ? opponentPieceActivityProfile
+        : null;
+      const openingTree = sameUser(opponentOpeningTree?.username, g.opponentUsername)
+        ? opponentOpeningTree
+        : null;
+      const timePressureProfile = sameUser(opponentTimePressureProfile?.username, g.opponentUsername)
+        ? opponentTimePressureProfile
+        : null;
+      const currentPhase: GamePhase = gamePhaseFromFen(new Chess(inferenceFen));
+      const phaseBucket = timePressureProfile?.byPhase[currentPhase] ?? null;
+      const collapsing = !!phaseBucket && phaseBucket.confidence !== "low" &&
+        Math.random() < phaseBucket.collapseRate;
 
       const result = await rerankMoves({
         fen: inferenceFen,
         logitsMaia,
         opponentFeatures: matchingOpponentFeatures,
-        pieceActivityProfile:
-          matchingOpponentFeatures !== NEUTRAL_OPPONENT_FEATURES ? opponentPieceActivityProfile : null,
+        pieceActivityProfile,
+        openingTree,
       });
-      // Replay the model's own legal top choice. The profile-based reranker
-      // intentionally boosts captures/checks, but it has no tactical safety
-      // check and can promote a poisoned capture above Maia's baseline.
-      const uci: string | null = result.baseTopMove?.uci ?? null;
+      if (stale()) return;
 
       console.info("Maia replay choice", {
         gameId: g.id,
@@ -575,46 +753,78 @@ export default function GamePanel() {
         maiaColor: g.playerColor === "white" ? "black" : "white",
         selfRating,
         oppRating,
-        usedOpponentProfile: matchingOpponentFeatures !== NEUTRAL_OPPONENT_FEATURES,
-        opponentProfileUsername: matchingOpponentFeatures.username,
+        usedPieceActivityProfile: !!pieceActivityProfile,
+        usedOpeningTree: !!openingTree,
+        currentPhase,
+        collapsing,
+        phaseAvgSec: phaseBucket?.phaseAvgSec ?? null,
+        collapseRate: phaseBucket?.collapseRate ?? null,
         baseTopMove: result.baseTopMove?.uci,
         adjustedTopMove: result.topMove?.uci,
-        selectedMove: uci,
+        safetyChecked: result.safetyChecked,
+        safetyDowngraded: result.safetyDowngraded,
       });
 
-      const delay = MAIA_DELAY_MIN_MS + Math.random() * (MAIA_DELAY_MAX_MS - MAIA_DELAY_MIN_MS);
+      let delay: number;
+      if (collapsing) {
+        delay = MAIA_DELAY_MIN_MS * 0.3 + Math.random() * (MAIA_DELAY_MIN_MS * 0.4);
+      } else if (phaseBucket?.phaseAvgSec) {
+        const avgMs = phaseBucket.phaseAvgSec * 1000;
+        delay = Math.min(MAIA_DELAY_MAX_MS * 3, Math.max(MAIA_DELAY_MIN_MS, avgMs));
+      } else {
+        delay = MAIA_DELAY_MIN_MS + Math.random() * (MAIA_DELAY_MAX_MS - MAIA_DELAY_MIN_MS);
+      }
       await new Promise((res) => setTimeout(res, delay));
+      if (stale()) return;
 
-      if (!uci) {
-        checkGameOver(chess, g);
+      let playedUci: string | null = null;
+      if (collapsing) {
+        const sampled = weightedSample(result.moves);
+        if (sampled && tryPlayUci(chess, sampled.uci)) playedUci = sampled.uci;
+      }
+      const candidates = [result.topMove?.uci, result.baseTopMove?.uci, ...result.moves.map((move) => move.uci)]
+        .filter((uci): uci is string => !!uci);
+      for (const uci of candidates) {
+        if (playedUci) break;
+        if (tryPlayUci(chess, uci)) {
+          playedUci = uci;
+          break;
+        }
+        console.error("Maia candidate rejected by chess.js:", uci, "at fen", chess.fen());
+      }
+
+      if (!playedUci) {
+        if (!checkGameOver(chess, g)) setReplayStatus("maia-error");
         return;
       }
 
-      const from = uci.slice(0, 2);
-      const to = uci.slice(2, 4);
-      const promotion = uci.length > 4 ? uci.slice(4) : undefined;
-
-      const legal = chess.moves({ verbose: true }).some((m) => m.from === from && m.to === to);
-      if (!legal) {
-        console.error("Maia produced an illegal move, skipping it:", uci, "at fen", chess.fen());
-        setReplayStatus("your-turn"); // don't leave the board stuck — let the user move again instead
-        return;
+      if (playedUci !== (result.topMove?.uci ?? result.baseTopMove?.uci)) {
+        console.info("Maia played a different move than ranked (collapse or fallback)", {
+          gameId: g.id,
+          playedUci,
+          collapsing,
+          rankedTopMove: result.topMove?.uci ?? null,
+        });
       }
-
-      chess.move({ from, to, promotion });
 
       setReplayFen(chess.fen());
-      setLastMove([from as Key, to as Key]);
+      setLastMove([playedUci.slice(0, 2) as Key, playedUci.slice(2, 4) as Key]);
 
       if (!checkGameOver(chess, g)) {
         setReplayStatus("your-turn");
       }
     } catch (err) {
       console.error("runMaiaTurn failed:", err);
-      setReplayStatus("your-turn");
+      if (!stale()) setReplayStatus("maia-error");
     } finally {
-      maiaTurnInProgress.current = false;
+      if (maiaTurnSessionRef.current === session) maiaTurnSessionRef.current = null;
     }
+  }
+
+  function retryMaiaTurn() {
+    const chess = chessRef.current;
+    if (!chess || !game) return;
+    runMaiaTurn(chess, game);
   }
 
 
@@ -628,27 +838,32 @@ export default function GamePanel() {
       // side to move is the one who got mated 
       outcome = userToMove ? "Checkmate — you were mated" : "Checkmate — you win";
     } else if (chess.isStalemate()) {
-       
       outcome = "Stalemate — draw";
-    } else if (chess.isDraw()) { 
-      outcome = "Draw";
-    } else { 
+    } else if (chess.isThreefoldRepetition()) {
+      outcome = "Draw — threefold repetition";
+    } else if (chess.isInsufficientMaterial()) {
+      outcome = "Draw — insufficient material";
+    } else if (chess.isDraw()) {
+      outcome = "Draw — 50-move rule";
+    } else {
       outcome = "Game over";
     }
     setReplayResult(outcome);
 
-    if (!attemptLoggedRef.current && username && activeFlag) {
+    const { flag, firstSan, firstTimeSec } = attemptRef.current;
+    if (!attemptLoggedRef.current && username && flag) {
        attemptLoggedRef.current = true;
        appendAttempt(username, {
-         gameId: activeFlag.gameId,
-         ply: activeFlag.ply,
-         flagSan: activeFlag.san,
-         flagTimeSpentSec: activeFlag.timeSpentSec,
-         replaySan: replayFirstMoveSan,
-         replayTimeSec: replayFirstMoveTimeSec,
+         gameId: flag.gameId,
+         ply: flag.ply,
+         flagSan: flag.san,
+         flagTimeSpentSec: flag.timeSpentSec,
+         replaySan: firstSan,
+         replayTimeSec: firstTimeSec,
          outcome,
          loggedAt: Date.now(),
        });
+       setAttemptCount(loadAttempts(username).length);
      }
 
 
@@ -658,14 +873,20 @@ export default function GamePanel() {
   function handleUserMove(from: Key, to: Key) {
     const chess = chessRef.current;
     if (!chess || !game || replayStatus !== "your-turn") return;
-    const moveResult = chess.move({ from, to, promotion: "q" }); // always auto-queen for now — underpromotion UI not in scope
-    
+    let moveResult;
+    try {
+      moveResult = chess.move({ from, to, promotion: "q" }); // always auto-queen for now — underpromotion UI not in scope
+    } catch {
+      return;
+    }
     if (!moveResult) return; // illegal or malformed, Chessground shouldn't offer it anyway given dests
 
-    if (replayFirstMoveSan === null) {
-      setReplayFirstMoveSan(moveResult.san);
+    if (attemptRef.current.firstSan === null) {
       const startedAt = replayStartedAtRef.current;
-      setReplayFirstMoveTimeSec(startedAt ? (Date.now() - startedAt) / 1000 : null);
+      const timeSec = startedAt ? (Date.now() - startedAt) / 1000 : null;
+      attemptRef.current = { ...attemptRef.current, firstSan: moveResult.san, firstTimeSec: timeSec };
+      setReplayFirstMoveSan(moveResult.san);
+      setReplayFirstMoveTimeSec(timeSec);
     }
 
     setReplayFen(chess.fen());
@@ -679,9 +900,14 @@ export default function GamePanel() {
   
 
   function exitReplay() {
+    replaySessionRef.current += 1;
+    maiaTurnSessionRef.current = null;
+    attemptRef.current = { flag: null, firstSan: null, firstTimeSec: null };
     setReplay(false);
     setReplayStatus("idle");
     setReplayResult(null);
+    setReplayFen(undefined);
+    setLastMove(undefined);
     chessRef.current = null;
     setActiveFlag(null);
     setReplayFirstMoveSan(null);
@@ -776,7 +1002,13 @@ export default function GamePanel() {
               <div>
                 Status:{" "}
                 {replayStatus === "your-turn" && "Your move"}
-                {replayStatus === "maia-thinking" && "Maia is thinking…"} 
+                {replayStatus === "maia-thinking" && "Maia is thinking…"}
+                {replayStatus === "maia-error" && (
+                  <>
+                    Maia couldn't produce a move.{" "}
+                    <button type="button" onClick={retryMaiaTurn}>Retry Maia&apos;s move</button>
+                  </>
+                )}
                 {replayStatus === "game-over" && "Game over"}
               </div> 
 
@@ -864,6 +1096,9 @@ export default function GamePanel() {
             onJump={() => jumpToFlag(flag)}
             onDismiss={() => dismissFlag(flag)}
             onReplay={() => replayFromFlag(flag)}
+            pivotMove={flag.pivotMove ?? pivotByKey[pivotKey(flag)] ?? null}
+            pivotLoading={pivotStatusByKey[pivotKey(flag)] === "loading"}
+            onLoadPivot={() => loadPivotForListFlag(flag)}
           />
         ))}
       </div>

@@ -18,18 +18,16 @@
 //   file is now the ONLY place legality is enforced — baseTopMove and
 //   topMove below are both guaranteed legal. If you call the worker
 //   directly elsewhere, its output is still NOT legality-checked.
-// - Opening-book boosting is a STUB (openingBoostApplied always false).
-//   OpponentFeatures.mostCommonOpenings is whole-game data (name/eco/count),
-//   not a move-by-move book tree, so there's no honest way to tell "is this
-//   candidate move the book continuation" from what Step 8 collects. Needs
-//   a new data source (e.g. Lichess's /api/opening-explorer) before this
-//   can be real. Left as a documented no-op rather than faked.
+// - Opening-book boosting reads a real per-opponent OpeningTree, gated on
+//   at least MIN_OCCURRENCES observations for the candidate move.
 
 import { Chess } from "chess.js";
 import { loadMoveVocab } from "./moveVocab";
 import { mirrorUci } from "./boardToTensor";
+import { openingBookPosition, MIN_OCCURRENCES, OPENING_BOOST_CAP } from "../profile/openingTree";
+import { evalFen } from "../eval/stockfishEngine";
 import type { OpponentFeatures } from "../lichess/opponentFeatures";
-import type { PieceActivityProfile, PieceType } from "@/types";
+import type { OpeningTree, PieceActivityProfile, PieceType } from "@/types";
 
 export interface RerankedMove {
   uci: string;
@@ -40,6 +38,8 @@ export interface RerankedMove {
   isCapture: boolean;
   isQueenCapture: boolean;
   isCheck: boolean;
+  openingMatchCount: number | null;
+  openingTotalCount: number | null;
 }
 
 export interface RerankResult {
@@ -47,20 +47,25 @@ export interface RerankResult {
   baseTopMove: { uci: string; san: string; probability: number } | null; // what Maia alone picks
   topMove: { uci: string; san: string; probability: number } | null;     // after reranking
   moves: RerankedMove[]; // all legal moves, sorted by adjustedProbability desc
-  openingBoostApplied: false; // always false — see file header. Kept as an explicit field
-                               // so callers/UI can show "opening data not available" honestly
-                               // instead of silently pretending it happened.
+  openingBoostApplied: boolean;
+  safetyChecked: boolean;
+  safetyDowngraded: boolean;
+}
+
+const SAFETY_CP_LOSS_THRESHOLD = 150;
+
+function moverCpFromResult(result: { cp: number | null; mate: number | null }): number {
+  if (result.cp !== null) return -result.cp;
+  if (result.mate !== null) return result.mate > 0 ? -10000 : 10000;
+  return 0;
 }
 
 // Arbitrary judgment-call constants, same spirit as Step 4's flag thresholds
 // and Step 8's aggression-index weights — not validated against anything,
 // flagged for later tuning once Step 10's replay loop makes behavior visible.
-const QUEEN_TRADE_BOOST_STRENGTH = 1.5; // multiplier scale on (queenTradeRate - baseline)
-const QUEEN_TRADE_BASELINE = 0.5;       // "coin flip" baseline for whether queens come off
+const QUEEN_TRADE_BOOST_STRENGTH = 1.5; // multiplier scale on (tradeRate - baseline), now piece/phase-scoped
+const TRADE_RATE_BASELINE = 0.5;        // "coin flip" baseline for whether this piece trades off in this phase
 const AGGRESSION_BOOST_STRENGTH = 1.5;
-// No population baseline exists yet. Use the neutral midpoint of the [0,1]
-// aggressionIndex range rather than a value measured from one specific user.
-const AGGRESSION_BASELINE = 0.5;
 const MIN_BOOST_FACTOR = 0.1;           // clamp so boosts can't zero out or invert a move's rank
 
 // Piece-activity preference boost; unlike capture/check boosts, this can
@@ -76,7 +81,7 @@ const FULL_MATERIAL = 78;
 const OPENING_END_MOVE = 12;
 const PIECE_VALUES: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 };
 
-function gamePhaseFromFen(chess: Chess): "opening" | "middlegame" | "endgame" {
+export function gamePhaseFromFen(chess: Chess): "opening" | "middlegame" | "endgame" {
   let material = 0;
   for (const row of chess.board()) {
     for (const square of row) {
@@ -110,8 +115,10 @@ export async function rerankMoves(params: {
   logitsMaia: Float32Array;
   opponentFeatures: OpponentFeatures;
   pieceActivityProfile?: PieceActivityProfile | null;
+  openingTree?: OpeningTree | null;
 }): Promise<RerankResult> {
-  const { fen, logitsMaia, opponentFeatures, pieceActivityProfile } = params;
+  const { fen, logitsMaia, pieceActivityProfile, openingTree } = params;
+  void params.opponentFeatures;
 
   const vocab = await loadMoveVocab(); // throws if not exactly 1880 entries, per moveVocab.ts
   if (logitsMaia.length !== vocab.length) {
@@ -125,6 +132,7 @@ export async function rerankMoves(params: {
   const mirrorMoves = chess.turn() === "b";
   const legalMoves = chess.moves({ verbose: true });
   const currentPhase = gamePhaseFromFen(chess);
+  const openingPosition = openingBookPosition(openingTree, fen);
   let playerPhaseTotalMoves = 0;
   if (pieceActivityProfile) {
     for (const pieceType of ["p", "n", "b", "r", "q", "k"] as const) {
@@ -134,7 +142,10 @@ export async function rerankMoves(params: {
 
   if (legalMoves.length === 0) {
     // Game over (checkmate/stalemate) at this FEN — nothing to rerank.
-    return { fen, baseTopMove: null, topMove: null, moves: [], openingBoostApplied: false };
+    return {
+      fen, baseTopMove: null, topMove: null, moves: [], openingBoostApplied: false,
+      safetyChecked: false, safetyDowngraded: false,
+    };
   }
 
   // Map UCI -> verbose move info for every LEGAL move. chess.js verbose
@@ -167,6 +178,7 @@ export async function rerankMoves(params: {
   }
 
   const results: RerankedMove[] = [];
+  let anyOpeningBoostApplied = false;
 
   for (let i = 0; i < vocab.length; i++) {
     const modelUci = vocab[i];
@@ -183,17 +195,23 @@ export async function rerankMoves(params: {
 
     let boost = 1;
 
-    // Queen-trade tendency boost.
-    if (isQueenCapture) {
-      boost *= 1 + (opponentFeatures.queenTradeRate - QUEEN_TRADE_BASELINE) * QUEEN_TRADE_BOOST_STRENGTH;
-    }
+    // Trade and aggression signals now come from the opponent's per-piece,
+    // per-phase PieceActivityProfile. Low-confidence profiles contribute no
+    // boost for this signal.
+    const pieceBucketForTrade =
+      pieceActivityProfile && pieceActivityProfile.confidence !== "low"
+        ? pieceActivityProfile.byPieceType[m.piece as PieceType][currentPhase]
+        : null;
+    const tradeRate =
+      pieceBucketForTrade && pieceBucketForTrade.moveCount > 0
+        ? pieceBucketForTrade.tradeInitiatedCount / pieceBucketForTrade.moveCount
+        : null;
 
-    // Aggression boost — applies to any forcing move (capture or check),
-    // not just queen captures. Overlaps with the queen-trade boost above
-    // for queen-capturing checks; this is intentional (both signals apply),
-    // not a bug, but worth knowing if a move's boost looks unexpectedly large.
-    if (isCapture || isCheck) {
-      boost *= 1 + (opponentFeatures.aggressionIndex - AGGRESSION_BASELINE) * AGGRESSION_BOOST_STRENGTH;
+    if (tradeRate !== null && isQueenCapture) {
+      boost *= 1 + (tradeRate - TRADE_RATE_BASELINE) * QUEEN_TRADE_BOOST_STRENGTH;
+    }
+    if (tradeRate !== null && (isCapture || isCheck)) {
+      boost *= 1 + (tradeRate - TRADE_RATE_BASELINE) * AGGRESSION_BOOST_STRENGTH;
     }
 
     if (pieceActivityProfile && playerPhaseTotalMoves >= 5) {
@@ -202,6 +220,19 @@ export async function rerankMoves(params: {
       const playerShare = bucket.moveCount / playerPhaseTotalMoves;
       const populationShare = POPULATION_PIECE_SHARE_BASELINE[currentPhase][pieceType];
       boost *= 1 + (playerShare - populationShare) * PIECE_BOOST_STRENGTH;
+    }
+
+    let openingMatchCount: number | null = null;
+    let openingTotalCount: number | null = null;
+    if (openingPosition) {
+      const matchCount = openingPosition.byUci[uci] ?? 0;
+      if (matchCount >= MIN_OCCURRENCES) {
+        const share = matchCount / openingPosition.total;
+        boost *= Math.min(OPENING_BOOST_CAP, 1 + share * (OPENING_BOOST_CAP - 1));
+        openingMatchCount = matchCount;
+        openingTotalCount = openingPosition.total;
+        anyOpeningBoostApplied = true;
+      }
     }
 
     boost = Math.max(MIN_BOOST_FACTOR, boost);
@@ -215,6 +246,8 @@ export async function rerankMoves(params: {
       isCapture,
       isQueenCapture,
       isCheck,
+      openingMatchCount,
+      openingTotalCount,
     });
   }
 
@@ -225,16 +258,50 @@ export async function rerankMoves(params: {
   results.sort((a, b) => b.adjustedProbability - a.adjustedProbability);
 
   const baseTopMove = [...results].sort((a, b) => b.baseProbability - a.baseProbability)[0];
+  let topCandidate = results[0];
+  let safetyChecked = false;
+  let safetyDowngraded = false;
+
+  if (
+    topCandidate &&
+    baseTopMove &&
+    topCandidate.uci !== baseTopMove.uci &&
+    (topCandidate.isCapture || topCandidate.isCheck)
+  ) {
+    safetyChecked = true;
+    try {
+      const afterBoosted = new Chess(fen);
+      afterBoosted.move(topCandidate.san);
+      const afterBase = new Chess(fen);
+      afterBase.move(baseTopMove.san);
+      const [boostedEval, baseEval] = await Promise.all([
+        evalFen(afterBoosted.fen()),
+        evalFen(afterBase.fen()),
+      ]);
+      const boostedMoverCp = moverCpFromResult(boostedEval);
+      const baseMoverCp = moverCpFromResult(baseEval);
+      if (boostedMoverCp < baseMoverCp - SAFETY_CP_LOSS_THRESHOLD) {
+        safetyDowngraded = true;
+        topCandidate = baseTopMove;
+      }
+    } catch (err) {
+      console.error("Phase 4 safety check failed, falling back to baseTopMove:", err);
+      safetyDowngraded = true;
+      topCandidate = baseTopMove;
+    }
+  }
 
   return {
     fen,
     baseTopMove: baseTopMove
       ? { uci: baseTopMove.uci, san: baseTopMove.san, probability: baseTopMove.baseProbability }
       : null,
-    topMove: results[0]
-      ? { uci: results[0].uci, san: results[0].san, probability: results[0].adjustedProbability }
+    topMove: topCandidate
+      ? { uci: topCandidate.uci, san: topCandidate.san, probability: topCandidate.adjustedProbability }
       : null,
     moves: results,
-    openingBoostApplied: false,
+    openingBoostApplied: anyOpeningBoostApplied,
+    safetyChecked,
+    safetyDowngraded,
   };
 }

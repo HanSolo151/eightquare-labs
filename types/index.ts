@@ -56,6 +56,23 @@ export interface PlayerProfile {
   // deliberately omitted here rather than faked.
 }
 
+export type GamePhase = "opening" | "middlegame" | "endgame";
+
+export interface PhaseTimePressure {
+  phaseAvgSec: number | null;
+  sampleSize: number;
+  collapseCount: number;
+  collapseRate: number;
+  confidence: "low" | "medium" | "high";
+}
+
+export interface OpponentTimePressureProfile {
+  username: string;
+  gamesAnalyzed: number;
+  evaluatedGameIds: string[];
+  byPhase: Record<GamePhase, PhaseTimePressure>;
+}
+
 
 // --- Evaluation -------------------------------------------------------------
 
@@ -92,6 +109,15 @@ export interface GameEval {
   points: EvalPoint[];       // one per ply, same indexing as MoveFeature
   evaluatedAt: number;       // timestamp, for cache invalidation
   engineVersion: string;     // bump this to invalidate old cached evals on engine upgrade
+}
+
+// --- Opening tree (opponent's observed opening choices) --------------------
+export interface OpeningTree {
+  username: string;
+  positions: Record<string, Record<string, number>>;
+  evaluatedGameIds: string[];
+  gamesEvaluated: number;
+  builtAt: number;
 }
 
 // --- Causality (did the deficit from a candidate move actually hold) -------

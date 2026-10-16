@@ -1,9 +1,9 @@
 import type { MoveFeature, PlayerProfile, WeaknessProfile, GameEval, EvalPoint, FlaggedMove } from "@/types";
 import { checkCausality } from "./causality";
 
-const TIME_RATIO_COLLAPSE_THRESHOLD = 0.35;
+export const TIME_RATIO_COLLAPSE_THRESHOLD = 0.35;
 const TIME_RATIO_PARADOX_SLOW_THRESHOLD = 1.8; // "spent way more time than usual and still got it wrong"
-const MIN_CP_LOSS = 100;
+export const MIN_CP_LOSS = 100;
 
 // Phase 2: same synthetic "getting mated" cp value used in causality.ts's
 // own mate handling (see that file's comment — magnitude needs to match,
@@ -91,7 +91,7 @@ export function flagMoves(
  * silently in flagMoves before this change). Returns null when there's no
  * usable comparison — same exclusion as before for that case.
  */
-function resolveCpLoss(evalPoint: EvalPoint): { cpLoss: number; evalConfidence: FlaggedMove["evalConfidence"] } | null {
+export function resolveCpLoss(evalPoint: EvalPoint): { cpLoss: number; evalConfidence: FlaggedMove["evalConfidence"] } | null {
   // Fully normal case: both sides are real cp numbers.
   if (evalPoint.cpBefore !== null && evalPoint.cpAfter !== null) {
     return { cpLoss: evalPoint.cpBefore - evalPoint.cpAfter, evalConfidence: "full" };

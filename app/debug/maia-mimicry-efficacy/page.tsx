@@ -8,6 +8,7 @@ import { extractOpponentFeatures, type OpponentFeatures } from "@/lib/lichess/op
 import { useMaiaWorker } from "@/lib/maia/useMaiaWorker";
 import { rerankMoves } from "@/lib/maia/rerank";
 import { buildOpponentPieceActivityProfile } from "@/lib/profile/opponentPieceActivity";
+import { buildOpponentOpeningTree } from "@/lib/profile/opponentOpeningTree";
 import type { ParsedGame, PieceType } from "@/types";
 
 const NEUTRAL_FEATURES: OpponentFeatures = {
@@ -115,7 +116,9 @@ export default function MaiaMimicryEfficacyPage() {
 
     const opponentFeatures = await extractOpponentFeatures(opponentUsername, BUILD_SET_COUNT);
     append("Building piece-activity profile from build set...");
-    const pieceActivityProfile = await buildOpponentPieceActivityProfile(opponentUsername);
+    const pieceActivityProfile = await buildOpponentPieceActivityProfile(opponentUsername, undefined, buildGames);
+    append("Building opening tree from build set...");
+    const openingTree = await buildOpponentOpeningTree(opponentUsername, undefined, buildGames);
 
     for (const game of heldOutGames) {
       const chess = new Chess();
@@ -136,7 +139,7 @@ export default function MaiaMimicryEfficacyPage() {
         try {
           const { logitsMaia } = await infer(fenBeforeMove, game.playerRating, game.opponentRating);
           const baseline = await rerankMoves({ fen: fenBeforeMove, logitsMaia, opponentFeatures: NEUTRAL_FEATURES });
-          const reranked = await rerankMoves({ fen: fenBeforeMove, logitsMaia, opponentFeatures, pieceActivityProfile });
+          const reranked = await rerankMoves({ fen: fenBeforeMove, logitsMaia, opponentFeatures, pieceActivityProfile, openingTree });
           const baselineUci = baseline.baseTopMove?.uci ?? null;
           const rerankedUci = reranked.topMove?.uci ?? reranked.baseTopMove?.uci ?? null;
           if (baselineUci && pieceTypeFromUci(fenBeforeMove, baselineUci) === actualPieceType) bucket.baselineMatches++;
