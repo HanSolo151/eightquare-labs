@@ -2,7 +2,10 @@ import type { GameEval, EvalPoint } from "@/types";
 import { Chess } from "chess.js";
 import { evalFen, type EvalResult } from "./stockfishEngine";
 
-const ENGINE_VERSION = "stockfish-19-lite-single-depth14-v2";
+// Phase 2e: SEARCH_DEPTH in stockfishEngine.ts bumped 14 -> 16, so this must
+// change too to invalidate every depth-14 cached eval (same cache-busting
+// pattern as Phase 0's bump to -v2).
+const ENGINE_VERSION = "stockfish-19-lite-single-depth16-v2";
 const DB_NAME = "eval-cache";
 const STORE = "games";
 
@@ -104,6 +107,7 @@ export function normalizeEvalPoint(ply: number, before: EvalResult, after: EvalR
     mateBefore: before.mate,
     mateAfter: after.mate !== null ? -after.mate : null,
     depth: Math.min(before.depth, after.depth),
+    bestMoveUci: before.bestMoveUci,
   };
 }
 

@@ -24,7 +24,15 @@ export interface MoveFeature {
   san: string;
   timeSpentSec: number | null;   // null if clocks missing or index out of bounds
   clockRemainingSec: number | null;
-  likelyPremove: boolean;        // true if timeSpentSec < PREMOVE_THRESHOLD_SEC
+  // Phase 2a: premove vs genuine snap decision, split by position complexity
+  // (not just elapsed time). likelyPremove === true excludes the move from
+  // flagging AND from the player-profile timing baseline, same as before.
+  // isSnapDecision === true means it's a FAST but genuine decision in a
+  // complex position — NOT excluded, eligible for collapse flagging.
+  // A move is never both true at once. See extractFeatures.ts for the
+  // classification logic.
+  likelyPremove: boolean;
+  isSnapDecision: boolean;
   isCapture: boolean;
   isCheck: boolean;
   isForcing: boolean;            // capture, check, or opponent has <= FORCING_REPLY_LIMIT legal replies
@@ -58,6 +66,25 @@ export interface EvalPoint {
   mateBefore: number | null; // moves to mate if forced, else null
   mateAfter: number | null;
   depth: number;             // search depth used
+  bestMoveUci: string | null; // engine's top move from the position before this ply
+}
+
+// --- Piece-activity profiling -----------------------------------------------
+export type PieceType = "p" | "n" | "b" | "r" | "q" | "k";
+
+export interface PieceActivityPhaseBucket {
+  moveCount: number;
+  tradeInitiatedCount: number;
+  engineTopMatchCount: number;
+}
+
+export interface PieceActivityProfile {
+  username: string;
+  byPieceType: Record<PieceType, Record<MoveFeature["gamePhase"], PieceActivityPhaseBucket>>;
+  evaluatedGameIds: string[];
+  gamesEvaluated: number;
+  confidence: "low" | "medium" | "high";
+  builtAt: number;
 }
 
 export interface GameEval {
@@ -86,7 +113,9 @@ export type FlagType = "collapse" | "pattern_repeat" | "tilt_cascade" | "time_pa
 export interface PivotMoveAttribution {
   ply: number;                    // the opponent move being attributed as the pivot
   san: string;
-  evalShiftCp: number;            // swing in the position's eval caused by this move
+  // Best-line versus played-line gap. Meaningful only when wasInTopN is true;
+  // otherwise 0 is a cost-saving fallback, not a zero-shift claim.
+  evalShiftCp: number;
   wasTopEngineChoice: boolean;    // true if this was Stockfish's top line
   wasInTopN: boolean;             // true if within Stockfish's top-3 lines (requires multiPV)
   complexityDelta: number;        // change in position complexity (forcing-reply-count based) across this move

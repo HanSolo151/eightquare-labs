@@ -1,13 +1,26 @@
 // Dismissal persistence for verdict cards.
-// Key format in localStorage: "verdict-dismissed:<username>" -> string[] of "<gameId>:<ply>"
+// Key format in localStorage: "verdict-dismissed:<username>" -> string[] of dismissal ids.
+// Legacy "<gameId>:<ply>" ids still dismiss every flag type at that ply;
+// current "<gameId>:<ply>:<flagType>" ids dismiss only that specific flag.
 // Namespaced per username so switching accounts doesn't carry over dismissals.
+
+import type { FlagType } from "@/types";
 
 function storageKey(username: string): string {
   return `verdict-dismissed:${username}`;
 }
 
-export function dismissalId(gameId: string, ply: number): string {
-  return `${gameId}:${ply}`;
+export function dismissalId(gameId: string, ply: number, flagType: FlagType): string {
+	return `${gameId}:${ply}:${flagType}`;
+}
+
+function legacyDismissalId(gameId: string, ply: number): string {
+	return `${gameId}:${ply}`;
+}
+
+/** Check current and legacy dismissal ids for a flag. */
+export function isDismissed(dismissed: Set<string>, gameId: string, ply: number, flagType: FlagType): boolean {
+	return dismissed.has(dismissalId(gameId, ply, flagType)) || dismissed.has(legacyDismissalId(gameId, ply));
 }
 
 export function loadDismissed(username: string): Set<string> {

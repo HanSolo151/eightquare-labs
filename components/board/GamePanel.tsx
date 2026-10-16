@@ -6,16 +6,21 @@ import type { Key } from "chessground/types";
 import ChessgroundBoard from "./ChessgroundBoard";
 import UsernameForm from "./UsernameForm";
 import VerdictCard from "./VerdictCard";
-import { dismissalId, loadDismissed, saveDismissed } from "@/lib/dismissals";
+import { dismissalId, isDismissed, loadDismissed, saveDismissed } from "@/lib/dismissals";
 import { useMaiaWorker } from "@/lib/maia/useMaiaWorker";
 import { rerankMoves } from "@/lib/maia/rerank";
 import { useOpponentFeatures } from "@/lib/useOpponentFeatures";
 import { eloToBucket } from "@/lib/maia/eloBuckets";
 import { extractAllMoveFeatures, buildPlayerProfile } from "@/lib/features/extractFeatures";
 import { flagMoves } from "@/lib/flags/flagEngine";
+import { computePivotMove } from "@/lib/flags/pivotMove";
 import { runBackgroundEval } from "@/lib/onboarding/backgroundEval";
 import { getCachedEval, inspectGameEval } from "@/lib/eval/evalCache";
 import { emptyProfile, getProfile } from "@/lib/profile/profileCache";
+import { buildOpponentPieceActivityProfile } from "@/lib/profile/opponentPieceActivity";
+import { emptyPieceActivityProfile, updatePieceActivityProfile } from "@/lib/profile/pieceActivityProfile";
+import { getPieceActivityProfile, savePieceActivityProfile } from "@/lib/profile/pieceActivityProfileCache";
+import type { PieceActivityProfile } from "@/types";
  
 
 import { appendAttempt, loadAttempts } from "@/lib/attemptLog";
@@ -29,7 +34,7 @@ import {
 } from "@/lib/gameDataCache";
 
  
-import type { ParsedGame, FlaggedMove } from "@/types";
+import type { ParsedGame, FlaggedMove, PivotMoveAttribution } from "@/types";
 import type { OpponentFeatures } from "@/lib/lichess/opponentFeatures";
 
  
@@ -113,10 +118,46 @@ export default function GamePanel() {
 
    
   const [activeFlag, setActiveFlag] = useState<FlaggedMove | null>(null);
+  const [opponentPieceActivityProfile, setOpponentPieceActivityProfile] = useState<PieceActivityProfile | null>(null);
   const [replayFirstMoveSan, setReplayFirstMoveSan] = useState<string | null>(null);
   const [replayFirstMoveTimeSec, setReplayFirstMoveTimeSec] = useState<number | null>(null);
   const replayStartedAtRef = useRef<number | null>(null); // wall-clock ms when the board became interactive
   const attemptLoggedRef = useRef(false); // guards against double-logging if checkGameOver fires more than once
+  const pivotMoveCache = useRef(new Map<string, PivotMoveAttribution | null>());
+
+  function mergePivotIntoActiveFlag(flag: FlaggedMove, pivotMove: PivotMoveAttribution) {
+    setActiveFlag((prev) => prev && prev.gameId === flag.gameId && prev.ply === flag.ply
+      ? { ...prev, pivotMove }
+      : prev);
+  }
+
+  function loadPivotMove(flag: FlaggedMove, g: ParsedGame) {
+    if (flag.ply < 1) return;
+    const key = `${flag.gameId}:${flag.ply}`;
+    if (pivotMoveCache.current.has(key)) {
+      const cached = pivotMoveCache.current.get(key) ?? null;
+      if (cached) mergePivotIntoActiveFlag(flag, cached);
+      return;
+    }
+    const pivotPly = flag.ply - 1;
+    const positionBeforePivot = new Chess();
+    for (let i = 0; i < pivotPly; i++) {
+      const san = g.moves[i];
+      if (!san) break;
+      positionBeforePivot.move(san);
+    }
+    const pivotSan = g.moves[pivotPly];
+    if (!pivotSan) return;
+    void computePivotMove(positionBeforePivot, pivotPly, pivotSan)
+      .then((result) => {
+        pivotMoveCache.current.set(key, result);
+        if (result) mergePivotIntoActiveFlag(flag, result);
+      })
+      .catch((err) => {
+        console.error("Pivot-move attribution failed:", err);
+        pivotMoveCache.current.set(key, null);
+      });
+  }
 
 
 
@@ -251,7 +292,7 @@ export default function GamePanel() {
   const visibleFlags = useMemo(() => {
     if (!data) return [];
     return [...data.flagged]
-      .filter((f) => !dismissed.has(dismissalId(f.gameId, f.ply)))
+      .filter((f) => !isDismissed(dismissed, f.gameId, f.ply, f.flagType))
       .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
   }, [data, dismissed]);
 
@@ -263,6 +304,19 @@ export default function GamePanel() {
   useEffect(() => {
     if (game?.opponentUsername && game.opponentUsername.toLowerCase() !== "anonymous") {
       loadOpponentFeatures(game.opponentUsername);
+      setOpponentPieceActivityProfile(null);
+      void buildOpponentPieceActivityProfile(game.opponentUsername)
+        .then((profile) => {
+          setOpponentPieceActivityProfile(profile);
+          console.info("Opponent piece-activity profile updated", {
+            opponent: game.opponentUsername,
+            gamesEvaluated: profile.gamesEvaluated,
+            confidence: profile.confidence,
+          });
+        })
+        .catch((err) => {
+          console.error("Opponent piece-activity profile build failed:", err);
+        });
     }
   }, [game?.opponentUsername, loadOpponentFeatures]);
 
@@ -288,6 +342,8 @@ export default function GamePanel() {
 
         setFlagAnalysisStatus("Generating flags…");
         const weaknessProfile = (await getProfile(username)) ?? emptyProfile(username);
+        const pieceActivityProfile =
+          (await getPieceActivityProfile(username)) ?? emptyPieceActivityProfile(username);
         const flagged: FlaggedMove[] = [];
         const evalQualityIssues: ReturnType<typeof inspectGameEval>[] = [];
         let expectedPlies = 0;
@@ -340,7 +396,22 @@ export default function GamePanel() {
               evaluatedGame.playerColor
             )
           );
+          updatePieceActivityProfile(
+            pieceActivityProfile,
+            evaluatedGame.id,
+            evaluatedGame.moves,
+            gameEval,
+            gameFeatures,
+            evaluatedGame.playerColor
+          );
         }
+
+        await savePieceActivityProfile(pieceActivityProfile);
+        console.info("Piece-activity profile updated", {
+          username,
+          gamesEvaluated: pieceActivityProfile.gamesEvaluated,
+          confidence: pieceActivityProfile.confidence,
+        });
 
         console.info("Flagging evaluation coverage", {
           username,
@@ -394,7 +465,7 @@ export default function GamePanel() {
 
   function dismissFlag(flag: FlaggedMove) {
     if (!username) return;
-    const id = dismissalId(flag.gameId, flag.ply);
+    const id = dismissalId(flag.gameId, flag.ply, flag.flagType);
     const next = new Set(dismissed);
     next.add(id);
     setDismissed(next);
@@ -435,6 +506,7 @@ export default function GamePanel() {
     setReplayFirstMoveSan(null);
     setReplayFirstMoveTimeSec(null);
     attemptLoggedRef.current = false;
+    loadPivotMove(flag, g);
 
     // flag.ply is 0-indexed; whoever's turn it is at that ply is the user's turn
     // (the flag IS that move — the user gets a fresh shot at the same decision point)
@@ -489,6 +561,8 @@ export default function GamePanel() {
         fen: inferenceFen,
         logitsMaia,
         opponentFeatures: matchingOpponentFeatures,
+        pieceActivityProfile:
+          matchingOpponentFeatures !== NEUTRAL_OPPONENT_FEATURES ? opponentPieceActivityProfile : null,
       });
       // Replay the model's own legal top choice. The profile-based reranker
       // intentionally boosts captures/checks, but it has no tactical safety
@@ -782,8 +856,8 @@ export default function GamePanel() {
         <h3 style={{ marginTop: 0 }}>Flagged moves ({visibleFlags.length})</h3>
         {visibleFlags.length === 0 && <div>Nothing flagged (or everything dismissed).</div>}
         {visibleFlags.map((flag) => (
-          <VerdictCard
-            key={dismissalId(flag.gameId, flag.ply)}
+          <VerdictCard 
+            key={dismissalId(flag.gameId, flag.ply, flag.flagType)}
             flag={flag}
             opponentLabel={opponentLabelFor(flag)}
             opponentUsername={data.games.find((g) => g.id === flag.gameId)?.opponentUsername}

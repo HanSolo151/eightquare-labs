@@ -29,6 +29,7 @@ import { Chess } from "chess.js";
 import { loadMoveVocab } from "./moveVocab";
 import { mirrorUci } from "./boardToTensor";
 import type { OpponentFeatures } from "../lichess/opponentFeatures";
+import type { PieceActivityProfile, PieceType } from "@/types";
 
 export interface RerankedMove {
   uci: string;
@@ -57,9 +58,36 @@ export interface RerankResult {
 const QUEEN_TRADE_BOOST_STRENGTH = 1.5; // multiplier scale on (queenTradeRate - baseline)
 const QUEEN_TRADE_BASELINE = 0.5;       // "coin flip" baseline for whether queens come off
 const AGGRESSION_BOOST_STRENGTH = 1.5;
-const AGGRESSION_BASELINE = 0.35;       // roughly the brino test value from Step 8's live run —
-                                         // used as "typical" rather than any principled number
+// No population baseline exists yet. Use the neutral midpoint of the [0,1]
+// aggressionIndex range rather than a value measured from one specific user.
+const AGGRESSION_BASELINE = 0.5;
 const MIN_BOOST_FACTOR = 0.1;           // clamp so boosts can't zero out or invert a move's rank
+
+// Piece-activity preference boost; unlike capture/check boosts, this can
+// also favor quiet moves associated with a particular piece type.
+const PIECE_BOOST_STRENGTH = 1.5;
+const POPULATION_PIECE_SHARE_BASELINE: Record<"opening" | "middlegame" | "endgame", Record<PieceType, number>> = {
+  opening: { p: 0.45, n: 0.18, b: 0.13, r: 0.03, q: 0.04, k: 0.17 },
+  middlegame: { p: 0.3, n: 0.15, b: 0.13, r: 0.15, q: 0.12, k: 0.15 },
+  endgame: { p: 0.25, n: 0.08, b: 0.08, r: 0.2, q: 0.09, k: 0.3 },
+};
+const ENDGAME_MATERIAL_FRACTION = 0.5;
+const FULL_MATERIAL = 78;
+const OPENING_END_MOVE = 12;
+const PIECE_VALUES: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+
+function gamePhaseFromFen(chess: Chess): "opening" | "middlegame" | "endgame" {
+  let material = 0;
+  for (const row of chess.board()) {
+    for (const square of row) {
+      if (square) material += PIECE_VALUES[square.type] ?? 0;
+    }
+  }
+  if (material / FULL_MATERIAL <= ENDGAME_MATERIAL_FRACTION) return "endgame";
+  const fullmoveNumber = Number.parseInt(chess.fen().split(" ")[5] ?? "1", 10) || 1;
+  if (fullmoveNumber <= OPENING_END_MOVE) return "opening";
+  return "middlegame";
+}
 
 function softmax(logits: Float32Array): Float64Array {
   let maxVal = -Infinity;
@@ -81,8 +109,9 @@ export async function rerankMoves(params: {
   fen: string;
   logitsMaia: Float32Array;
   opponentFeatures: OpponentFeatures;
+  pieceActivityProfile?: PieceActivityProfile | null;
 }): Promise<RerankResult> {
-  const { fen, logitsMaia, opponentFeatures } = params;
+  const { fen, logitsMaia, opponentFeatures, pieceActivityProfile } = params;
 
   const vocab = await loadMoveVocab(); // throws if not exactly 1880 entries, per moveVocab.ts
   if (logitsMaia.length !== vocab.length) {
@@ -95,6 +124,13 @@ export async function rerankMoves(params: {
   const chess = new Chess(fen);
   const mirrorMoves = chess.turn() === "b";
   const legalMoves = chess.moves({ verbose: true });
+  const currentPhase = gamePhaseFromFen(chess);
+  let playerPhaseTotalMoves = 0;
+  if (pieceActivityProfile) {
+    for (const pieceType of ["p", "n", "b", "r", "q", "k"] as const) {
+      playerPhaseTotalMoves += pieceActivityProfile.byPieceType[pieceType][currentPhase].moveCount;
+    }
+  }
 
   if (legalMoves.length === 0) {
     // Game over (checkmate/stalemate) at this FEN — nothing to rerank.
@@ -158,6 +194,14 @@ export async function rerankMoves(params: {
     // not a bug, but worth knowing if a move's boost looks unexpectedly large.
     if (isCapture || isCheck) {
       boost *= 1 + (opponentFeatures.aggressionIndex - AGGRESSION_BASELINE) * AGGRESSION_BOOST_STRENGTH;
+    }
+
+    if (pieceActivityProfile && playerPhaseTotalMoves >= 5) {
+      const pieceType = m.piece as PieceType;
+      const bucket = pieceActivityProfile.byPieceType[pieceType][currentPhase];
+      const playerShare = bucket.moveCount / playerPhaseTotalMoves;
+      const populationShare = POPULATION_PIECE_SHARE_BASELINE[currentPhase][pieceType];
+      boost *= 1 + (playerShare - populationShare) * PIECE_BOOST_STRENGTH;
     }
 
     boost = Math.max(MIN_BOOST_FACTOR, boost);

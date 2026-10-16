@@ -3,14 +3,17 @@ import type { ParsedGame, MoveFeature, PlayerProfile } from "../../types";
 
 // --- Tunables -------------------------------------------------------------
 
-// Clock-diff below this is treated as a premove: the real thinking happened
-// on the opponent's clock, so the timing data for THIS move is unreliable
-// and should not feed the "too fast" flag in Step 4.
-// Chosen option 1 (threshold cutoff) from the Step 2 design note — simplest,
-// ships now. If this proves too blunt once Step 4's real data comes in,
-// swap to a per-player rate (option 2) or forcing-move cross-check (option 3)
-// without changing the MoveFeature shape.
-const PREMOVE_THRESHOLD_SEC = 3;
+// Phase 2a: split "fast move" into two buckets by position complexity,
+// instead of one flat cutoff. Below PREMOVE_THRESHOLD_SEC in a tactically
+// simple position, it's a true premove — unreliable timing data, still
+// excluded entirely (from flagging AND from the profile timing baseline).
+// Between PREMOVE_THRESHOLD_SEC and SNAP_DECISION_MAX_SEC in a COMPLEX
+// position, it's a genuine fast decision — no longer excluded, now eligible
+// for collapse flagging. The same window in a SIMPLE position (a fast,
+// obviously-forced reply) still gets excluded, same as the old flat cutoff —
+// there's no real decision happening there either way.
+const PREMOVE_THRESHOLD_SEC = 1;
+const SNAP_DECISION_MAX_SEC = 4;
 
 // A position counts as "forcing" if the mover's move is a capture or check,
 // OR the opponent is left with very few legal replies. This second case
@@ -18,12 +21,21 @@ const PREMOVE_THRESHOLD_SEC = 3;
 // themselves (e.g. a king forced to a single square).
 const FORCING_REPLY_LIMIT = 2;
 
-// Rough phase boundaries by full move number. Endgame detection here is
-// move-number-based, not material-based — good enough for Step 3; can be
-// upgraded to a material-count heuristic later if the move-number cutoff
-// proves too crude in practice.
+// Rough phase boundaries by full move number. OPENING_END_MOVE still gates
+// the "opening" phase (see gamePhaseForPosition below) — material alone
+// can't tell "still in known theory" apart from "early middlegame with no
+// trades yet", both look like full material on the board. Endgame detection
+// (Phase 2d) no longer uses move number at all; it's material-based.
 const OPENING_END_MOVE = 12;
-const ENDGAME_START_MOVE = 40;
+
+// Phase 2d: fraction of total non-king material (both sides combined)
+// remaining on the board, below which the position counts as an endgame.
+// FULL_MATERIAL = 2 * (8 pawns + 2 knights + 2 bishops + 2 rooks + 1 queen)
+// = 2 * (8*1 + 2*3 + 2*3 + 2*5 + 1*9) = 78, kings excluded (always present,
+// carry no material-count signal).
+const ENDGAME_MATERIAL_FRACTION = 0.5;
+const FULL_MATERIAL = 78;
+const PIECE_VALUES: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 };
 
 // --- Per-move extraction ----------------------------------------------------
 
@@ -36,10 +48,63 @@ function plyToMoveNumber(ply: number): number {
   return Math.floor(ply / 2) + 1;
 }
 
-function gamePhaseForMove(moveNumber: number): MoveFeature["gamePhase"] {
+/** Sum of standard piece values on the board, both colors, kings excluded. */
+function materialCount(chess: Chess): number {
+  let total = 0;
+  for (const row of chess.board()) {
+    for (const square of row) {
+      if (!square) continue;
+      total += PIECE_VALUES[square.type] ?? 0;
+    }
+  }
+  return total;
+}
+
+/**
+ * Phase 2d: material-based phase detection, replacing the old pure
+ * move-number cutoffs. Endgame is now driven by how much material has
+ * actually left the board — a game that trades down fast (e.g. an early
+ * queen trade) counts as endgame well before move 40, and a long
+ * maneuvering middlegame that stays material-heavy past move 40 doesn't
+ * flip to "endgame" just because that move number arrived. Opening is still
+ * move-number-gated (see OPENING_END_MOVE above) since material alone can't
+ * distinguish "still in known theory" from "early middlegame, no trades yet".
+ */
+function gamePhaseForPosition(moveNumber: number, chess: Chess): MoveFeature["gamePhase"] {
+  const materialFraction = materialCount(chess) / FULL_MATERIAL;
+  if (materialFraction <= ENDGAME_MATERIAL_FRACTION) return "endgame";
   if (moveNumber <= OPENING_END_MOVE) return "opening";
-  if (moveNumber >= ENDGAME_START_MOVE) return "endgame";
   return "middlegame";
+}
+
+/**
+ * Phase 2a: classifies a fast move as a true premove (excluded) or a
+ * genuine snap decision (included, flaggable) based on position complexity,
+ * using `isForcing` as the complexity signal — a forcing position (our move
+ * is a capture/check, or leaves the opponent almost no replies) is treated
+ * as tactically SIMPLE, since there's little genuine decision happening.
+ */
+function classifyMoveSpeed(
+  timeSpentSec: number | null,
+  isForcing: boolean
+): { likelyPremove: boolean; isSnapDecision: boolean } {
+  if (timeSpentSec === null) return { likelyPremove: false, isSnapDecision: false };
+
+  const isComplexPosition = !isForcing;
+
+  if (timeSpentSec < PREMOVE_THRESHOLD_SEC) {
+    // Under 1s is treated as noise regardless of apparent complexity — a
+    // sub-second reaction isn't enough to credit as a real decision even
+    // when isForcing didn't flag the position as simple.
+    return { likelyPremove: true, isSnapDecision: false };
+  }
+  if (timeSpentSec < SNAP_DECISION_MAX_SEC) {
+    if (isComplexPosition) return { likelyPremove: false, isSnapDecision: true };
+    // Fast move in a simple/forced position: not a meaningful signal either
+    // way, same exclusion the old flat cutoff gave this whole window.
+    return { likelyPremove: true, isSnapDecision: false };
+  }
+  return { likelyPremove: false, isSnapDecision: false };
 }
 
 /**
@@ -103,8 +168,7 @@ export function extractMoveFeatures(game: ParsedGame): MoveFeature[] {
       }
     }
 
-    const likelyPremove =
-      timeSpentSec !== null && timeSpentSec < PREMOVE_THRESHOLD_SEC;
+    const { likelyPremove, isSnapDecision } = classifyMoveSpeed(timeSpentSec, isForcing);
 
     const moveNumber = plyToMoveNumber(ply);
 
@@ -117,10 +181,11 @@ export function extractMoveFeatures(game: ParsedGame): MoveFeature[] {
       timeSpentSec,
       clockRemainingSec,
       likelyPremove,
+      isSnapDecision,
       isCapture,
       isCheck,
       isForcing,
-      gamePhase: gamePhaseForMove(moveNumber),
+      gamePhase: gamePhaseForPosition(moveNumber, chess),
     });
   }
 

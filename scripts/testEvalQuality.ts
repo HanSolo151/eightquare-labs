@@ -11,6 +11,7 @@ const cpParsed = parseStockfishInfoLine("info depth 14 score cp 125 nodes 1000",
   cp: null,
   mate: null,
   depth: 0,
+  bestMoveUci: null,
 });
 assert(cpParsed.cp === 125, "UCI cp score stays in centipawns (125 means +1.25 pawns)");
 assert(cpParsed.depth === 14, "UCI search depth is retained");
@@ -20,28 +21,28 @@ assert(mateParsed.cp === null && mateParsed.mate === -3, "mate score is not misr
 
 const whitePoint = normalizeEvalPoint(
   0,
-  { cp: 80, mate: null, depth: 14 },
-  { cp: -125, mate: null, depth: 16 }
+  { cp: 80, mate: null, depth: 14, bestMoveUci: null },
+  { cp: -125, mate: null, depth: 16, bestMoveUci: null }
 );
 assert(whitePoint.cpBefore === 80 && whitePoint.cpAfter === 125, "White move after-score is converted from Black POV to White POV");
 assert(whitePoint.depth === 14, "per-ply confidence depth uses the shallower of before and after searches");
 const whiteMatePoint = normalizeEvalPoint(
   0,
-  { cp: null, mate: 3, depth: 14 },
-  { cp: null, mate: -2, depth: 16 }
+  { cp: null, mate: 3, depth: 14, bestMoveUci: null },
+  { cp: null, mate: -2, depth: 16, bestMoveUci: null }
 );
 assert(whiteMatePoint.mateBefore === 3 && whiteMatePoint.mateAfter === 2, "mate distance is converted to the mover's POV");
 
 const blackPoint = normalizeEvalPoint(
   1,
-  { cp: 60, mate: null, depth: 14 },
-  { cp: 190, mate: null, depth: 15 }
+  { cp: 60, mate: null, depth: 14, bestMoveUci: null },
+  { cp: 190, mate: null, depth: 15, bestMoveUci: null }
 );
 assert(blackPoint.cpBefore === 60 && blackPoint.cpAfter === -190, "Black move after-score is converted from White POV to Black POV");
 const blackMatePoint = normalizeEvalPoint(
   1,
-  { cp: null, mate: 4, depth: 14 },
-  { cp: null, mate: -1, depth: 16 }
+  { cp: null, mate: 4, depth: 14, bestMoveUci: null },
+  { cp: null, mate: -1, depth: 16, bestMoveUci: null }
 );
 assert(blackMatePoint.mateBefore === 4 && blackMatePoint.mateAfter === 1, "Black mate distance is also stored from the mover's POV");
 

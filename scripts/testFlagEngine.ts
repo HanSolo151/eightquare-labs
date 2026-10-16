@@ -35,6 +35,7 @@ function feature(ply: number, color: "white" | "black"): MoveFeature {
     timeSpentSec: 1,
     clockRemainingSec: 60,
     likelyPremove: false,
+    isSnapDecision: false,
     isCapture: false,
     isCheck: false,
     isForcing: false,
