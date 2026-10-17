@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { authConfig } from "@/lib/auth.config";
+import { encryptOAuthToken } from "@/lib/auth/tokenEncryption";
 
 // Full config — Node runtime only (API routes, server components).
 // Extends the edge-safe authConfig with the DB-touching callbacks that
@@ -11,24 +12,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost : true,
   callbacks: {
     async signIn({ user, account }) {
-      console.log("[signIn debug] user:", user, "account:", account);
-      if (!user.id) return false;
+      // providerAccountId is Lichess's stable account id. Without a database
+      // adapter, Auth.js can generate a fresh user.id on each sign-in.
+      if (!account?.providerAccountId) return false;
 
       await prisma.user.upsert({
-        where: { lichessId: user.id },
+        where: { lichessId: account.providerAccountId },
         update: {
-          username: user.name ?? user.id,
-          accessToken: account?.access_token ?? null,
-          refreshToken: account?.refresh_token ?? null,
+          username: user.name ?? account.providerAccountId,
+          accessToken: encryptOAuthToken(account?.access_token),
+          refreshToken: encryptOAuthToken(account?.refresh_token),
           tokenExpiresAt: account?.expires_at
             ? new Date(account.expires_at * 1000)
             : null,
         },
         create: {
-          lichessId: user.id,
-          username: user.name ?? user.id,
-          accessToken: account?.access_token ?? null,
-          refreshToken: account?.refresh_token ?? null,
+          lichessId: account.providerAccountId,
+          username: user.name ?? account.providerAccountId,
+          accessToken: encryptOAuthToken(account?.access_token),
+          refreshToken: encryptOAuthToken(account?.refresh_token),
           tokenExpiresAt: account?.expires_at
             ? new Date(account.expires_at * 1000)
             : null,
@@ -37,10 +39,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       return true;
     },
-    async jwt({ token, user }) {
-      if (user?.id) {
+    async jwt({ token, user, account }) {
+      if (account?.providerAccountId) {
+        token.providerAccountId = account.providerAccountId;
+      }
+      if (user?.id && token.providerAccountId) {
         const dbUser = await prisma.user.findUnique({
-          where: { lichessId: user.id },
+          where: { lichessId: token.providerAccountId as string },
           select: { id: true, username: true, plan: true },
         });
         if (dbUser) {

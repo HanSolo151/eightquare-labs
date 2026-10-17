@@ -46,8 +46,7 @@ const AGGRESSION_EARLY_QUEEN_PLY_CUTOFF = 30; // move 15 full-move == ply 30
  * opponent played in that specific game, tracked via their username).
  */
 function analyzeGame(
-  game: ParsedGame,
-  opponentUsername: string
+  game: ParsedGame
 ): {
   queenTradedByCutoff: boolean;
   opponentCaptures: number;
@@ -75,7 +74,7 @@ function analyzeGame(
     const moverColor = ply % 2 === 0 ? "white" : "black";
     let moveResult;
     try {
-      moveResult = chess.move(san, { strict: false } as any);
+      moveResult = chess.move(san, { strict: false });
     } catch {
       // Some exported/aborted games contain SAN that cannot be replayed from
       // the initial board. Stop this game's contribution instead of failing
@@ -164,7 +163,7 @@ export async function extractOpponentFeatures(
       });
     }
 
-    const result = analyzeGame(game, opponentUsername);
+    const result = analyzeGame(game);
     if (result.queenTradedByCutoff) queenTradeCount++;
     totalCaptures += result.opponentCaptures;
     totalChecks += result.opponentChecks;

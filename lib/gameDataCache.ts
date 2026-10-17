@@ -4,6 +4,11 @@ export interface GameData {
   games: ParsedGame[];
   flagged: FlaggedMove[];
   warnings: string[];
+  // Game ids the signed-in user has a persisted GameEval for (Step 4's
+  // /api/games overlay). Drives both the game selector's checkmark and,
+  // as of Step 5's client integration, which games GamePanel skips
+  // re-evaluating client-side in favor of the persisted `flagged` rows.
+  evaluatedGameIds: string[];
 }
 
 interface CachedGameData extends GameData {

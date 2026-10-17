@@ -1,34 +1,29 @@
 import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
 import { getSessionUserId, getSessionPlan } from "@/lib/auth/session";
-import { runSync } from "@/lib/sync/runSync";
+import { prisma } from "@/lib/prisma";
 import { SyncPanel } from "@/components/dashboard/SyncPanel";
 
 export const instant = false;
 
 export default async function DashboardPage() {
   const session = await auth();
-  if (!session?.user) redirect("/login");
-
   const userId = getSessionUserId(session);
-  // Passive sync on load — throttled inside runSync. The SyncPanel button
-  // calls POST /api/sync with force instead.
-  const result = userId
-    ? await runSync(userId)
-    : ({ ok: false, error: "no session user id" } as const);
+  // Render from stored data immediately; SyncPanel starts the throttled sync
+  // after mount so the page doesn't wait for Lichess.
+  const totalGames = userId ? await prisma.game.count({ where: { userId } }) : 0;
 
   return (
-    <main className="min-h-screen bg-black p-8 font-mono text-white">
-      <p>logged in as {session.user.name}</p>
+    <div className="space-y-8">
       <p className="text-sm text-neutral-400">plan: {getSessionPlan(session)}</p>
 
-      <SyncPanel
-        initialSynced={result.ok ? result.synced : 0}
-        initialTotalGames={result.ok ? result.totalGames : 0}
-        initialLastSyncedAt={result.ok ? result.lastSyncedAt.toISOString() : null}
-        initialSkipped={result.ok && result.skipped}
-        initialError={result.ok ? null : result.error}
-      />
-    </main>
+      <section className="rounded border border-neutral-800 p-6">
+        <h1 className="text-sm text-neutral-400">Your signature</h1>
+        <p className="mt-2 text-neutral-500">
+          Not wired up yet — this screen will display the saved insights from GET /api/dashboard.
+        </p>
+      </section>
+
+      <SyncPanel initialTotalGames={totalGames} autoSyncOnMount />
+    </div>
   );
 }

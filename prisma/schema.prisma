@@ -21,8 +21,8 @@ model User {
   lichessId         String   @unique // Lichess account id — stable, unlike username
   username          String // Lichess username — display only, can change
   plan              String   @default("free")
-  accessToken       String? // encrypted at the application layer before write
-  refreshToken      String?
+  accessToken       String? // AES-GCM encrypted; derived key requires stable AUTH_SECRET
+  refreshToken      String? // AES-GCM encrypted; derived key requires stable AUTH_SECRET
   tokenExpiresAt    DateTime?
   lastSyncedAt      DateTime?
   lastGameCreatedAt DateTime? // watermark for incremental sync
@@ -37,7 +37,8 @@ model User {
 // --- Games --------------------------------------------------------------
 
 model Game {
-  id               String   @id // Lichess game id — globally unique, used as PK directly
+  id               String   @id @default(cuid()) // Internal database identity
+  lichessGameId    String   // External game id; unique per account because games can be shared
   userId           String
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -61,6 +62,7 @@ model Game {
 
   @@index([userId])
   @@index([userId, lichessCreatedAt])
+  @@unique([userId, lichessGameId])
 }
 
 model GameEval {
@@ -85,6 +87,7 @@ model FlaggedMove {
   timeSpentSec         Float
   phaseAvgSec          Float
   timeRatio            Float
+  ratio                Float
   clockRemainingSec    Float
   gamePhase            String
 

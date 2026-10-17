@@ -9,7 +9,7 @@ import { useMaiaWorker } from "@/lib/maia/useMaiaWorker";
 import { rerankMoves } from "@/lib/maia/rerank";
 import { buildOpponentPieceActivityProfile } from "@/lib/profile/opponentPieceActivity";
 import { buildOpponentOpeningTree } from "@/lib/profile/opponentOpeningTree";
-import type { ParsedGame, PieceType } from "@/types";
+import type { PieceType } from "@/types";
 
 const NEUTRAL_FEATURES: OpponentFeatures = {
   username: "",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { Chess } from "chess.js";
 import type { Key } from "chessground/types";
 import ChessgroundBoard from "./ChessgroundBoard";
@@ -11,7 +11,6 @@ import { useMaiaWorker } from "@/lib/maia/useMaiaWorker";
 import { rerankMoves, gamePhaseFromFen } from "@/lib/maia/rerank";
 import type { RerankedMove } from "@/lib/maia/rerank";
 import { useOpponentFeatures } from "@/lib/useOpponentFeatures";
-import { eloToBucket } from "@/lib/maia/eloBuckets";
 import { extractAllMoveFeatures, buildPlayerProfile } from "@/lib/features/extractFeatures";
 import { flagMoves } from "@/lib/flags/flagEngine";
 import { computePivotMove } from "@/lib/flags/pivotMove";
@@ -38,14 +37,20 @@ import {
 } from "@/lib/gameDataCache";
 
  
-import type { ParsedGame, FlaggedMove, PivotMoveAttribution } from "@/types";
+import type { ParsedGame, FlaggedMove, PivotMoveAttribution, PlayerProfile, GameEval } from "@/types";
 import type { OpponentFeatures } from "@/lib/lichess/opponentFeatures";
 
  
 
 type GameData = CachedGameDataShape;
+type EvalPushPayload = {
+  gameId: string;
+  gameEval: GameEval;
+  moveFeatures: ReturnType<typeof extractAllMoveFeatures>;
+  flags: FlaggedMove[];
+};
 type IncomingGameData = Pick<GameData, "games"> &
-  Partial<Pick<GameData, "flagged" | "warnings">>;
+  Partial<Pick<GameData, "flagged" | "warnings" | "evaluatedGameIds">>;
 
 function isGameData(value: unknown): value is IncomingGameData {
   if (!value || typeof value !== "object") return false;
@@ -62,7 +67,8 @@ function isGameData(value: unknown): value is IncomingGameData {
     (candidate.flagged === undefined || Array.isArray(candidate.flagged)) &&
     (candidate.warnings === undefined ||
       (Array.isArray(candidate.warnings) &&
-        candidate.warnings.every((warning) => typeof warning === "string")))
+        candidate.warnings.every((warning) => typeof warning === "string"))) &&
+    (candidate.evaluatedGameIds === undefined || Array.isArray(candidate.evaluatedGameIds))
   );
 }
 
@@ -71,6 +77,7 @@ function normalizeGameData(value: IncomingGameData): GameData {
     ...value,
     flagged: value.flagged ?? [],
     warnings: value.warnings ?? [],
+    evaluatedGameIds: value.evaluatedGameIds ?? [],
   };
 }
 
@@ -133,7 +140,7 @@ const NEUTRAL_OPPONENT_FEATURES: OpponentFeatures = {
   fetchedAt: Date.now(),
 };
 
-export default function GamePanel() {
+export default function GamePanel({ authenticatedUsername = null }: { authenticatedUsername?: string | null }) {
   const [username, setUsername] = useState<string | null>(null);
   const [data, setData] = useState<GameData | null>(null);
   const [gameIdx, setGameIdx] = useState(0);
@@ -282,17 +289,20 @@ export default function GamePanel() {
 
   // --- Step 12: auto-load last-used username on mount, skipping the intake form ---
   useEffect(() => {
-    const last = loadLastUsername();
-    if (last) setUsername(last);
-    setInitialUsernameChecked(true);
-  }, []);
+    const last = authenticatedUsername ?? loadLastUsername();
+    startTransition(() => {
+      if (last) setUsername(last);
+      setInitialUsernameChecked(true);
+    });
+  }, [authenticatedUsername]);
 
   useEffect(() => {
     if (!username) return;
     
-    setDismissed(loadDismissed(username));
- 
-    setAttemptCount(loadAttempts(username).length);
+    startTransition(() => {
+      setDismissed(loadDismissed(username));
+      setAttemptCount(loadAttempts(username).length);
+    });
     saveLastUsername(username);
 
     const cached = loadCachedGameData(username);
@@ -302,12 +312,14 @@ export default function GamePanel() {
       // this is the actual "skip the intake" behavior. isStale() just
       // controls whether we show a nudge to refresh, not whether we show
       // anything at all.
-      setData(normalizedCache);
-      setDataFetchedAt(cached.fetchedAt);
-      setGameIdx(0);
-      setPly(0);
-      setLoadError(null);
-      setLoading(false);
+      startTransition(() => {
+        setData(normalizedCache);
+        setDataFetchedAt(cached.fetchedAt);
+        setGameIdx(0);
+        setPly(0);
+        setLoadError(null);
+        setLoading(false);
+      });
       if (isStale(cached)) fetchLive(username, false);
       return;
     }
@@ -420,9 +432,11 @@ export default function GamePanel() {
     if (!opponentName || opponentName.toLowerCase() === "anonymous") return;
     let cancelled = false;
 
-    setOpponentPieceActivityProfile(null);
-    setOpponentOpeningTree(null);
-    setOpponentTimePressureProfile(null);
+    startTransition(() => {
+      setOpponentPieceActivityProfile(null);
+      setOpponentOpeningTree(null);
+      setOpponentTimePressureProfile(null);
+    });
 
     // Lichess asks clients to make one API request at a time. These loaders
     // each need the same recent game list, so keep the requests sequential;
@@ -492,19 +506,48 @@ export default function GamePanel() {
     };
   }, [game?.opponentUsername, loadOpponentFeatures]);
 
+  const persistedFlagsRef = useRef<FlaggedMove[]>([]);
+  useEffect(() => {
+    persistedFlagsRef.current = data?.flagged ?? [];
+  }, [data?.flagged]);
+
   useEffect(() => {
     if (!username || !data?.games.length) return;
 
     const games = data.games;
     let cancelled = false;
-    const allMoveFeatures = extractAllMoveFeatures(games);
-    const playerProfile = buildPlayerProfile(username, games, allMoveFeatures);
-    setFlagAnalysisError(null);
-    setFlagAnalysisStatus("Preparing game evaluations…");
+
+    // Step 5 (client integration): don't re-run the Stockfish/Maia pipeline
+    // or re-push an eval for a game the server already has a persisted
+    // GameEval for — /api/games overlays `evaluatedGameIds` and `flagged`
+    // for exactly this reason. Only games missing a persisted eval (newly
+    // synced, or evaluated before Step 3 wired up the push) go through the
+    // engine here; the rest reuse the flags that came back with the fetch.
+    const persistedEvaluatedIds = new Set(data.evaluatedGameIds ?? []);
+    const reusedFlags = persistedFlagsRef.current.filter((f) => persistedEvaluatedIds.has(f.gameId));
+    const gamesToEvaluate = games.filter((g) => !persistedEvaluatedIds.has(g.id));
+
+    if (gamesToEvaluate.length === 0) {
+      startTransition(() => {
+        setFlagAnalysisError(null);
+        setFlagAnalysisStatus(null);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const allGamesMoveFeatures = extractAllMoveFeatures(games);
+    const allMoveFeatures = allGamesMoveFeatures.filter((feature) => !persistedEvaluatedIds.has(feature.gameId));
+    const playerProfile = buildPlayerProfile(username, games, allGamesMoveFeatures);
+    startTransition(() => {
+      setFlagAnalysisError(null);
+      setFlagAnalysisStatus("Preparing game evaluations…");
+    });
 
     void (async () => {
       try {
-        await runBackgroundEval(username, games, (progress) => {
+        await runBackgroundEval(username, gamesToEvaluate, (progress) => {
           if (cancelled || progress.total === 0) return;
           setFlagAnalysisStatus(
             `Evaluating game ${Math.min(progress.done + 1, progress.total)} of ${progress.total}…`
@@ -516,7 +559,8 @@ export default function GamePanel() {
         const weaknessProfile = (await getProfile(username)) ?? emptyProfile(username);
         const pieceActivityProfile =
           (await getPieceActivityProfile(username)) ?? emptyPieceActivityProfile(username);
-        const flagged: FlaggedMove[] = [];
+        const flagged: FlaggedMove[] = [...reusedFlags];
+        const evalPushes: EvalPushPayload[] = [];
         const evalQualityIssues: ReturnType<typeof inspectGameEval>[] = [];
         let expectedPlies = 0;
         let cpComparablePlies = 0;
@@ -524,7 +568,7 @@ export default function GamePanel() {
         let unscoredPlies = 0;
         const moveFeatureCoverageIssues: { gameId: string; parsedMoves: number; features: number }[] = [];
 
-        for (const evaluatedGame of games) {
+        for (const evaluatedGame of gamesToEvaluate) {
           const gameEval = await getCachedEval(evaluatedGame.id, evaluatedGame.moves.length);
           if (!gameEval) {
             evalQualityIssues.push({
@@ -559,15 +603,22 @@ export default function GamePanel() {
               features: gameFeatures.length,
             });
           }
-          flagged.push(
-            ...flagMoves(
-              gameFeatures,
-              playerProfile,
-              weaknessProfile,
-              gameEval,
-              evaluatedGame.playerColor
-            )
+          const gameFlags = flagMoves(
+            gameFeatures,
+            playerProfile,
+            weaknessProfile,
+            gameEval,
+            evaluatedGame.playerColor
           );
+          flagged.push(...gameFlags);
+          if (sameUser(username, authenticatedUsername)) {
+            evalPushes.push({
+              gameId: evaluatedGame.id,
+              gameEval,
+              moveFeatures: gameFeatures,
+              flags: gameFlags,
+            });
+          }
           updatePieceActivityProfile(
             pieceActivityProfile,
             evaluatedGame.id,
@@ -611,7 +662,20 @@ export default function GamePanel() {
           saveCachedGameData(username, updated);
           return updated;
         });
-        setFlagAnalysisStatus(null);
+        if (evalPushes.length > 0) {
+          setFlagAnalysisStatus("Saving evaluation results to your account…");
+          void pushCompletedEvaluations(playerProfile, evalPushes).then(({ saved, failed }) => {
+            if (!cancelled) {
+              setFlagAnalysisStatus(
+                failed > 0
+                  ? `Saved ${saved}/${evalPushes.length} games — ${failed} failed to save, check console.`
+                  : null
+              );
+            }
+          });
+        } else {
+          setFlagAnalysisStatus(null);
+        }
       } catch (error) {
         if (cancelled) return;
         const message = error instanceof Error ? error.message : String(error);
@@ -624,7 +688,46 @@ export default function GamePanel() {
     return () => {
       cancelled = true;
     };
-  }, [username, data?.games]);
+  }, [username, data?.games, data?.evaluatedGameIds, authenticatedUsername]);
+
+  async function pushCompletedEvaluations(profile: PlayerProfile, entries: EvalPushPayload[]) {
+    let saved = 0;
+    let failed = 0;
+
+    // Keep pushes sequential: the endpoint incrementally folds each game
+    // into the user's weakness profile, so concurrent requests could race
+    // while reading and writing that aggregate row.
+    for (const entry of entries) {
+      try {
+        const response = await fetch("/api/eval/push", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...entry, playerProfile: profile }),
+        });
+        if (response.status === 401) {
+          console.info("Skipping evaluation persistence: sign in to save results across devices.");
+          failed += entries.length - saved;
+          break;
+        }
+        if (!response.ok) {
+          const result = (await response.json().catch(() => ({}))) as { error?: string };
+          throw new Error(result.error ?? `request failed (${response.status})`);
+        }
+        saved++;
+      } catch (error) {
+        failed++;
+        console.error("Failed to persist evaluated game:", entry.gameId, error);
+      }
+    }
+
+    console.info("Client evaluation persistence finished", {
+      username: profile.username,
+      saved,
+      failed,
+      total: entries.length,
+    });
+    return { saved, failed };
+  }
 
   function jumpToFlag(flag: FlaggedMove) {
     if (!data) return;
@@ -981,6 +1084,7 @@ export default function GamePanel() {
         >
           {data.games.map((g, i) => (
             <option key={g.id} value={i}>
+              {data.evaluatedGameIds.includes(g.id) ? "✓ " : ""}
               {g.openingName} — vs {g.opponentUsername} ({g.result})
             </option>
           ))}
@@ -1005,7 +1109,7 @@ export default function GamePanel() {
                 {replayStatus === "maia-thinking" && "Maia is thinking…"}
                 {replayStatus === "maia-error" && (
                   <>
-                    Maia couldn't produce a move.{" "}
+                  Maia couldn&apos;t produce a move.{" "}
                     <button type="button" onClick={retryMaiaTurn}>Retry Maia&apos;s move</button>
                   </>
                 )}

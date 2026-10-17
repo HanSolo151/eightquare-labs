@@ -224,7 +224,7 @@ function buildFlag(
     pivotMove: null, // Phase 3
     cascadeMeta: null, // only tilt_cascade flags (built via buildCascadeFlag) carry this
     evalConfidence,
-    explanation: explain(flagType, move, timeRatio, cpLoss, causality),
+      explanation: explain(flagType, move, timeRatio, cpLoss),
   };
 }
 
@@ -271,7 +271,7 @@ function severityFromBreakdown(b: FlaggedMove["severityBreakdown"]): "low" | "me
   return score > 300 ? "high" : score > 150 ? "medium" : "low";
 }
 
-function explain(flagType: FlaggedMove["flagType"], move: MoveFeature, timeRatio: number, cpLoss: number, causality: ReturnType<typeof checkCausality>): string {
+function explain(flagType: FlaggedMove["flagType"], move: MoveFeature, timeRatio: number, cpLoss: number): string {
   const base = `Lost ~${(cpLoss / 100).toFixed(1)} pawns of eval, deficit never recovered.`;
   if (flagType === "collapse") return `${base} Played in ${move.timeSpentSec?.toFixed(1)}s — ${(timeRatio * 100).toFixed(0)}% of your usual time here.`;
   if (flagType === "time_paradox") return `${base} Took ${(timeRatio * 100).toFixed(0)}% longer than usual and was still wrong.`;

@@ -3,12 +3,14 @@ import { auth } from "@/lib/auth";
 import { getSessionUserId } from "@/lib/auth/session";
 import { runSync } from "@/lib/sync/runSync";
 
-export async function POST() {
+export async function POST(request: Request) {
   const session = await auth();
   const userId = getSessionUserId(session);
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const result = await runSync(userId, { force: true });
+  const body = await request.json().catch(() => ({})) as { force?: boolean };
+  // Keep requests without a body equivalent to the explicit manual sync.
+  const result = await runSync(userId, { force: body.force !== false });
   if (!result.ok) {
     return NextResponse.json(
       { error: result.error },

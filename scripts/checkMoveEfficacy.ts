@@ -11,7 +11,6 @@
 //   npx tsx scripts/testPieceActivityEfficacy.ts --user <name>     (+ signal quality for one real user)
 //   npx tsx scripts/testPieceActivityEfficacy.ts --compare <a> <b> (+ distinctiveness between two users)
 
-import { Chess } from "chess.js";
 import { parseStockfishInfoLine, type EvalResult } from "../lib/eval/stockfishEngine";
 import { evaluateMoveSequence } from "../lib/eval/evalCache";
 import { extractMoveFeatures } from "../lib/features/extractFeatures";

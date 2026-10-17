@@ -20,7 +20,7 @@ const EXPECTED_UCI = "g1f3";
 
 export default function MaiaWorkerTest() {
   const { infer } = useMaiaWorker();
-  const [status, setStatus] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "running" | "done" | "error">("running");
   const [result, setResult] = useState<{
     white: { topMoveIndex: number; topMoveUci: string };
     black: { topMoveIndex: number; topMoveUci: string };
@@ -31,8 +31,6 @@ export default function MaiaWorkerTest() {
 
   useEffect(() => {
     let cancelled = false;
-    setStatus("running");
-
     // Elo bucket 5 (1500-1599) for both sides, matching Step 1's validation
     // setup ("elo bucket 5 for both sides").
     void (async () => {
@@ -79,7 +77,7 @@ export default function MaiaWorkerTest() {
   return (
     <div style={{ fontFamily: "monospace", padding: 16 }}>
       <h3>Step 7 end-to-end validation</h3>
-      <p>Expected (from Step 1, Python): index {EXPECTED_INDEX}, move {EXPECTED_UCI}</p>
+      <p>Expected (from Step 1&apos;s Python output): index {EXPECTED_INDEX}, move {EXPECTED_UCI}</p>
       <p>White to move: index {result?.white.topMoveIndex}, move {result?.white.topMoveUci}</p>
       <p>Black to move: index {result?.black.topMoveIndex}, move {result?.black.topMoveUci}</p>
       <p>Asymmetric mirror pair: {result?.asymmetricWhite.topMoveUci} / {result?.asymmetricBlack.topMoveUci}</p>
@@ -91,7 +89,7 @@ export default function MaiaWorkerTest() {
       {!indexMatch && (
         <p>
           Index mismatch suggests either the board tensor encoding or the
-          onnx session itself is producing different results than Step 1's
+            onnx session itself is producing different results than Step 1&apos;s
           Python export — re-check the fp16 conversion and tensor shape
           before debugging further.
         </p>

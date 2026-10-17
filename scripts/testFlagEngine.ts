@@ -60,6 +60,7 @@ function evalForBlunder(ply: number, playerColor: "white" | "black"): GameEval {
       mateBefore: null,
       mateAfter: null,
       depth: 14,
+      bestMoveUci: null,
     };
   });
 

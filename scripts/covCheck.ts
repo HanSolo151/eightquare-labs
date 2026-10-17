@@ -24,11 +24,9 @@
 // what fraction of plies come back with usable cpBefore/cpAfter data?
 
 import { Chess } from "chess.js";
+import stockfishFactory from "stockfish";
 import { fetchGames } from "../lib/lichess/fetchGames";
 import { parseGames } from "../lib/lichess/parseGame";
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const stockfishFactory = require("stockfish");
 
 // --- CLI args ----------------------------------------------------------
 

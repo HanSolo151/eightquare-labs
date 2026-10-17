@@ -45,40 +45,61 @@ export async function runSync(
     }
 
     const since = user.lastGameCreatedAt?.getTime();
-    const raw = await fetchGames({
-      username: user.username,
-      max: since ? 200 : 25,
-      rated: true,
-      perfType: "rapid",
-      since,
-    });
+    const pageSize = since ? 200 : 25;
+    const raw: Awaited<ReturnType<typeof fetchGames>> = [];
+    let until: number | undefined;
+
+    // Lichess returns newest games first. A fixed 200-game incremental
+    // request must not advance the watermark past older games in that same
+    // window. Walk backward with `until` until the page is short, then only
+    // advance the watermark to the newest timestamp seen across all pages.
+    while (true) {
+      const page = await fetchGames({
+        username: user.username,
+        max: pageSize,
+        since,
+        until,
+      });
+      raw.push(...page);
+      if (!since || page.length < pageSize) break;
+
+      const timestamps = page
+        .map((game) => game.createdAt)
+        .filter((value): value is number => Number.isFinite(value));
+      if (timestamps.length !== page.length) {
+        throw new Error("Cannot safely paginate Lichess games without a createdAt timestamp on every game");
+      }
+      const oldestTimestamp = Math.min(...timestamps);
+      if (oldestTimestamp <= since || (until !== undefined && oldestTimestamp >= until)) break;
+      until = oldestTimestamp;
+    }
     const games = parseGames(raw, user.username);
 
+    let insertedCount = 0;
     if (games.length > 0) {
-      await prisma.$transaction(
-        games.map((game) =>
-          prisma.game.upsert({
-            where: { id: game.id },
-            update: {},
-            create: {
-              id: game.id,
-              userId: user.id,
-              playerColor: game.playerColor,
-              opponentUsername: game.opponentUsername,
-              opponentRating: game.opponentRating,
-              playerRating: game.playerRating,
-              moves: game.moves,
-              clocks: game.clocks ?? undefined,
-              openingName: game.openingName,
-              openingEco: game.openingEco,
-              result: game.result,
-              rated: game.rated,
-              speed: game.speed,
-              lichessCreatedAt: game.createdAt ? new Date(game.createdAt) : null,
-            },
-          })
-        )
-      );
+      // createMany + skipDuplicates uses PostgreSQL's atomic conflict handling.
+      // It avoids the race between overlapping syncs and gives the number of
+      // newly inserted games, rather than counting no-op upserts as synced.
+      const insertResult = await prisma.game.createMany({
+        data: games.map((game) => ({
+          lichessGameId: game.id,
+          userId: user.id,
+          playerColor: game.playerColor,
+          opponentUsername: game.opponentUsername,
+          opponentRating: game.opponentRating,
+          playerRating: game.playerRating,
+          moves: game.moves,
+          clocks: game.clocks ?? undefined,
+          openingName: game.openingName,
+          openingEco: game.openingEco,
+          result: game.result,
+          rated: game.rated,
+          speed: game.speed,
+          lichessCreatedAt: game.createdAt ? new Date(game.createdAt) : null,
+        })),
+        skipDuplicates: true,
+      });
+      insertedCount = insertResult.count;
     }
 
     const newestTimestamp = games.reduce(
@@ -98,7 +119,7 @@ export async function runSync(
 
     return {
       ok: true,
-      synced: games.length,
+      synced: insertedCount,
       totalGames,
       lastSyncedAt,
       lastGameCreatedAt: updatedUser.lastGameCreatedAt,

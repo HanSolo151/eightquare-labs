@@ -33,7 +33,10 @@ export default function ChessgroundBoard({
   const el = useRef<HTMLDivElement>(null);
   const api = useRef<Api | null>(null);
   const onUserMoveRef = useRef(onUserMove);
-  onUserMoveRef.current = onUserMove;
+
+  useEffect(() => {
+    onUserMoveRef.current = onUserMove;
+  }, [onUserMove]);
 
   useEffect(() => {
     if (!el.current) return;

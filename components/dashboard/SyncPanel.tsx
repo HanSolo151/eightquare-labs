@@ -1,13 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface SyncPanelProps {
-  initialSynced: number;
   initialTotalGames: number;
-  initialLastSyncedAt: string | null;
-  initialSkipped: boolean;
-  initialError: string | null;
+  autoSyncOnMount?: boolean;
 }
 
 interface SyncResponse {
@@ -18,31 +16,40 @@ interface SyncResponse {
   error?: string;
 }
 
-export function SyncPanel({
-  initialSynced,
-  initialTotalGames,
-  initialLastSyncedAt,
-  initialSkipped,
-  initialError,
-}: SyncPanelProps) {
-  const [synced, setSynced] = useState(initialSynced);
+export function SyncPanel({ initialTotalGames, autoSyncOnMount }: SyncPanelProps) {
+  const router = useRouter();
+  const [synced, setSynced] = useState(0);
   const [totalGames, setTotalGames] = useState(initialTotalGames);
-  const [lastSyncedAt, setLastSyncedAt] = useState(initialLastSyncedAt);
-  const [skipped, setSkipped] = useState(initialSkipped);
-  const [error, setError] = useState(initialError);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [skipped, setSkipped] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const hasAutoSynced = useRef(false);
 
-  async function syncNow() {
+  useEffect(() => {
+    if (autoSyncOnMount && !hasAutoSynced.current) {
+      hasAutoSynced.current = true;
+      void syncNow();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function syncNow(force = false) {
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch("/api/sync", { method: "POST" });
+      const response = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force }),
+      });
       const payload = (await response.json()) as SyncResponse;
       if (!response.ok) throw new Error(payload.error ?? `Sync failed (${response.status})`);
       setSynced(payload.synced ?? 0);
       setTotalGames(payload.totalGames ?? totalGames);
       setLastSyncedAt(payload.lastSyncedAt ?? null);
       setSkipped(payload.skipped ?? false);
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -63,7 +70,7 @@ export function SyncPanel({
       {error && <p className="text-sm text-red-400">{error}</p>}
       <button
         type="button"
-        onClick={syncNow}
+        onClick={() => void syncNow(true)}
         disabled={busy}
         className="rounded border border-white px-3 py-2 text-sm hover:bg-white hover:text-black disabled:opacity-50"
       >

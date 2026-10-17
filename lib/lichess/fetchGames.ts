@@ -7,6 +7,8 @@ export interface FetchGamesOptions {
   until?: number; // ms timestamp
 }
 
+export type LichessRawGame = Record<string, unknown>;
+
 /**
  * Streams a user's games from the Lichess public API as NDJSON
  * and returns them as an array of raw game objects.
@@ -31,8 +33,8 @@ const GAME_CACHE_TTL_MS = 5 * 60 * 1000;
 const MIN_REQUEST_GAP_MS = 1000;
 const RATE_LIMIT_WAIT_MS = 60 * 1000;
 const MAX_429_RETRIES = 1;
-const gameCache = new Map<string, { expiresAt: number; games: any[] }>();
-const inFlight = new Map<string, Promise<any[]>>();
+const gameCache = new Map<string, { expiresAt: number; games: LichessRawGame[] }>();
+const inFlight = new Map<string, Promise<LichessRawGame[]>>();
 let requestQueue: Promise<void> = Promise.resolve();
 let nextRequestAt = 0;
 let rateLimitedUntil = 0;
@@ -49,33 +51,19 @@ function retryAfterMs(response: Response): number {
   const date = Date.parse(retryAfter);
   return Number.isFinite(date) ? Math.max(RATE_LIMIT_WAIT_MS, date - Date.now()) : RATE_LIMIT_WAIT_MS;
 }
-export interface FetchGamesOptions {
-  username: string;
-  max?: number;
-  rated?: boolean;
-  perfType?: "rapid" | "blitz" | "bullet" | "classical";
-  since?: number; // ms timestamp
-  until?: number; // ms timestamp
-}
-
-/**
- * Streams a user's games from the Lichess public API as NDJSON
- * and returns them as an array of raw game objects.
- * Docs: https://lichess.org/api#tag/Games/operation/apiGamesUser
- */
-async function fetchGamesRequest(opts: FetchGamesOptions): Promise<any[]> {
-  const { username, max = 20, rated = true, perfType = "rapid", since, until } = opts;
+async function fetchGamesRequest(opts: FetchGamesOptions): Promise<LichessRawGame[]> {
+  const { username, max = 20, rated, perfType, since, until } = opts;
 
   const params = new URLSearchParams({
     max: String(max),
-    rated: String(rated),
-    perfType,
     clocks: "true",
     opening: "true",
     moves: "true",
   });
-  if (since) params.set("since", String(since));
-  if (until) params.set("until", String(until));
+  if (rated !== undefined) params.set("rated", String(rated));
+  if (perfType) params.set("perfType", perfType);
+  if (since !== undefined) params.set("since", String(since));
+  if (until !== undefined) params.set("until", String(until));
 
   const url = `https://lichess.org/api/games/user/${encodeURIComponent(
     username
@@ -105,7 +93,7 @@ async function fetchGamesRequest(opts: FetchGamesOptions): Promise<any[]> {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  const games: any[] = [];
+  const games: LichessRawGame[] = [];
 
   while (true) {
     const { done, value } = await reader.read();
@@ -118,13 +106,13 @@ async function fetchGamesRequest(opts: FetchGamesOptions): Promise<any[]> {
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed) continue;
-      games.push(JSON.parse(trimmed));
+      games.push(asLichessRawGame(JSON.parse(trimmed)));
     }
   }
 
   // flush any trailing line without a newline
   const trimmed = buffer.trim();
-  if (trimmed) games.push(JSON.parse(trimmed));
+  if (trimmed) games.push(asLichessRawGame(JSON.parse(trimmed)));
 
   return games;
 }
@@ -134,12 +122,14 @@ async function fetchGamesRequest(opts: FetchGamesOptions): Promise<any[]> {
  * and a process-local serial queue. Lichess asks API clients to send one
  * request at a time and wait a full minute after HTTP 429 responses.
  */
-export function fetchGames(opts: FetchGamesOptions): Promise<any[]> {
+export function fetchGames(opts: FetchGamesOptions): Promise<LichessRawGame[]> {
   const key = JSON.stringify({
     username: opts.username.trim().toLowerCase(),
     max: opts.max ?? 20,
-    rated: opts.rated ?? true,
-    perfType: opts.perfType ?? "rapid",
+    // Omitted filters produce a different upstream URL than explicit
+    // `rated=true, perfType=rapid`; keep those cache entries distinct.
+    rated: opts.rated ?? null,
+    perfType: opts.perfType ?? null,
     since: opts.since ?? null,
     until: opts.until ?? null,
   });
@@ -162,4 +152,11 @@ export function fetchGames(opts: FetchGamesOptions): Promise<any[]> {
     inFlight.delete(key);
   }).catch(() => undefined);
   return request;
+}
+
+function asLichessRawGame(value: unknown): LichessRawGame {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Lichess returned a game record that was not a JSON object");
+  }
+  return value as LichessRawGame;
 }

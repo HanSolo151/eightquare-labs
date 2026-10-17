@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "paths": {
+      "@/lib/prisma": ["./fakes/prisma.ts"],
+      "@/lib/lichess/fetchGames": ["./fakes/fetchGames.ts"],
+      "@/*": ["../../*"]
+    }
+  }
+}

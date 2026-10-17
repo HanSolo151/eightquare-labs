@@ -87,6 +87,7 @@ async function testMoveSequence(): Promise<void> {
     cp: rawSequenceScores[sequenceSearches++],
     mate: null,
     depth: 14,
+    bestMoveUci: null,
   }));
   assert(sequenceSearches === 4, "N moves perform N+1 searches because adjacent plies reuse the shared position");
   assert(sequencePoints.length === 3, "the SAN evaluation loop yields exactly one EvalPoint per move ply");
@@ -103,7 +104,7 @@ async function testMoveSequence(): Promise<void> {
 
   let invalidSanRejected = false;
   try {
-    await evaluateMoveSequence(["e4", "not-a-move"], async () => ({ cp: 0, mate: null, depth: 14 }));
+    await evaluateMoveSequence(["e4", "not-a-move"], async () => ({ cp: 0, mate: null, depth: 14, bestMoveUci: null }));
   } catch {
     invalidSanRejected = true;
   }

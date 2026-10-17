@@ -1,4 +1,4 @@
-import type { WeaknessProfile, WeaknessPattern, GameEval, MoveFeature, CausalityVerdict } from "@/types";
+import type { WeaknessProfile, GameEval, MoveFeature, CausalityVerdict } from "@/types";
 import { checkCausality } from "../flags/causality";
 
 const MIN_CP_LOSS_FOR_CANDIDATE = 100; // half-pawn-plus swing, tunable

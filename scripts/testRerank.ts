@@ -130,13 +130,10 @@ async function main() {
     // Scholar's-mate-adjacent test position with a clean capture available:
     // using a simpler constructed FEN instead — white to move, can play
     // Nxe5 (capture) or Nf3 (quiet development).
-    const fen = "rnbqkb1r/pppp1ppp/5n2/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 2 3";
     // Legal captures from here: none actually (no piece attacks e5) —
     // switching to a position with an unambiguous capture on offer.
-    const fenWithCapture = "rnbqkb1r/ppp2ppp/3p1n2/4N3/4P3/8/PPPP1PPP/RNBQKB1R w KQkq - 0 4";
     // White knight on e5 can play Nxd7? no - let's use a textbook hanging pawn instead.
     // Simplify further: construct a position where Nxf7 (capture) is legal and clearly flagged.
-    const fenFinal = "rnbqkb1r/ppppp1pp/5n2/5N2/8/8/PPPPPPPP/RNBQKB1R w KQkq - 2 3";
     // Ne5xf7 not legal from f5. Use a known tactic position instead, verified by hand:
     // Fried Liver-ish: white knight on e5 attacking f7.
     const fenKnownCapture =
@@ -144,8 +141,8 @@ async function main() {
     // Here it's BLACK to move with white knight having just captured on f7
     // (a real capture already happened). Instead, give black a recapture:
     // Nxf7 is already played; black can play Kxf7 (a capture) or ignore it.
-    const logitsCapture = await fakeLogits(["e1f2"]); // mirrored Kxf7 — recapture, "isCapture" true
-    const logitsQuiet = await fakeLogits(["g1e2"]); // mirrored quiet-ish alternative, not a capture
+    await fakeLogits(["e1f2"]); // mirrored Kxf7 — recapture, "isCapture" true
+    await fakeLogits(["g1e2"]); // mirrored quiet-ish alternative, not a capture
 
     const aggressiveOpponent = fakeOpponent({ aggressionIndex: 0.9, queenTradeRate: 0.5 });
     const passiveOpponent = fakeOpponent({ aggressionIndex: 0.05, queenTradeRate: 0.5 });
