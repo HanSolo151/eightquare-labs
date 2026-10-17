@@ -4,6 +4,7 @@ import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { Chess } from "chess.js";
 import type { Key } from "chessground/types";
 import ChessgroundBoard from "./ChessgroundBoard";
+import PositionSpar from "./PositionSpar";
 import UsernameForm from "./UsernameForm";
 import VerdictCard from "./VerdictCard";
 import { dismissalId, isDismissed, loadDismissed, saveDismissed } from "@/lib/dismissals";
@@ -17,10 +18,7 @@ import { computePivotMove } from "@/lib/flags/pivotMove";
 import { runBackgroundEval } from "@/lib/onboarding/backgroundEval";
 import { getCachedEval, inspectGameEval } from "@/lib/eval/evalCache";
 import { emptyProfile, getProfile } from "@/lib/profile/profileCache";
-import { buildOpponentPieceActivityProfile } from "@/lib/profile/opponentPieceActivity";
-import { buildOpponentOpeningTree } from "@/lib/profile/opponentOpeningTree";
-import { buildOpponentTimePressureProfile } from "@/lib/profile/opponentTimePressure";
-import { LichessFetchError } from "@/lib/lichess/fetchGames";
+import { loadOpponentMimicProfiles } from "@/lib/profile/opponentMimicProfiles";
 import { emptyPieceActivityProfile, updatePieceActivityProfile } from "@/lib/profile/pieceActivityProfile";
 import { getPieceActivityProfile, savePieceActivityProfile } from "@/lib/profile/pieceActivityProfileCache";
 import type { PieceActivityProfile, OpeningTree, OpponentTimePressureProfile, GamePhase } from "@/types";
@@ -445,58 +443,26 @@ export default function GamePanel({ authenticatedUsername = null }: { authentica
       await loadOpponentFeatures(opponentName);
       if (cancelled) return;
 
-      try {
-        const profile = await buildOpponentPieceActivityProfile(opponentName);
-        if (cancelled) return;
-        setOpponentPieceActivityProfile(profile);
-        console.info("Opponent piece-activity profile updated", {
-          opponent: opponentName,
-          gamesEvaluated: profile.gamesEvaluated,
-          confidence: profile.confidence,
-        });
-      } catch (err) {
-        if (err instanceof LichessFetchError && err.isNotFound) {
-          console.info("Opponent account no longer exists on Lichess:", opponentName);
-        } else {
-          console.error("Opponent piece-activity profile build failed:", err);
-        }
-      }
+      const profiles = await loadOpponentMimicProfiles(opponentName);
       if (cancelled) return;
-
-      try {
-        const tree = await buildOpponentOpeningTree(opponentName);
-        if (cancelled) return;
-        setOpponentOpeningTree(tree);
-        console.info("Opponent opening tree updated", {
-          opponent: opponentName,
-          gamesEvaluated: tree.gamesEvaluated,
-          positionsSeen: Object.keys(tree.positions).length,
-        });
-      } catch (err) {
-        if (err instanceof LichessFetchError && err.isNotFound) {
-          console.info("Opponent account no longer exists on Lichess:", opponentName);
-        } else {
-          console.error("Opponent opening-tree build failed:", err);
-        }
-      }
-      if (cancelled) return;
-
-      try {
-        const timePressure = await buildOpponentTimePressureProfile(opponentName);
-        if (cancelled) return;
-        setOpponentTimePressureProfile(timePressure);
-        console.info("Opponent time-pressure profile updated", {
-          opponent: opponentName,
-          gamesAnalyzed: timePressure.gamesAnalyzed,
-          byPhase: timePressure.byPhase,
-        });
-      } catch (err) {
-        if (err instanceof LichessFetchError && err.isNotFound) {
-          console.info("Opponent account no longer exists on Lichess:", opponentName);
-        } else {
-          console.error("Opponent time-pressure profile build failed:", err);
-        }
-      }
+      setOpponentPieceActivityProfile(profiles.pieceActivity);
+      setOpponentOpeningTree(profiles.openingTree);
+      setOpponentTimePressureProfile(profiles.timePressure);
+      if (profiles.pieceActivity) console.info("Opponent piece-activity profile updated", {
+        opponent: opponentName,
+        gamesEvaluated: profiles.pieceActivity.gamesEvaluated,
+        confidence: profiles.pieceActivity.confidence,
+      });
+      if (profiles.openingTree) console.info("Opponent opening tree updated", {
+        opponent: opponentName,
+        gamesEvaluated: profiles.openingTree.gamesEvaluated,
+        positionsSeen: Object.keys(profiles.openingTree.positions).length,
+      });
+      if (profiles.timePressure) console.info("Opponent time-pressure profile updated", {
+        opponent: opponentName,
+        gamesAnalyzed: profiles.timePressure.gamesAnalyzed,
+        byPhase: profiles.timePressure.byPhase,
+      });
     })().catch((err) => {
       console.error("Opponent feature load failed:", err);
     });
@@ -1145,7 +1111,20 @@ export default function GamePanel({ authenticatedUsername = null }: { authentica
 
           </>
         ) : (
-          fen && <ChessgroundBoard fen={fen} />
+          fen && game && <>
+            <div style={{ width: 480, marginTop: 12 }}>
+              <PositionSpar
+                fen={fen}
+                humanColor={game.playerColor}
+                maiaRating={game.opponentRating}
+                humanRating={game.playerRating}
+                opponentUsername={game.opponentUsername}
+                prewarmMimic={false}
+                inferOverride={infer}
+                boardClassName="w-full overflow-hidden rounded-lg border border-white/10 bg-[#1b1a18] p-1"
+              />
+            </div>
+          </>
         )}
       </div>
 

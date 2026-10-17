@@ -1,15 +1,23 @@
 import { useEffect, useRef, useCallback } from "react";
 
-type PendingResolve = (result: { topMoveIndex: number; topMoveUci: string; logitsMaia: Float32Array }) => void;
+export interface MaiaInferenceResult {
+  topMoveIndex: number;
+  topMoveUci: string;
+  logitsMaia: Float32Array;
+}
+
+type PendingResolve = (result: MaiaInferenceResult) => void;
 type PendingReject = (err: Error) => void;
 
-export function useMaiaWorker() {
+export function useMaiaWorker(enabled = true) {
   const workerRef = useRef<Worker | null>(null);
   const pendingRef = useRef<Map<string, { resolve: PendingResolve; reject: PendingReject }>>(new Map());
 
   useEffect(() => {
+    if (!enabled) return;
     const worker = new Worker(new URL("../../public/workers/maia.worker.ts", import.meta.url));
     workerRef.current = worker;
+    const pendingRequests = pendingRef.current;
 
     worker.onmessage = (e: MessageEvent) => {
       const { id, ok } = e.data;
@@ -23,8 +31,14 @@ export function useMaiaWorker() {
       }
     };
 
-    return () => worker.terminate();
-  }, []);
+    return () => {
+      worker.terminate();
+      if (workerRef.current === worker) workerRef.current = null;
+      const pending = [...pendingRequests.values()];
+      pendingRequests.clear();
+      for (const request of pending) request.reject(new Error("Maia worker stopped."));
+    };
+  }, [enabled]);
 
   const infer = useCallback(
     (fen: string, selfRating: number | null, oppRating: number | null) => {

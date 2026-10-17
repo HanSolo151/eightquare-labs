@@ -38,6 +38,10 @@ export default function ChessgroundBoard({
     onUserMoveRef.current = onUserMove;
   }, [onUserMove]);
 
+  // Chessground does not support changing `viewOnly` through api.set().
+  // Recreate its controller on the same DOM node when interaction toggles,
+  // so the existing board can enter/leave spar mode without rendering a
+  // second board.
   useEffect(() => {
     if (!el.current) return;
     const config: Config = {
@@ -58,13 +62,12 @@ export default function ChessgroundBoard({
     api.current = Chessground(el.current, config);
     return () => api.current?.destroy();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // mount once, same as Step 5
+  }, [interactive]);
 
   useEffect(() => {
     api.current?.set({
       fen,
       orientation,
-      viewOnly: !interactive,
       turnColor, // FIX: was missing from this .set() call too
       lastMove,
       movable: {
@@ -73,7 +76,10 @@ export default function ChessgroundBoard({
         dests,
       },
     });
-  }, [fen, orientation, interactive, turnColor, dests, lastMove]);
+  // turnColor is derived from fen, so fen already covers that change.
+  // Keeping this dependency list stable also avoids a size mismatch during HMR.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fen, orientation, interactive, dests, lastMove]);
 
-  return <div ref={el} style={{ width: 480, height: 480 }} />;
+  return <div ref={el} style={{ width: "min(480px, 100%)", aspectRatio: "1 / 1" }} />;
 }
