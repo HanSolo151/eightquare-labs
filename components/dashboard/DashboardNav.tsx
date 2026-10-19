@@ -4,7 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const tabs = [
-  { href: "/dashboard", label: "Signature" },
+  // TODO(BUILD_ORDER.md step 3a): rename to "Spar" once Ghost Replay ships.
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/dashboard/signature", label: "Signature" },
+  { href: "/dashboard/openings", label: "Openings" },
   { href: "/dashboard/games", label: "Games" },
   { href: "/dashboard/patterns", label: "Patterns" },
 ] as const;

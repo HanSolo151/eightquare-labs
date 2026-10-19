@@ -138,7 +138,13 @@ const NEUTRAL_OPPONENT_FEATURES: OpponentFeatures = {
   fetchedAt: Date.now(),
 };
 
-export default function GamePanel({ authenticatedUsername = null }: { authenticatedUsername?: string | null }) {
+export default function GamePanel({
+  authenticatedUsername = null,
+  authenticatedUserId = null,
+}: {
+  authenticatedUsername?: string | null;
+  authenticatedUserId?: string | null;
+}) {
   const [username, setUsername] = useState<string | null>(null);
   const [data, setData] = useState<GameData | null>(null);
   const [gameIdx, setGameIdx] = useState(0);
@@ -424,7 +430,7 @@ export default function GamePanel({ authenticatedUsername = null }: { authentica
   // rerankMoves() during replay. Loaded eagerly once a game is selected
   // (unlike VerdictCard's on-demand pattern from Step 8), since replay needs
   // it the instant the user makes their first move, not after a click.
-  const { features: opponentFeatures, load: loadOpponentFeatures } = useOpponentFeatures();
+  const { features: opponentFeatures, load: loadOpponentFeatures } = useOpponentFeatures(authenticatedUserId);
   useEffect(() => {
     const opponentName = game?.opponentUsername;
     if (!opponentName || opponentName.toLowerCase() === "anonymous") return;
@@ -1176,6 +1182,7 @@ export default function GamePanel({ authenticatedUsername = null }: { authentica
             flag={flag}
             opponentLabel={opponentLabelFor(flag)}
             opponentUsername={data.games.find((g) => g.id === flag.gameId)?.opponentUsername}
+            authenticatedUserId={authenticatedUserId}
             onJump={() => jumpToFlag(flag)}
             onDismiss={() => dismissFlag(flag)}
             onReplay={() => replayFromFlag(flag)}

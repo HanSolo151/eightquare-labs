@@ -34,6 +34,7 @@ export default function VerdictCard({
   flag,
   opponentLabel,
   opponentUsername,
+  authenticatedUserId,
   onJump,
   onDismiss,
   onReplay, // NEW, Step 10 — optional so this stays backward compatible if a caller doesn't pass it
@@ -44,6 +45,7 @@ export default function VerdictCard({
   flag: FlaggedMove;
   opponentLabel?: string;
   opponentUsername?: string;
+  authenticatedUserId: string | null;
   onJump: () => void;
   onDismiss: () => void;
   onReplay?: () => void;
@@ -92,7 +94,9 @@ export default function VerdictCard({
         )}
       </div>
 
-      {expanded && opponentUsername && <OpponentPanel opponentUsername={opponentUsername} />}
+      {expanded && opponentUsername && (
+        <OpponentPanel opponentUsername={opponentUsername} userId={authenticatedUserId} />
+      )}
 
       {pivotExpanded && (
         <div style={{ fontSize: 12, opacity: 0.85, marginTop: 6, paddingTop: 6, borderTop: "1px solid #333" }}>

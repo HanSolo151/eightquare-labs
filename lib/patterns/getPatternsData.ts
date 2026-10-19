@@ -4,11 +4,11 @@ import type { GamePhase, WeaknessPattern } from "@/types";
 // Step 4/6: Screen 3 (Patterns). Like getDashboardData, this only reads
 // what's already persisted — no Stockfish/engine work happens here.
 //
-// Caveat worth stating up front: BiasProfile (rank/file/diagonal bias) has
-// a schema home but no engine behind it yet (see prisma/schema.prisma and
-// the plan doc, Section 2). The `bias` field below is therefore either the
-// stored row if one somehow exists, or an explicit "not built" placeholder
-// — never fabricated data.
+// Caveat: BiasProfile now stores square-level statistics, but those are
+// populated as new evaluations are pushed. Existing persisted evaluations
+// need a one-time backfill before this can represent the full archive.
+// The `bias` field below only exposes the stored aggregates; it does not
+// invent values from unrelated metrics.
 //
 // Pulled out of app/api/patterns/route.ts so the Patterns screen (a server
 // component) can call it directly instead of self-fetching its own route.
@@ -161,7 +161,7 @@ export async function getPatternsData(userId: string): Promise<PatternsData> {
       lastSeenAt: pattern.lastSeenAt,
     }));
 
-  // --- Bias (rank/file/diagonal) — engine not built yet ------------------
+  // --- Bias (rank/file/diagonal) -----------------------------------------
   const bias: PatternsBias = biasRow
     ? {
         built: true,

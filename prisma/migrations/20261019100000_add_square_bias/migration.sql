@@ -1,0 +1,3 @@
+ALTER TABLE "BiasProfile"
+ADD COLUMN "squareBias" JSONB NOT NULL DEFAULT '{}',
+ADD COLUMN "evaluatedGameIds" JSONB NOT NULL DEFAULT '[]';

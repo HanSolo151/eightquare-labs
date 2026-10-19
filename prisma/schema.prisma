@@ -132,15 +132,17 @@ model WeaknessProfileRow {
   builtAt          DateTime @default(now())
 }
 
-// New engine surface from the DeepSeek doc — rank/file/diagonal bias.
-// Schema home only; engine work is a later phase.
 model BiasProfile {
-  userId     String   @id
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  rankBias   Json
-  fileBias   Json
+  userId      String   @id
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rankBias    Json
+  fileBias    Json
   diagonalBias Json
-  sampleSize Int      @default(0)
-  confidence String   @default("low")
-  builtAt    DateTime @default(now())
+  // squareBias is the source of truth; aggregate views are derived from it.
+  squareBias  Json     @default("{}")
+  // Makes the per-game read/modify/write fold idempotent across retries.
+  evaluatedGameIds Json @default("[]")
+  sampleSize  Int      @default(0)
+  confidence  String   @default("low")
+  builtAt     DateTime @default(now())
 }

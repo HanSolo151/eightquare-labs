@@ -1,3 +1,12 @@
+/**
+ * PROVISIONAL HOME PAGE — see BUILD_ORDER.md, step 3a.
+ * This is pre-revision "Player dossier" content. Per spec §8, /dashboard
+ * is supposed to be the Spar hero (Ghost Replay for the most recent
+ * unresolved flagged moment + flagged-moment queue), with this page's
+ * metrics/tempo/repertoire content relocated to /dashboard/signature.
+ * Do not treat this layout as final — replace once Ghost Replay (step 3)
+ * ships, per BUILD_ORDER.md.
+ */
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { getSessionUserId, getSessionPlan } from "@/lib/auth/session";

@@ -2,6 +2,7 @@ import { useOpponentFeatures } from "../../lib/useOpponentFeatures";
 
 interface OpponentPanelProps {
   opponentUsername: string;
+  userId: string | null;
 }
 
 /**
@@ -13,8 +14,8 @@ interface OpponentPanelProps {
  * Structure-only styling, no color/theme — consistent with Steps 5-6's
  * deferred-theming decision.
  */
-export function OpponentPanel({ opponentUsername }: OpponentPanelProps) {
-  const { features, loading, error, load } = useOpponentFeatures();
+export function OpponentPanel({ opponentUsername, userId }: OpponentPanelProps) {
+  const { features, loading, error, load } = useOpponentFeatures(userId);
 
   // Fire the load on first render. Not wrapped in a useEffect with an
   // explicit mount guard because the parent already controls mount/unmount

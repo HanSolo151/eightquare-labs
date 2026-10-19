@@ -38,16 +38,25 @@ export interface DashboardGamesData {
 }
 
 /** Paged, account-scoped read model for the dashboard Games screen. */
-export async function getGamesData(userId: string, requestedPage = 1): Promise<DashboardGamesData> {
+export async function getGamesData(
+  userId: string,
+  requestedPage = 1,
+  filter?: { openingEco?: string; severity?: "low" | "medium" | "high" }
+): Promise<DashboardGamesData> {
   const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
+  const where = {
+    userId,
+    ...(filter?.openingEco ? { openingEco: filter.openingEco } : {}),
+    ...(filter?.severity ? { flags: { some: { severity: filter.severity } } } : {}),
+  };
   const [totalGames, evaluatedGames] = await Promise.all([
-    prisma.game.count({ where: { userId } }),
-    prisma.game.count({ where: { userId, eval: { isNot: null } } }),
+    prisma.game.count({ where }),
+    prisma.game.count({ where: { ...where, eval: { isNot: null } } }),
   ]);
   const totalPages = Math.max(1, Math.ceil(totalGames / DASHBOARD_GAMES_PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const rows = await prisma.game.findMany({
-    where: { userId },
+    where,
     orderBy: [
       { lichessCreatedAt: { sort: "desc", nulls: "last" } },
       { createdAt: "desc" },

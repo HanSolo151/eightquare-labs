@@ -20,7 +20,7 @@ interface UseOpponentFeaturesResult {
  *
  * Cache-first: checks localStorage (24h TTL) before hitting the API route.
  */
-export function useOpponentFeatures(): UseOpponentFeaturesResult {
+export function useOpponentFeatures(userId: string | null): UseOpponentFeaturesResult {
   const [features, setFeatures] = useState<OpponentFeatures | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +30,14 @@ export function useOpponentFeatures(): UseOpponentFeaturesResult {
     const requestId = ++requestIdRef.current;
     setError(null);
 
-    const cached = loadCachedOpponentFeatures(username);
+    if (!userId) {
+      setFeatures(null);
+      setLoading(false);
+      setError("sign in to see opponent details");
+      return;
+    }
+
+    const cached = loadCachedOpponentFeatures(userId, username);
     if (cached) {
       setFeatures(cached);
       setLoading(false);
@@ -43,20 +50,22 @@ export function useOpponentFeatures(): UseOpponentFeaturesResult {
       const res = await fetch(
         `/api/opponent?username=${encodeURIComponent(username)}`
       );
+      if (res.status === 401) throw new Error("sign in to see opponent details");
+      if (res.status === 403) throw new Error("no games recorded against this opponent");
       if (!res.ok) {
         throw new Error(`request failed: ${res.status}`);
       }
       const data: OpponentFeatures = await res.json();
       if (requestId !== requestIdRef.current) return;
       setFeatures(data);
-      saveCachedOpponentFeatures(username, data);
+      saveCachedOpponentFeatures(userId, username, data);
     } catch (err) {
       if (requestId !== requestIdRef.current) return;
       setError(err instanceof Error ? err.message : "unknown error");
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   return { features, loading, error, load };
 }

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { updateWeaknessProfile } from "@/lib/profile/weaknessProfile";
+import { updateBiasProfile, type BiasProfileState } from "@/lib/bias/updateBiasProfile";
 import type { GameEval, MoveFeature, WeaknessProfile, FlaggedMove, PlayerProfile } from "@/types";
 
 interface PushBody {
@@ -195,6 +196,51 @@ export async function POST(req: NextRequest) {
         gamesEvaluated: updated.gamesEvaluated,
         gamesFetched: updated.gamesFetched,
         confidence: updated.confidence,
+      },
+    });
+
+    const biasRow = await tx.biasProfile.findUnique({ where: { userId } });
+    const storedBiasGameIds = Array.isArray(biasRow?.evaluatedGameIds)
+      ? biasRow.evaluatedGameIds.filter((id): id is string => typeof id === "string")
+      : [];
+    const existingBias: BiasProfileState = biasRow
+      ? {
+          squareBias: biasRow.squareBias as unknown as BiasProfileState["squareBias"],
+          evaluatedGameIds: storedBiasGameIds,
+          sampleSize: biasRow.sampleSize,
+          confidence: biasRow.confidence as BiasProfileState["confidence"],
+          builtAt: biasRow.builtAt.getTime(),
+        }
+      : { squareBias: {}, evaluatedGameIds: [], sampleSize: 0, confidence: "low", builtAt: Date.now() };
+
+    const updatedBias = updateBiasProfile(
+      existingBias,
+      gameId,
+      storedMoves as string[],
+      moveFeatures,
+      flags,
+      game.playerColor as "white" | "black"
+    );
+
+    await tx.biasProfile.upsert({
+      where: { userId },
+      update: {
+        squareBias: updatedBias.squareBias as unknown as Prisma.InputJsonValue,
+        evaluatedGameIds: updatedBias.evaluatedGameIds as unknown as Prisma.InputJsonValue,
+        sampleSize: updatedBias.sampleSize,
+        confidence: updatedBias.confidence,
+        builtAt: new Date(updatedBias.builtAt),
+      },
+      create: {
+        userId,
+        rankBias: {} as unknown as Prisma.InputJsonValue,
+        fileBias: {} as unknown as Prisma.InputJsonValue,
+        diagonalBias: {} as unknown as Prisma.InputJsonValue,
+        squareBias: updatedBias.squareBias as unknown as Prisma.InputJsonValue,
+        evaluatedGameIds: updatedBias.evaluatedGameIds as unknown as Prisma.InputJsonValue,
+        sampleSize: updatedBias.sampleSize,
+        confidence: updatedBias.confidence,
+        builtAt: new Date(updatedBias.builtAt),
       },
     });
 

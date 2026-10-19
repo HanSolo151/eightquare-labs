@@ -5,8 +5,8 @@ import type { OpponentFeatures } from "./lichess/opponentFeatures";
  * lib/dismissals.ts from Step 6: try/catch everything, SSR-safe, silent
  * failure rather than throwing if storage is unavailable/full.
  *
- * Namespaced per-username, separate key prefix from dismissals so the two
- * never collide: "opponent-features:<username>".
+ * Namespaced per account and opponent, separate key prefix from dismissals:
+ * "opponent-features:<userId>:<username>".
  *
  * TTL exists because this is re-fetched from Lichess every time a verdict
  * card's opponent is expanded — without a cache, clicking the same
@@ -16,16 +16,17 @@ import type { OpponentFeatures } from "./lichess/opponentFeatures";
 
 const TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-function cacheKey(username: string): string {
-  return `opponent-features:${username}`;
+function cacheKey(userId: string, username: string): string {
+  return `opponent-features:${userId}:${username.trim().toLowerCase()}`;
 }
 
 export function loadCachedOpponentFeatures(
+  userId: string,
   username: string
 ): OpponentFeatures | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(cacheKey(username));
+    const raw = window.localStorage.getItem(cacheKey(userId, username));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as OpponentFeatures;
     if (!parsed || typeof parsed.fetchedAt !== "number") return null;
@@ -37,12 +38,13 @@ export function loadCachedOpponentFeatures(
 }
 
 export function saveCachedOpponentFeatures(
+  userId: string,
   username: string,
   features: OpponentFeatures
 ): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(cacheKey(username), JSON.stringify(features));
+    window.localStorage.setItem(cacheKey(userId, username), JSON.stringify(features));
   } catch {
     // storage full/disabled — silently skip caching, matches dismissals.ts
   }

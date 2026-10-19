@@ -18,17 +18,21 @@ function resultLabel(result: string) {
 }
 
 interface GamesPageProps {
-  searchParams: Promise<{ page?: string | string[] }>;
+  searchParams: Promise<{ page?: string | string[]; opening?: string | string[]; severity?: string | string[] }>;
 }
 
 export default async function GamesPage({ searchParams }: GamesPageProps) {
-  const [{ page: rawPage }, session] = await Promise.all([searchParams, auth()]);
+  const [{ page: rawPage, opening: rawOpening, severity: rawSeverity }, session] = await Promise.all([searchParams, auth()]);
   const userId = getSessionUserId(session);
   if (!userId) return <EmptyState title="Session unavailable" detail="Sign in again to view your saved games." />;
 
   const pageValue = Array.isArray(rawPage) ? rawPage[0] : rawPage;
   const requestedPage = pageValue && /^\d+$/.test(pageValue) ? Number.parseInt(pageValue, 10) : 1;
-  const data = await getGamesData(userId, requestedPage);
+  const openingValue = Array.isArray(rawOpening) ? rawOpening[0] : rawOpening;
+  const severityValue = Array.isArray(rawSeverity) ? rawSeverity[0] : rawSeverity;
+  const openingEco = openingValue && /^[A-E]\d{2}$/i.test(openingValue) ? openingValue.toUpperCase() : undefined;
+  const severity = severityValue === "low" || severityValue === "medium" || severityValue === "high" ? severityValue : undefined;
+  const data = await getGamesData(userId, requestedPage, { openingEco, severity });
   const first = data.totalGames === 0 ? 0 : (data.page - 1) * data.pageSize + 1;
   const last = Math.min(data.page * data.pageSize, data.totalGames);
 
@@ -38,7 +42,7 @@ export default async function GamesPage({ searchParams }: GamesPageProps) {
         <div>
           <p className="text-xs uppercase tracking-[0.28em] text-emerald-300">Game archive / 02</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Games</h1>
-          <p className="mt-2 text-sm text-neutral-400">Saved games and persisted analysis, newest first.</p>
+          <p className="mt-2 text-sm text-neutral-400">Saved games and persisted analysis, newest first.{openingEco ? ` Opening ${openingEco}.` : ""}{severity ? ` ${severity} severity flags.` : ""}</p>
         </div>
         <p className="text-xs tabular-nums text-neutral-400">{data.evaluatedGames.toLocaleString()} / {data.totalGames.toLocaleString()} evaluated</p>
       </header>
@@ -93,12 +97,19 @@ export default async function GamesPage({ searchParams }: GamesPageProps) {
       )}
 
       {data.totalPages > 1 && <nav aria-label="Game pages" className="flex items-center justify-between border-t border-white/10 pt-4 text-sm">
-        {data.page > 1 ? <Link href={`/dashboard/games?page=${data.page - 1}`} className="text-neutral-300 hover:text-white">← Newer</Link> : <span className="text-neutral-700">← Newer</span>}
+        {data.page > 1 ? <Link href={gamesPageHref(data.page - 1, openingEco, severity)} className="text-neutral-300 hover:text-white">← Newer</Link> : <span className="text-neutral-700">← Newer</span>}
         <span className="text-xs tabular-nums text-neutral-500">Page {data.page} / {data.totalPages}</span>
-        {data.page < data.totalPages ? <Link href={`/dashboard/games?page=${data.page + 1}`} className="text-neutral-300 hover:text-white">Older →</Link> : <span className="text-neutral-700">Older →</span>}
+        {data.page < data.totalPages ? <Link href={gamesPageHref(data.page + 1, openingEco, severity)} className="text-neutral-300 hover:text-white">Older →</Link> : <span className="text-neutral-700">Older →</span>}
       </nav>}
     </div>
   );
+}
+
+function gamesPageHref(page: number, openingEco?: string, severity?: string) {
+  const params = new URLSearchParams({ page: String(page) });
+  if (openingEco) params.set("opening", openingEco);
+  if (severity) params.set("severity", severity);
+  return `/dashboard/games?${params.toString()}`;
 }
 
 function EmptyState({ title, detail }: { title: string; detail: string }) {
