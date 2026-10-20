@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { connection, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getSessionUserId, getSessionPlan } from "@/lib/auth/session";
 import { getDashboardData } from "@/lib/dashboard/getDashboardData";
@@ -10,6 +10,7 @@ import type { Session } from "next-auth";
 // are always from the DB, never recomputed live" decision in the plan.
 
 export async function GET() {
+  await connection();
   let session: Session | null;
   try {
     session = await auth();

@@ -65,3 +65,8 @@ export function openingBookEntryFor(
   const boost = Math.min(OPENING_BOOST_CAP, 1 + (matchCount / position.total) * (OPENING_BOOST_CAP - 1));
   return { matchCount, totalCount: position.total, boost };
 }
+
+/** Total observed replies at a position, independent of move choice. */
+export function openingTreeHitsAt(tree: OpeningTree | null | undefined, fen: string): number {
+  return openingBookPosition(tree, fen)?.total ?? 0;
+}

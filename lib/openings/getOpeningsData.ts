@@ -17,14 +17,18 @@ export interface OpeningRow {
   sparkline: { moveNumber: number; avgCpLoss: number }[];
 }
 
-export async function getOpeningsData(userId: string): Promise<OpeningRow[]> {
+export async function getOpeningsData(userId: string, opponentUsername?: string): Promise<OpeningRow[]> {
+  const gameWhere = {
+    userId,
+    ...(opponentUsername ? { opponentUsername: { equals: opponentUsername, mode: "insensitive" as const } } : {}),
+  };
   const [games, flags] = await Promise.all([
     prisma.game.findMany({
-      where: { userId },
+      where: gameWhere,
       select: { id: true, openingName: true, openingEco: true, result: true, moves: true, playerColor: true },
     }),
     prisma.flaggedMove.findMany({
-      where: { game: { userId } },
+      where: { game: gameWhere },
       select: { gameId: true, ply: true, cpLoss: true, moveNumber: true },
     }),
   ]);

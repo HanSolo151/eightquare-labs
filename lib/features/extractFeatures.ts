@@ -269,6 +269,7 @@ export function buildPlayerProfile(
     .map(([name, v]) => ({ name, eco: v.eco, count: v.count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
+  const avgOpponentRating = average(opponentRatings);
 
   return {
     username,
@@ -280,6 +281,8 @@ export function buildPlayerProfile(
     },
     premoveRate: ownMoveCount > 0 ? premoveCount / ownMoveCount : 0,
     mostCommonOpenings,
-    avgOpponentRating: average(opponentRatings),
+    // PostgreSQL stores this profile field as an integer rating. The mean
+    // can be fractional even though every source rating is integral.
+    avgOpponentRating: avgOpponentRating === null ? null : Math.round(avgOpponentRating),
   };
 }

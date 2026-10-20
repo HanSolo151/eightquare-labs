@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { connection, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getPatternsData } from "@/lib/patterns/getPatternsData";
@@ -11,6 +11,7 @@ import type { Session } from "next-auth";
 // page can call the same function directly instead of fetching its own API.
 
 export async function GET() {
+  await connection();
   let session: Session | null;
   try {
     session = await auth();

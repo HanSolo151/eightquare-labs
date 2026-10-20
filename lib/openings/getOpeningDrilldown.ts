@@ -1,6 +1,9 @@
 import { Chess } from "chess.js";
 import { prisma } from "@/lib/prisma";
 import { openingFenKey, OPENING_TREE_PLIES } from "@/lib/profile/openingTree";
+import { getEffectiveRatingSignals } from "@/lib/opponent/effectiveRating";
+import { findWorstFlaggedMove } from "@/lib/flags/findWorstFlaggedMove";
+import { getEffectiveRatingSignal } from "@/lib/opponent/effectiveRating";
 
 export interface DrilldownNode {
   ply: number;
@@ -13,6 +16,7 @@ export interface DrilldownNode {
   maiaRating: number | null;
   humanRating: number | null;
   playerColor: "white" | "black";
+  effectiveRatingFires: boolean;
 }
 
 export interface OpeningDrilldown {
@@ -33,15 +37,12 @@ export async function getOpeningDrilldown(userId: string, eco: string): Promise<
     },
   });
   if (games.length === 0) return null;
+  const effectiveRatings = await getEffectiveRatingSignals(userId, games.map((game) => game.opponentUsername));
 
   type Aggregate = Omit<DrilldownNode, "occurrences" | "flaggedCount" | "avgCpLoss"> & {
     occurrences: number; flaggedPlies: Map<number, number>;
   };
   const byKey = new Map<string, Aggregate>();
-  let dangerMove: DrilldownNode | null = null;
-  let dangerMoveSeverityRank = 0;
-  const severityRank: Record<string, number> = { low: 1, medium: 2, high: 3 };
-
   for (const game of games) {
     const moves = Array.isArray(game.moves) ? game.moves.filter((move): move is string => typeof move === "string") : [];
     const flagsByPly = new Map<number, typeof game.flags>();
@@ -64,6 +65,7 @@ export async function getOpeningDrilldown(userId: string, eco: string): Promise<
           opponentUsername: game.opponentUsername, maiaRating: game.opponentRating,
           humanRating: game.playerRating,
           playerColor: game.playerColor === "black" ? "black" : "white",
+          effectiveRatingFires: effectiveRatings.get(game.opponentUsername.trim().toLowerCase())?.fires ?? false,
         };
         byKey.set(key, entry);
       }
@@ -71,15 +73,6 @@ export async function getOpeningDrilldown(userId: string, eco: string): Promise<
       const moveFlags = flagsByPly.get(ply) ?? [];
       if (moveFlags.length) {
         entry.flaggedPlies.set(ply, Math.max(entry.flaggedPlies.get(ply) ?? 0, ...moveFlags.map((flag) => flag.cpLoss)));
-        const strongest = [...moveFlags].sort((a, b) => (severityRank[b.severity] ?? 0) - (severityRank[a.severity] ?? 0) || b.cpLoss - a.cpLoss)[0];
-        const rank = strongest ? severityRank[strongest.severity] ?? 0 : 0;
-        if (strongest && (!dangerMove || rank > dangerMoveSeverityRank ||
-          (rank === dangerMoveSeverityRank && strongest.cpLoss > (dangerMove.avgCpLoss ?? 0)))) {
-          dangerMove = {
-            ...entry, flaggedCount: 1, avgCpLoss: strongest.cpLoss,
-          };
-          dangerMoveSeverityRank = rank;
-        }
       }
     }
   }
@@ -92,8 +85,26 @@ export async function getOpeningDrilldown(userId: string, eco: string): Promise<
       avgCpLoss: losses.length ? losses.reduce((sum, value) => sum + value, 0) / losses.length : null,
       opponentUsername: entry.opponentUsername, maiaRating: entry.maiaRating,
       humanRating: entry.humanRating, playerColor: entry.playerColor,
+      effectiveRatingFires: entry.effectiveRatingFires,
     };
   }).sort((a, b) => a.ply - b.ply || b.flaggedCount - a.flaggedCount || a.san.localeCompare(b.san));
+  const worst = await findWorstFlaggedMove({ userId, openingEco: eco });
+  const worstEffectiveRating = worst
+    ? await getEffectiveRatingSignal(userId, worst.opponentUsername)
+    : null;
+  const dangerMove: DrilldownNode | null = worst ? {
+    ply: worst.ply,
+    san: worst.san,
+    fenBefore: worst.fen,
+    occurrences: 1,
+    flaggedCount: 1,
+    avgCpLoss: worst.cpLoss,
+    opponentUsername: worst.opponentUsername,
+    maiaRating: worst.maiaRating,
+    humanRating: worst.humanRating,
+    playerColor: worst.playerColor,
+    effectiveRatingFires: worstEffectiveRating?.fires ?? false,
+  } : null;
   return {
     eco, openingName: games.find((game) => game.openingName)?.openingName ?? null,
     nodes,

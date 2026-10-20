@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { connection, NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getSessionUserId } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
@@ -19,6 +19,7 @@ import { LichessFetchError } from "../../../lib/lichess/fetchGames";
  * a cache miss/expiry.
  */
 export async function GET(req: NextRequest) {
+  await connection();
   let session;
   try {
     session = await auth();

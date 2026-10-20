@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
+import { connection, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getGamesData } from "@/lib/dashboard/getGamesData";
 import type { Session } from "next-auth";
 
 export async function GET(request: Request) {
+  await connection();
   let session: Session | null;
   try {
     session = await auth();

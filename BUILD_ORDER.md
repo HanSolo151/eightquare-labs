@@ -1,15 +1,18 @@
 # Build Order (from EightSquare Labs spec, §11)
 
-1. [ ] Blind Spot Heatmap — update/read/UI code is in place; migration, existing-game backfill, and browser validation remain
-2. [x] Opening Danger Score + drill-down — relative score from persisted games/flags; interactive move-position spar. Validate migration-independent reads and UI against real archive data.
-3. [ ] Ghost Replay (three-way divergence: you / Stockfish / typical player at rating band)
-3a. [ ] **Redirect `/dashboard` to the Spar hero (§8) once step 3 ships.**
-    Current `/dashboard` (`app/dashboard/page.tsx`) is pre-revision "Player
-    dossier" content — metrics, tempo profile, opening repertoire. It's a
-    legitimate placeholder, not the spec'd home page. Do not let it stay
-    the permanent `/dashboard` past this step — it has no scheduled
-    replacement unless tracked explicitly, which is why this line exists.
-4. [ ] Opponent-Specific Replay (Maia4All tiered model) — build alongside 3
-5. [ ] Daily Puzzle from flagged moves
-6. [ ] Rivalry Tracker (self-facing only — see api/opponent auth fix, done)
-7. [ ] Ambient Pace Signal (post-game only, retrospective)
+1. [x] Blind Spot Heatmap — update/read/UI code is in place; migration, existing-game backfill, and browser validation remain.
+2. [x] Opening Danger Score + drill-down — relative score from persisted games/flags; interactive move-position spar. Validate against real archive data.
+3. [x] Ghost Replay — single-moment three-way comparison (your move / Stockfish / Maia) with spar from the flagged position. Browser validation remains.
+   - Not built: scrub bar and synchronized multi-ply continuation evaluation graph from the full spec.
+3a. [x] `/dashboard` is now the Spar hero. The player dossier has moved to `/dashboard/signature` and includes the heatmap.
+4. [ ] Opponent-Specific Replay (Maia4All tiered model) — partial model support exists in spar; validate tier behavior and coverage.
+5. [x] Daily Puzzle from flagged moves — persisted solve/skip state and interactive board are implemented; apply the migration and validate the browser flow.
+6. [x] Rivalry Tracker — self-scoped list/detail, matchup openings, flagged-square distribution, and worst flagged-position spar. Browser validation remains.
+7. [x] Ambient Pace Signal — retrospective recurring cascade signal on saved game review. Browser validation remains.
+
+## Remaining foundation work
+
+- Apply and verify outstanding migrations/backfill steps where needed.
+- Browser-validate the implemented flows against the real archive.
+- Spar-session resume/persistence (flag id, attempt index, move list, clock, and 24-hour abandonment handling) is not implemented; there is no `SparSession` table yet.
+- Full Ghost Replay continuation graph remains separate scope.

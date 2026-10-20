@@ -17,6 +17,8 @@ function heatColor(value: number): string {
 export default function BlindSpotHeatmap({ data }: { data: BiasData }) {
   const [theme, setTheme] = useState<HeatmapTheme>("blunderDensity");
   const [hovered, setHovered] = useState<SquareView | null>(null);
+  const visibleThemes = THEMES.filter((item) => (data.availableThemes ?? THEMES.map((entry) => entry.id)).includes(item.id));
+  const activeTheme = visibleThemes.some((item) => item.id === theme) ? theme : visibleThemes[0]?.id ?? "blunderDensity";
 
   if (!data.meetsThreshold) {
     return (
@@ -28,28 +30,32 @@ export default function BlindSpotHeatmap({ data }: { data: BiasData }) {
 
   return (
     <div>
-      <div className="flex gap-1 rounded-lg border border-white/10 bg-black/30 p-1 text-xs">
-        {THEMES.map((item) => (
+      {visibleThemes.length > 1 && <div className="flex gap-1 rounded-lg border border-white/10 bg-black/30 p-1 text-xs">
+        {visibleThemes.map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={() => setTheme(item.id)}
-            aria-pressed={theme === item.id}
-            className={`flex-1 rounded px-2 py-1.5 ${theme === item.id ? "bg-amber-500/20 text-amber-200" : "text-neutral-400 hover:text-white"}`}
+            aria-pressed={activeTheme === item.id}
+            className={`flex-1 rounded px-2 py-1.5 ${activeTheme === item.id ? "bg-amber-500/20 text-amber-200" : "text-neutral-400 hover:text-white"}`}
           >
             {item.label}
           </button>
         ))}
-      </div>
+      </div>}
 
       <p className="mt-3 text-[10px] text-neutral-500">
-        Color compares each square with your overall rate; squares with fewer than five moves stay neutral.
+        {data.flagOnly
+          ? "Color shows each square’s share relative to the most frequent destination among persisted flagged moves. Unflagged move counts are not stored per opponent."
+          : "Color compares each square with your overall rate; squares with fewer than five moves stay neutral."}
       </p>
       <div className="mt-3 grid aspect-square max-w-[480px] grid-cols-8 overflow-hidden rounded-lg border border-white/10">
-        {data.squares[theme].map((square) => {
-          const enoughMoves = square.moveCount >= 5;
-          const colorValue = theme === "accuracy" ? 1 - square.value : square.value;
-          const description = `${square.square}: ${square.flaggedCount} flagged moves from ${square.moveCount} moves${square.clockDataCount ? `; ${square.clockDataCount} with clock data` : ""}`;
+        {data.squares[activeTheme].map((square) => {
+          const enoughMoves = data.flagOnly ? square.flaggedCount > 0 : square.moveCount >= 5;
+          const colorValue = activeTheme === "accuracy" ? 1 - square.value : square.value;
+          const description = data.flagOnly
+            ? `${square.square}: ${square.flaggedCount} persisted flagged moves`
+            : `${square.square}: ${square.flaggedCount} flagged moves from ${square.moveCount} moves${square.clockDataCount ? `; ${square.clockDataCount} with clock data` : ""}`;
           return (
             <button
               key={square.square}
@@ -69,7 +75,7 @@ export default function BlindSpotHeatmap({ data }: { data: BiasData }) {
         })}
       </div>
 
-      <div className="mt-4 grid gap-2 text-xs sm:grid-cols-3">
+      {!data.flagOnly && <div className="mt-4 grid gap-2 text-xs sm:grid-cols-3">
         {([
           ["Ranks", data.axes.ranks[0]],
           ["Files", data.axes.files[0]],
@@ -82,12 +88,12 @@ export default function BlindSpotHeatmap({ data }: { data: BiasData }) {
             ) : <p className="mt-2 text-neutral-500">Not enough moves to compare</p>}
           </div>
         ))}
-      </div>
+      </div>}
 
       <div className="mt-3 min-h-[2.5rem] text-xs text-neutral-400" aria-live="polite">
         {hovered ? (
           <p>
-            <span className="font-mono text-white">{hovered.square}</span> — {hovered.flaggedCount} flagged / {hovered.moveCount} moves
+            <span className="font-mono text-white">{hovered.square}</span> — {data.flagOnly ? `${hovered.flaggedCount} persisted flagged moves` : `${hovered.flaggedCount} flagged / ${hovered.moveCount} moves`}
             {hovered.avgCpLoss !== null && <> · average {Math.round(hovered.avgCpLoss)} cp loss</>}
             {hovered.topFlagTypes.length > 0 && <> · {hovered.topFlagTypes.join(", ")}</>}
           </p>

@@ -39,6 +39,8 @@ export interface BiasData {
   squares: Record<HeatmapTheme, SquareView[]>;
   axes: { ranks: BiasAxisEntry[]; files: BiasAxisEntry[]; diagonals: BiasAxisEntry[] };
   caption: string | null;
+  availableThemes?: HeatmapTheme[];
+  flagOnly?: boolean;
 }
 
 function validStats(value: unknown): value is SquareStats {
@@ -55,10 +57,15 @@ function safeProfile(value: unknown): SquareBias {
   return Object.fromEntries(Object.entries(value).filter(([square, stats]) => parseSquare(square) && validStats(stats))) as SquareBias;
 }
 
-export async function getBiasData(userId: string): Promise<BiasData> {
-  const row = await prisma.biasProfile.findUnique({ where: { userId } });
-  const squareBias = safeProfile(row?.squareBias);
-  const sampleSize = row?.sampleSize ?? 0;
+export function buildBiasData(
+  input: SquareBias,
+  sampleSize: number,
+  options: { blunderDensityOnly?: boolean } = {}
+): BiasData {
+  const squareBias = safeProfile(input);
+  const availableThemes: HeatmapTheme[] = options.blunderDensityOnly
+    ? ["blunderDensity"]
+    : ["blunderDensity", "timePressure", "accuracy"];
   const meetsThreshold = sampleSize >= MIN_PROFILE_SAMPLES;
 
   if (!meetsThreshold) {
@@ -68,6 +75,32 @@ export async function getBiasData(userId: string): Promise<BiasData> {
       squares: { blunderDensity: [], timePressure: [], accuracy: [] },
       axes: { ranks: [], files: [], diagonals: [] },
       caption: null,
+      availableThemes,
+      flagOnly: options.blunderDensityOnly ?? false,
+    };
+  }
+
+  if (options.blunderDensityOnly) {
+    const maxFlagCount = Math.max(0, ...Object.values(squareBias).map((square) => square.flaggedCount));
+    const blunderDensity = allSquares().map((square): SquareView => {
+      const current = squareBias[square];
+      const stats = current ?? { moveCount: 0, flaggedCount: 0, totalCpLoss: 0, clockDataCount: 0, under30Count: 0, flagTypeCounts: {} };
+      return {
+        square,
+        // This is a share of recorded flagged moves, not a rate per move.
+        value: maxFlagCount > 0 ? stats.flaggedCount / maxFlagCount : 0,
+        flaggedCount: stats.flaggedCount,
+        moveCount: 0,
+        clockDataCount: 0,
+        avgCpLoss: stats.flaggedCount > 0 ? stats.totalCpLoss / stats.flaggedCount : null,
+        topFlagTypes: Object.entries(stats.flagTypeCounts).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([type]) => type),
+      };
+    });
+    return {
+      meetsThreshold, sampleSize,
+      squares: { blunderDensity, timePressure: [], accuracy: [] },
+      axes: { ranks: [], files: [], diagonals: [] },
+      caption: null, availableThemes, flagOnly: true,
     };
   }
 
@@ -166,5 +199,12 @@ export async function getBiasData(userId: string): Promise<BiasData> {
     squares: { blunderDensity: build("blunderDensity"), timePressure: build("timePressure"), accuracy: build("accuracy") },
     axes: { ranks: summarize(ranks), files: summarize(files), diagonals: summarize(diagonals) },
     caption,
+    availableThemes,
+    flagOnly: false,
   };
+}
+
+export async function getBiasData(userId: string): Promise<BiasData> {
+  const row = await prisma.biasProfile.findUnique({ where: { userId } });
+  return buildBiasData(safeProfile(row?.squareBias), row?.sampleSize ?? 0);
 }

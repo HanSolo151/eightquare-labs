@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { connection, NextRequest, NextResponse } from "next/server";
 import { fetchGames } from "@/lib/lichess/fetchGames";
 import { parseGames } from "@/lib/lichess/parseGame";
 import { extractAllMoveFeatures, buildPlayerProfile } from "@/lib/features/extractFeatures";
@@ -24,6 +24,7 @@ function sameUser(a: string | null | undefined, b: string | null | undefined): b
 }
 
 export async function GET(req: NextRequest) {
+  await connection();
   const username = req.nextUrl.searchParams.get("username");
   if (!username) return NextResponse.json({ error: "username required" }, { status: 400 });
 

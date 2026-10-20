@@ -26,43 +26,58 @@ function isSerializationConflict(error: unknown): boolean {
   return isRecord(error) && error.code === "P2034";
 }
 
-function isPushBody(value: unknown): value is PushBody {
-  if (!isRecord(value) || typeof value.gameId !== "string" || !value.gameId) return false;
-  if (!isRecord(value.gameEval) || value.gameEval.gameId !== value.gameId) return false;
-  if (typeof value.gameEval.engineVersion !== "string" || !Array.isArray(value.gameEval.points)) return false;
-  if (!Array.isArray(value.moveFeatures) || !Array.isArray(value.flags)) return false;
-  if (!isRecord(value.playerProfile)) return false;
+function pushBodyValidationError(value: unknown): string | null {
+  if (!isRecord(value)) return "body must be a JSON object";
+  if (typeof value.gameId !== "string" || !value.gameId) return "gameId must be a non-empty string";
+  if (!isRecord(value.gameEval)) return "gameEval must be an object";
+  if (value.gameEval.gameId !== value.gameId) return "gameEval.gameId must match gameId";
+  if (typeof value.gameEval.engineVersion !== "string") return "gameEval.engineVersion must be a string";
+  if (!Array.isArray(value.gameEval.points)) return "gameEval.points must be an array";
+  if (!Array.isArray(value.moveFeatures)) return "moveFeatures must be an array";
+  if (!Array.isArray(value.flags)) return "flags must be an array";
+  if (!isRecord(value.playerProfile)) return "playerProfile must be an object";
 
   const profile = value.playerProfile;
-  if (
-    typeof profile.username !== "string" ||
-    !Number.isInteger(profile.gamesAnalyzed) ||
-    !isFiniteNumber(profile.premoveRate) ||
-    !isRecord(profile.avgMoveTimeSecByPhase) ||
-    !Array.isArray(profile.mostCommonOpenings) ||
-    !(profile.avgOpponentRating === null || Number.isInteger(profile.avgOpponentRating))
-  ) return false;
+  if (typeof profile.username !== "string") return "playerProfile.username must be a string";
+  if (!Number.isInteger(profile.gamesAnalyzed)) return "playerProfile.gamesAnalyzed must be an integer";
+  if (!isFiniteNumber(profile.premoveRate)) return "playerProfile.premoveRate must be finite";
+  if (!isRecord(profile.avgMoveTimeSecByPhase)) return "playerProfile.avgMoveTimeSecByPhase must be an object";
+  if (!Array.isArray(profile.mostCommonOpenings)) return "playerProfile.mostCommonOpenings must be an array";
+  if (!(profile.avgOpponentRating === null || isFiniteNumber(profile.avgOpponentRating))) {
+    return "playerProfile.avgOpponentRating must be finite or null";
+  }
 
   const gameEvalPoints = value.gameEval.points;
-  if (!gameEvalPoints.every((point, ply) => {
-    if (!isRecord(point)) return false;
+  for (let ply = 0; ply < gameEvalPoints.length; ply++) {
+    const point = gameEvalPoints[ply];
+    if (!isRecord(point)) return `gameEval.points[${ply}] must be an object`;
     const validScore = (score: unknown) => score === null || isFiniteNumber(score);
-    return point.ply === ply &&
-      validScore(point.cpBefore) && validScore(point.cpAfter) &&
-      validScore(point.mateBefore) && validScore(point.mateAfter) &&
-      isFiniteNumber(point.depth);
-  })) return false;
+    if (point.ply !== ply) return `gameEval.points[${ply}].ply must equal its array index`;
+    if (!validScore(point.cpBefore) || !validScore(point.cpAfter) ||
+        !validScore(point.mateBefore) || !validScore(point.mateAfter)) {
+      return `gameEval.points[${ply}] has a score that is neither finite nor null`;
+    }
+    if (!isFiniteNumber(point.depth)) return `gameEval.points[${ply}].depth must be finite`;
+  }
 
-  if (!value.moveFeatures.every((feature) =>
-    isRecord(feature) && feature.gameId === value.gameId && Number.isInteger(feature.ply)
-  )) return false;
+  for (let index = 0; index < value.moveFeatures.length; index++) {
+    const feature = value.moveFeatures[index];
+    if (!isRecord(feature)) return `moveFeatures[${index}] must be an object`;
+    if (feature.gameId !== value.gameId) return `moveFeatures[${index}].gameId must match gameId`;
+    if (!Number.isInteger(feature.ply)) return `moveFeatures[${index}].ply must be an integer`;
+  }
 
-  return value.flags.every((flag) =>
-    isRecord(flag) && flag.gameId === value.gameId && Number.isInteger(flag.ply) &&
-    isFiniteNumber(flag.cpLoss) && isFiniteNumber(flag.timeSpentSec) &&
-    isFiniteNumber(flag.phaseAvgSec) && isFiniteNumber(flag.timeRatio) &&
-    isFiniteNumber(flag.ratio) && isFiniteNumber(flag.clockRemainingSec)
-  );
+  const numericFlagFields = ["cpLoss", "timeSpentSec", "phaseAvgSec", "timeRatio", "ratio", "clockRemainingSec"] as const;
+  for (let index = 0; index < value.flags.length; index++) {
+    const flag = value.flags[index];
+    if (!isRecord(flag)) return `flags[${index}] must be an object`;
+    if (flag.gameId !== value.gameId) return `flags[${index}].gameId must match gameId`;
+    if (!Number.isInteger(flag.ply)) return `flags[${index}].ply must be an integer`;
+    for (const field of numericFlagFields) {
+      if (!isFiniteNumber(flag[field])) return `flags[${index}].${field} must be finite`;
+    }
+  }
+  return null;
 }
 
 export async function POST(req: NextRequest) {
@@ -76,11 +91,20 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
   }
-  if (!isPushBody(payload)) {
-    return NextResponse.json({ error: "invalid evaluation payload" }, { status: 400 });
+  const payloadError = pushBodyValidationError(payload);
+  if (payloadError) {
+    return NextResponse.json(
+      { error: "invalid evaluation payload", detail: payloadError },
+      { status: 400 }
+    );
   }
-  const body = payload;
+  const body = payload as PushBody;
   const { gameId, gameEval, moveFeatures, flags, playerProfile } = body;
+  // The profile type represents an average and can legitimately be
+  // fractional; the PostgreSQL column is Int, so normalize at persistence.
+  const storedAvgOpponentRating = playerProfile.avgOpponentRating === null
+    ? null
+    : Math.round(playerProfile.avgOpponentRating);
 
   const game = await prisma.game.findUnique({
     where: { userId_lichessGameId: { userId, lichessGameId: gameId } },
@@ -251,7 +275,7 @@ export async function POST(req: NextRequest) {
         avgMoveTimeSecByPhase: playerProfile.avgMoveTimeSecByPhase as unknown as Prisma.InputJsonValue,
         premoveRate: playerProfile.premoveRate,
         mostCommonOpenings: playerProfile.mostCommonOpenings as unknown as Prisma.InputJsonValue,
-        avgOpponentRating: playerProfile.avgOpponentRating,
+        avgOpponentRating: storedAvgOpponentRating,
       },
       create: {
         userId,
@@ -259,7 +283,7 @@ export async function POST(req: NextRequest) {
         avgMoveTimeSecByPhase: playerProfile.avgMoveTimeSecByPhase as unknown as Prisma.InputJsonValue,
         premoveRate: playerProfile.premoveRate,
         mostCommonOpenings: playerProfile.mostCommonOpenings as unknown as Prisma.InputJsonValue,
-        avgOpponentRating: playerProfile.avgOpponentRating,
+        avgOpponentRating: storedAvgOpponentRating,
       },
     });
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });

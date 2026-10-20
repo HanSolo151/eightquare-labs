@@ -21,6 +21,7 @@ export default function GameReplay({
   maiaRating,
   humanRating,
   opponentUsername,
+  effectiveRatingFires,
 }: {
   moves: string[];
   flags: ReplayFlag[];
@@ -28,6 +29,7 @@ export default function GameReplay({
   maiaRating: number | null;
   humanRating: number | null;
   opponentUsername: string;
+  effectiveRatingFires: boolean;
 }) {
   const [ply, setPly] = useState(0);
   const { fen, invalidPly } = useMemo(() => {
@@ -55,6 +57,7 @@ export default function GameReplay({
           maiaRating={maiaRating}
           humanRating={humanRating}
           opponentUsername={opponentUsername}
+          effectiveRatingFires={effectiveRatingFires}
           viewLastMove={lastMove(moves, ply)}
         />
         <div className="mx-auto flex w-full max-w-[480px] items-center justify-between rounded-lg border border-white/10 bg-black/35 px-3 py-2">

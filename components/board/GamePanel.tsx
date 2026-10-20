@@ -179,6 +179,7 @@ export default function GamePanel({
   const [opponentPieceActivityProfile, setOpponentPieceActivityProfile] = useState<PieceActivityProfile | null>(null);
   const [opponentOpeningTree, setOpponentOpeningTree] = useState<OpeningTree | null>(null);
   const [opponentTimePressureProfile, setOpponentTimePressureProfile] = useState<OpponentTimePressureProfile | null>(null);
+  const [effectiveRatingFiresByOpponent, setEffectiveRatingFiresByOpponent] = useState<Record<string, boolean>>({});
   const [replayFirstMoveSan, setReplayFirstMoveSan] = useState<string | null>(null);
   const [replayFirstMoveTimeSec, setReplayFirstMoveTimeSec] = useState<number | null>(null);
   const replaySessionRef = useRef(0);
@@ -433,6 +434,26 @@ export default function GamePanel({
   const { features: opponentFeatures, load: loadOpponentFeatures } = useOpponentFeatures(authenticatedUserId);
   useEffect(() => {
     const opponentName = game?.opponentUsername;
+    if (!authenticatedUserId || !opponentName || opponentName.toLowerCase() === "anonymous") return;
+    let cancelled = false;
+    void fetch(`/api/opponent/effective-rating?username=${encodeURIComponent(opponentName)}`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Effective rating lookup failed (${response.status})`);
+        return response.json() as Promise<{ fires?: boolean }>;
+      })
+      .then((signal) => {
+        if (!cancelled) setEffectiveRatingFiresByOpponent((current) => ({
+          ...current, [opponentName.trim().toLowerCase()]: signal.fires === true,
+        }));
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) console.info("Effective opponent rating unavailable; mimic stays data-gated:", error);
+      });
+    return () => { cancelled = true; };
+  }, [authenticatedUserId, game?.opponentUsername]);
+
+  useEffect(() => {
+    const opponentName = game?.opponentUsername;
     if (!opponentName || opponentName.toLowerCase() === "anonymous") return;
     let cancelled = false;
 
@@ -682,8 +703,9 @@ export default function GamePanel({
           break;
         }
         if (!response.ok) {
-          const result = (await response.json().catch(() => ({}))) as { error?: string };
-          throw new Error(result.error ?? `request failed (${response.status})`);
+          const result = (await response.json().catch(() => ({}))) as { error?: string; detail?: string };
+          const reason = result.detail ? `${result.error ?? "request failed"}: ${result.detail}` : result.error;
+          throw new Error(reason ?? `request failed (${response.status})`);
         }
         saved++;
       } catch (error) {
@@ -1125,6 +1147,9 @@ export default function GamePanel({
                 maiaRating={game.opponentRating}
                 humanRating={game.playerRating}
                 opponentUsername={game.opponentUsername}
+                effectiveRatingFires={effectiveRatingFiresByOpponent[game.opponentUsername.trim().toLowerCase()] ?? false}
+                pieceActivityProfile={sameUser(opponentPieceActivityProfile?.username, game.opponentUsername) ? opponentPieceActivityProfile : null}
+                openingTree={sameUser(opponentOpeningTree?.username, game.opponentUsername) ? opponentOpeningTree : null}
                 prewarmMimic={false}
                 inferOverride={infer}
                 boardClassName="w-full overflow-hidden rounded-lg border border-white/10 bg-[#1b1a18] p-1"

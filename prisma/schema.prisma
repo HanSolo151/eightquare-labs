@@ -32,6 +32,7 @@ model User {
   profile         PlayerProfile?
   weaknessProfile WeaknessProfileRow?
   biasProfile     BiasProfile?
+  dailyPuzzleStates DailyPuzzleState[]
 }
 
 // --- Games --------------------------------------------------------------
@@ -145,4 +146,22 @@ model BiasProfile {
   sampleSize  Int      @default(0)
   confidence  String   @default("low")
   builtAt     DateTime @default(now())
+}
+
+// Keyed by the stable game + ply pair because FlaggedMove rows are replaced
+// on re-evaluation. Progress therefore survives analysis refreshes.
+model DailyPuzzleState {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameId        String
+  ply           Int
+  status        String   @default("active") // active | solved | deferred
+  skipCount     Int      @default(0)
+  lastSkippedAt DateTime?
+  solvedAt      DateTime?
+  createdAt     DateTime @default(now())
+
+  @@unique([userId, gameId, ply])
+  @@index([userId, status])
 }
