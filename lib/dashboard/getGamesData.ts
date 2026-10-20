@@ -41,13 +41,16 @@ export interface DashboardGamesData {
 export async function getGamesData(
   userId: string,
   requestedPage = 1,
-  filter?: { openingEco?: string; severity?: "low" | "medium" | "high" }
+  filter?: { openingEco?: string; severity?: "low" | "medium" | "high"; phase?: "opening" | "middlegame" | "endgame"; gameIds?: string[] }
 ): Promise<DashboardGamesData> {
   const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
   const where = {
     userId,
+    ...(filter?.gameIds ? { id: { in: filter.gameIds } } : {}),
     ...(filter?.openingEco ? { openingEco: filter.openingEco } : {}),
-    ...(filter?.severity ? { flags: { some: { severity: filter.severity } } } : {}),
+    ...(filter?.severity || filter?.phase
+      ? { flags: { some: { ...(filter.severity ? { severity: filter.severity } : {}), ...(filter.phase ? { gamePhase: filter.phase } : {}) } } }
+      : {}),
   };
   const [totalGames, evaluatedGames] = await Promise.all([
     prisma.game.count({ where }),

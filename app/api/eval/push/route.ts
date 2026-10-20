@@ -257,9 +257,8 @@ export async function POST(req: NextRequest) {
       },
       create: {
         userId,
-        rankBias: {} as unknown as Prisma.InputJsonValue,
-        fileBias: {} as unknown as Prisma.InputJsonValue,
-        diagonalBias: {} as unknown as Prisma.InputJsonValue,
+        // Legacy rank/file/diagonal columns default to empty JSON; supported
+        // aggregates are derived from squareBias when the profile is read.
         squareBias: updatedBias.squareBias as unknown as Prisma.InputJsonValue,
         evaluatedGameIds: updatedBias.evaluatedGameIds as unknown as Prisma.InputJsonValue,
         sampleSize: updatedBias.sampleSize,

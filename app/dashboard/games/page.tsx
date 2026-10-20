@@ -18,11 +18,11 @@ function resultLabel(result: string) {
 }
 
 interface GamesPageProps {
-  searchParams: Promise<{ page?: string | string[]; opening?: string | string[]; severity?: string | string[] }>;
+  searchParams: Promise<{ page?: string | string[]; opening?: string | string[]; severity?: string | string[]; phase?: string | string[]; gameIds?: string | string[]; occurrences?: string | string[]; occurrenceCount?: string | string[] }>;
 }
 
 export default async function GamesPage({ searchParams }: GamesPageProps) {
-  const [{ page: rawPage, opening: rawOpening, severity: rawSeverity }, session] = await Promise.all([searchParams, auth()]);
+  const [{ page: rawPage, opening: rawOpening, severity: rawSeverity, phase: rawPhase, gameIds: rawGameIds, occurrences: rawOccurrences, occurrenceCount: rawOccurrenceCount }, session] = await Promise.all([searchParams, auth()]);
   const userId = getSessionUserId(session);
   if (!userId) return <EmptyState title="Session unavailable" detail="Sign in again to view your saved games." />;
 
@@ -30,9 +30,32 @@ export default async function GamesPage({ searchParams }: GamesPageProps) {
   const requestedPage = pageValue && /^\d+$/.test(pageValue) ? Number.parseInt(pageValue, 10) : 1;
   const openingValue = Array.isArray(rawOpening) ? rawOpening[0] : rawOpening;
   const severityValue = Array.isArray(rawSeverity) ? rawSeverity[0] : rawSeverity;
+  const phaseValue = Array.isArray(rawPhase) ? rawPhase[0] : rawPhase;
+  const gameIdsValue = Array.isArray(rawGameIds) ? rawGameIds.join(",") : rawGameIds;
+  const gameIds = gameIdsValue === undefined
+    ? undefined
+    : [...new Set(gameIdsValue.split(",").slice(0, 50).filter((id) => /^[A-Za-z0-9_-]{1,128}$/.test(id)))];
+  const occurrenceValue = Array.isArray(rawOccurrences) ? rawOccurrences.join(",") : rawOccurrences;
+  const occurrencePlysByGame = new Map<string, number[]>();
+  for (const token of (occurrenceValue ?? "").split(",").slice(0, 50)) {
+    const match = /^([A-Za-z0-9_-]{1,128}):(\d{1,6})$/.exec(token);
+    if (!match || (gameIds && !gameIds.includes(match[1]))) continue;
+    const ply = Number.parseInt(match[2], 10);
+    if (!Number.isSafeInteger(ply)) continue;
+    occurrencePlysByGame.set(match[1], [...(occurrencePlysByGame.get(match[1]) ?? []), ply]);
+  }
+  const occurrenceCountValue = Array.isArray(rawOccurrenceCount) ? rawOccurrenceCount[0] : rawOccurrenceCount;
+  const linkedPatternOccurrences = [...occurrencePlysByGame.values()].reduce((sum, plys) => sum + plys.length, 0);
+  const parsedOccurrenceCount = occurrenceCountValue && /^\d+$/.test(occurrenceCountValue)
+    ? Number(occurrenceCountValue)
+    : NaN;
+  const totalPatternOccurrences = Number.isSafeInteger(parsedOccurrenceCount) && parsedOccurrenceCount >= linkedPatternOccurrences
+    ? parsedOccurrenceCount
+    : linkedPatternOccurrences;
   const openingEco = openingValue && /^[A-E]\d{2}$/i.test(openingValue) ? openingValue.toUpperCase() : undefined;
   const severity = severityValue === "low" || severityValue === "medium" || severityValue === "high" ? severityValue : undefined;
-  const data = await getGamesData(userId, requestedPage, { openingEco, severity });
+  const phase = phaseValue === "opening" || phaseValue === "middlegame" || phaseValue === "endgame" ? phaseValue : undefined;
+  const data = await getGamesData(userId, requestedPage, { openingEco, severity, phase, gameIds });
   const first = data.totalGames === 0 ? 0 : (data.page - 1) * data.pageSize + 1;
   const last = Math.min(data.page * data.pageSize, data.totalGames);
 
@@ -42,7 +65,7 @@ export default async function GamesPage({ searchParams }: GamesPageProps) {
         <div>
           <p className="text-xs uppercase tracking-[0.28em] text-emerald-300">Game archive / 02</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Games</h1>
-          <p className="mt-2 text-sm text-neutral-400">Saved games and persisted analysis, newest first.{openingEco ? ` Opening ${openingEco}.` : ""}{severity ? ` ${severity} severity flags.` : ""}</p>
+          <p className="mt-2 text-sm text-neutral-400">Saved games and persisted analysis, newest first.{openingEco ? ` Opening ${openingEco}.` : ""}{phase ? ` ${phase} phase.` : ""}{severity ? ` ${severity} severity flags.` : ""}{gameIds ? ` Matching ${linkedPatternOccurrences} source positions from this pattern.` : ""}</p>
         </div>
         <p className="text-xs tabular-nums text-neutral-400">{data.evaluatedGames.toLocaleString()} / {data.totalGames.toLocaleString()} evaluated</p>
       </header>
@@ -68,6 +91,7 @@ export default async function GamesPage({ searchParams }: GamesPageProps) {
                   </div>
                   <p className="mt-2 truncate text-xs text-neutral-300">{game.openingName ?? "Opening not recorded"}{game.openingEco ? <span className="ml-2 text-neutral-500">{game.openingEco}</span> : null}</p>
                   <p className="mt-1 text-[11px] text-neutral-500">{game.createdAt ? new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(game.createdAt) : "Date unavailable"} · {Math.ceil(game.moveCount / 2)} moves · {game.playerRating ? `your rating ${game.playerRating}` : "your rating unavailable"}</p>
+                  {occurrencePlysByGame.has(game.id) && <p className="mt-2 text-[11px] text-amber-200/80">Pattern occurrences: {occurrencePlysByGame.get(game.id)!.map((ply) => `move ${Math.floor(ply / 2) + 1} ${ply % 2 === 0 ? "(White)" : "(Black)"}`).join(", ")}</p>}
                 </div>
                 <div className="flex shrink-0 items-center gap-2 self-start">
                   <span className={`rounded-full border px-2.5 py-1 text-[10px] ${game.evaluated ? "border-emerald-300/20 text-emerald-200" : "border-white/10 text-neutral-500"}`}>{game.evaluated ? "evaluated" : "pending eval"}</span>
@@ -96,19 +120,24 @@ export default async function GamesPage({ searchParams }: GamesPageProps) {
         </div>
       )}
 
+      {gameIds && <p className="text-xs text-neutral-500">Showing {linkedPatternOccurrences} of {totalPatternOccurrences} stored occurrences{totalPatternOccurrences > linkedPatternOccurrences ? " (link capped at 50)" : ""}.</p>}
       {data.totalPages > 1 && <nav aria-label="Game pages" className="flex items-center justify-between border-t border-white/10 pt-4 text-sm">
-        {data.page > 1 ? <Link href={gamesPageHref(data.page - 1, openingEco, severity)} className="text-neutral-300 hover:text-white">← Newer</Link> : <span className="text-neutral-700">← Newer</span>}
+        {data.page > 1 ? <Link href={gamesPageHref(data.page - 1, openingEco, severity, phase, gameIds, occurrenceValue, totalPatternOccurrences)} className="text-neutral-300 hover:text-white">← Newer</Link> : <span className="text-neutral-700">← Newer</span>}
         <span className="text-xs tabular-nums text-neutral-500">Page {data.page} / {data.totalPages}</span>
-        {data.page < data.totalPages ? <Link href={gamesPageHref(data.page + 1, openingEco, severity)} className="text-neutral-300 hover:text-white">Older →</Link> : <span className="text-neutral-700">Older →</span>}
+        {data.page < data.totalPages ? <Link href={gamesPageHref(data.page + 1, openingEco, severity, phase, gameIds, occurrenceValue, totalPatternOccurrences)} className="text-neutral-300 hover:text-white">Older →</Link> : <span className="text-neutral-700">Older →</span>}
       </nav>}
     </div>
   );
 }
 
-function gamesPageHref(page: number, openingEco?: string, severity?: string) {
+function gamesPageHref(page: number, openingEco?: string, severity?: string, phase?: string, gameIds?: string[], occurrences?: string, occurrenceCount?: number) {
   const params = new URLSearchParams({ page: String(page) });
   if (openingEco) params.set("opening", openingEco);
   if (severity) params.set("severity", severity);
+  if (phase) params.set("phase", phase);
+  if (gameIds) params.set("gameIds", gameIds.join(","));
+  if (occurrences) params.set("occurrences", occurrences);
+  if (occurrenceCount !== undefined) params.set("occurrenceCount", String(occurrenceCount));
   return `/dashboard/games?${params.toString()}`;
 }
 

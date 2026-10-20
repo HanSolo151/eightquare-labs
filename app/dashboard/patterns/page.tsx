@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Fragment } from "react";
 import { auth } from "@/lib/auth";
 import { getSessionUserId } from "@/lib/auth/session";
-import { getPatternsData } from "@/lib/patterns/getPatternsData";
+import { getPatternsData, heatmapDrilldownHref, openingDrilldownHref, weaknessPatternGamesHref, weaknessPatternTagHref } from "@/lib/patterns/getPatternsData";
 
 export const instant = false;
 
@@ -30,7 +30,7 @@ export default async function PatternsPage() {
           <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Patterns</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">Where your saved analysis clusters across openings, game phases, and recurring weaknesses.</p>
         </div>
-        <div className="text-xs text-neutral-400"><span className="text-white">{data.meta.gamesEvaluated}</span> / {data.meta.gamesFetched} evaluated · <span className="capitalize">{data.meta.confidence}</span> confidence</div>
+        <div className="text-xs text-neutral-400"><span className="text-white">{data.meta.gamesEvaluated}</span> / {data.meta.gamesFetched} evaluated · weakness profile <span className="capitalize">{data.meta.confidence}</span> confidence</div>
       </header>
 
       <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
@@ -42,7 +42,13 @@ export default async function PatternsPage() {
                 <div className="mb-2 flex items-baseline gap-3">
                   <span className="w-6 font-mono text-xs text-emerald-300">{String(index + 1).padStart(2, "0")}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-neutral-100">{opening.name}<span className="ml-2 text-xs text-neutral-500">{opening.eco ?? ""}</span></p>
+                    {openingDrilldownHref(opening.eco) ? (
+                      <Link className="truncate text-sm text-neutral-100 hover:text-emerald-200" href={openingDrilldownHref(opening.eco)!}>
+                        {opening.name}<span className="ml-2 text-xs text-neutral-500">{opening.eco}</span>
+                      </Link>
+                    ) : (
+                      <p className="truncate text-sm text-neutral-100">{opening.name}<span className="ml-2 text-xs text-neutral-500">ECO unavailable · drill-down unavailable</span></p>
+                    )}
                     <p className="mt-1 text-[11px] text-neutral-500">{opening.flaggedGameCount} of {opening.gamesPlayed} games flagged · {opening.flagCount} total flags · {opening.avgCpLoss} average cp loss</p>
                   </div>
                   <span className="font-mono text-sm tabular-nums text-neutral-200">{Math.round(opening.blunderRate * 100)}%</span>
@@ -54,7 +60,7 @@ export default async function PatternsPage() {
         </section>
 
         <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
-          <SectionTitle eyebrow="Flag distribution" title="Phase × severity" detail="Counts of persisted flags. Cell brightness tracks the largest count in this matrix." />
+          <SectionTitle eyebrow="Flag distribution" title="Phase × severity" detail="Counts of persisted flags. Select a cell to filter the game archive by both phase and severity." />
           <div className="mt-6 grid grid-cols-[minmax(96px,1fr)_repeat(3,minmax(48px,0.7fr))] gap-2 text-center">
             <div />
             {SEVERITIES.map((severity) => <div key={severity} className={`pb-1 text-[10px] uppercase tracking-wider ${severityStyle[severity].text}`}>{severity}</div>)}
@@ -63,7 +69,7 @@ export default async function PatternsPage() {
               {SEVERITIES.map((severity) => {
                 const count = data.heatmap[phase][severity];
                 const opacity = count ? 0.18 + (count / maxFlags) * 0.78 : 0.035;
-                return <div key={`${phase}-${severity}`} className="flex aspect-square max-h-20 items-center justify-center rounded-lg border border-white/5 font-mono text-sm tabular-nums text-white" style={{ backgroundColor: `color-mix(in srgb, ${severity === "high" ? "#fb7185" : severity === "medium" ? "#fcd34d" : "#7dd3fc"} ${Math.round(opacity * 100)}%, transparent)` }} aria-label={`${phaseName[phase]}, ${severity}: ${count} flags`} title={`${phaseName[phase]} · ${severity}: ${count}`}>{count}</div>;
+                return <Link key={`${phase}-${severity}`} href={heatmapDrilldownHref(phase, severity)} className="flex aspect-square max-h-20 items-center justify-center rounded-lg border border-white/5 font-mono text-sm tabular-nums text-white transition-opacity hover:border-white/25 hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" style={{ backgroundColor: `color-mix(in srgb, ${severity === "high" ? "#fb7185" : severity === "medium" ? "#fcd34d" : "#7dd3fc"} ${Math.round(opacity * 100)}%, transparent)` }} aria-label={`${phaseName[phase]}, ${severity}: ${count} flags. Filter games`} title={`${phaseName[phase]} · ${severity}: ${count}`}>{count}</Link>;
               })}
             </Fragment>)}
           </div>
@@ -75,23 +81,41 @@ export default async function PatternsPage() {
         <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
           <SectionTitle eyebrow="Recurring signals" title="Weakness patterns" detail="Repeated patterns accumulated from evaluated games." />
           {data.weaknessPatterns.length === 0 ? <Empty>No repeated weakness patterns have been persisted yet.</Empty> : <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            {data.weaknessPatterns.map((pattern) => <article key={pattern.id} className="rounded-lg border border-white/10 bg-white/[0.025] p-4">
-              <div className="flex items-start justify-between gap-3"><p className="text-sm leading-5 text-neutral-100">{pattern.description}</p><span className="shrink-0 rounded-full border border-white/10 px-2 py-1 font-mono text-[10px] text-neutral-300">×{pattern.occurrenceCount}</span></div>
-              {pattern.tags.length > 0 && <ul className="mt-3 flex flex-wrap gap-1.5">{pattern.tags.map((tag) => <li key={tag} className="rounded bg-white/5 px-2 py-1 text-[10px] text-neutral-400">{tag}</li>)}</ul>}
+            {data.weaknessPatterns.map((pattern) => {
+              const gamesHref = weaknessPatternGamesHref(pattern.occurrences);
+              return <article key={pattern.id} className="rounded-lg border border-white/10 bg-white/[0.025] p-4">
+              <div className="flex items-start justify-between gap-3"><p className="text-sm leading-5 text-neutral-100">{pattern.description}</p>{gamesHref ? <Link href={gamesHref} aria-label={`Review ${pattern.occurrenceCount} occurrences of ${pattern.description}`} className="shrink-0 rounded-full border border-white/10 px-2 py-1 font-mono text-[10px] text-neutral-300 hover:border-emerald-300/40 hover:text-white">×{pattern.occurrenceCount}</Link> : <span className="shrink-0 rounded-full border border-white/10 px-2 py-1 font-mono text-[10px] text-neutral-500">×{pattern.occurrenceCount}</span>}</div>
+              {pattern.tags.length > 0 && <ul className="mt-3 flex flex-wrap gap-1.5">{pattern.tags.map((tag) => {
+                const tagHref = weaknessPatternTagHref(tag, pattern.occurrences);
+                return <li key={tag}>{tagHref
+                  ? <Link href={tagHref} className="rounded bg-white/5 px-2 py-1 text-[10px] text-neutral-400 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" aria-label={`Filter this pattern's games by ${tag}`}>{tag}</Link>
+                  : <span className="rounded bg-white/5 px-2 py-1 text-[10px] text-neutral-400">{tag}</span>}
+                </li>;
+              })}</ul>}
+              {gamesHref && <p className="mt-3"><Link href={gamesHref} className="text-[11px] text-neutral-400 hover:text-white">Review matching games and moves</Link></p>}
               <p className="mt-3 text-[10px] text-neutral-600">Seen {new Date(pattern.firstSeenAt).toLocaleDateString()} – {new Date(pattern.lastSeenAt).toLocaleDateString()}</p>
-            </article>)}
+            </article>;})}
           </div>}
         </section>
 
         <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
-          <SectionTitle eyebrow="Spatial tendencies" title="Board bias" detail="Rank, file, and diagonal tendencies need their own validated analysis pass." />
-          {data.bias.built ? <div className="mt-5 rounded-lg border border-emerald-300/15 bg-emerald-300/[0.04] p-4">
-            <p className="text-sm text-neutral-200">Stored analysis · sample {data.bias.sampleSize} · {data.bias.confidence} confidence</p>
-            <pre className="mt-4 max-h-64 overflow-auto whitespace-pre-wrap break-all text-[10px] leading-5 text-neutral-500">{JSON.stringify({ rank: data.bias.rankBias, file: data.bias.fileBias, diagonal: data.bias.diagonalBias }, null, 2)}</pre>
-          </div> : <div className="mt-5 rounded-lg border border-dashed border-white/15 p-5">
-            <p className="text-sm text-neutral-200">Analysis not built yet</p>
-            <p className="mt-2 text-xs leading-5 text-neutral-500">No spatial-bias engine has produced data. This panel stays empty until that analysis is implemented and validated; it does not infer tendencies from unrelated metrics.</p>
-          </div>}
+          <SectionTitle eyebrow="Spatial tendencies" title="Board bias" detail="Square-level move and flag records aggregated by rank, file, and diagonal." />
+          {data.bias.meetsThreshold ? <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.025] p-4">
+            <p className="text-sm text-neutral-200">Computed from {data.bias.sampleSize} flagged moves</p>
+            {data.bias.caption && <p className="mt-2 text-xs leading-5 text-neutral-400">{data.bias.caption}</p>}
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              {([ ["Ranks", data.bias.axes.ranks], ["Files", data.bias.axes.files], ["Diagonals", data.bias.axes.diagonals] ] as const).map(([title, entries]) => (
+                <div key={title}>
+                  <h3 className="text-xs font-medium text-neutral-200">{title}</h3>
+                  {entries.length > 0 ? <ul className="mt-2 space-y-1.5">
+                    {entries.slice(0, 3).map((entry) => <li key={entry.label} className="flex justify-between gap-2 text-[11px] text-neutral-400">
+                      <span>{entry.label}</span><span className="shrink-0 font-mono tabular-nums">{(entry.flaggedRate * 100).toFixed(1)}% <span className="text-neutral-600">({entry.flaggedCount}/{entry.moveCount})</span></span>
+                    </li>)}
+                  </ul> : <p className="mt-2 text-[11px] leading-4 text-neutral-500">No aggregate has enough moves yet.</p>}
+                </div>
+              ))}
+            </div>
+          </div> : <Empty>{`Not enough flagged moves yet: sample ${data.bias.sampleSize} of 20 required. Sync and evaluate more games to build a stable board-bias profile.`}</Empty>}
           <Link href="/dashboard/games" className="mt-5 inline-flex text-xs text-emerald-300 hover:text-emerald-200">Explore the game archive <span aria-hidden="true" className="ml-2">→</span></Link>
         </section>
       </div>

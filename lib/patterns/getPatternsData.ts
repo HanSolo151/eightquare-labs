@@ -1,18 +1,24 @@
 import { prisma } from "@/lib/prisma";
+import { getBiasData, type BiasData } from "@/lib/bias/getBiasData";
 import type { GamePhase, WeaknessPattern } from "@/types";
 
 // Step 4/6: Screen 3 (Patterns). Like getDashboardData, this only reads
 // what's already persisted — no Stockfish/engine work happens here.
 //
-// Caveat: BiasProfile now stores square-level statistics, but those are
-// populated as new evaluations are pushed. Existing persisted evaluations
-// need a one-time backfill before this can represent the full archive.
-// The `bias` field below only exposes the stored aggregates; it does not
-// invent values from unrelated metrics.
+// Board bias is derived from persisted square-level statistics by
+// getBiasData; existing games still need evaluation/push before contributing.
 //
 // Pulled out of app/api/patterns/route.ts so the Patterns screen (a server
 // component) can call it directly instead of self-fetching its own route.
 
+// Thresholds currently affecting this page:
+// - MIN_GAMES_FOR_OPENING (2 games): opening rate eligibility.
+// - MIN_PROFILE_SAMPLES (20 flagged moves): spatial-bias panel eligibility.
+// - MIN_SQUARE_MOVES (5 moves per square): square intensity visibility.
+// - MIN_AXIS_MOVES (10 moves per aggregate): rank/file/diagonal visibility.
+// - MAX_OPENINGS_RETURNED (10) and MAX_WEAKNESS_PATTERNS_RETURNED (8): display limits.
+// Weakness confidence is independently derived from gamesEvaluated in
+// lib/profile/weaknessProfile.ts (medium >=5 games, high >=15 games).
 const MIN_GAMES_FOR_OPENING = 2; // below this, "blunder rate" is noise, not signal
 const MAX_OPENINGS_RETURNED = 10;
 const MAX_WEAKNESS_PATTERNS_RETURNED = 8;
@@ -39,6 +45,10 @@ export interface PatternsOpening {
   avgCpLoss: number;
 }
 
+export function openingDrilldownHref(eco: string | null): string | null {
+  return eco ? `/dashboard/openings/${encodeURIComponent(eco)}` : null;
+}
+
 export type PatternsHeatmap = Record<GamePhase, Record<Severity, number>>;
 
 export interface PatternsWeaknessPattern {
@@ -46,20 +56,44 @@ export interface PatternsWeaknessPattern {
   description: string;
   tags: string[];
   occurrenceCount: number;
+  occurrences: { gameId: string; ply: number }[];
   firstSeenAt: number;
   lastSeenAt: number;
 }
 
-export type PatternsBias =
-  | {
-      built: true;
-      rankBias: unknown;
-      fileBias: unknown;
-      diagonalBias: unknown;
-      sampleSize: number;
-      confidence: string;
-    }
-  | { built: false; reason: "bias engine not implemented yet" };
+export const MAX_PATTERN_LINK_OCCURRENCES = 50;
+
+export function weaknessPatternGamesHref(occurrences: { gameId: string; ply: number }[]): string | null {
+  if (occurrences.length === 0) return null;
+  const linkedOccurrences = occurrences.slice(-MAX_PATTERN_LINK_OCCURRENCES);
+  const gameIds = [...new Set(linkedOccurrences.map((occurrence) => occurrence.gameId))];
+  const params = new URLSearchParams({
+    gameIds: gameIds.join(","),
+    occurrences: linkedOccurrences.map(({ gameId, ply }) => `${gameId}:${ply}`).join(","),
+    occurrenceCount: String(occurrences.length),
+  });
+  return `/dashboard/games?${params.toString()}`;
+}
+
+const WEAKNESS_PHASE_TAGS = new Set(["opening", "middlegame", "endgame"]);
+
+export function weaknessPatternTagHref(
+  tag: string,
+  occurrences: { gameId: string; ply: number }[]
+): string | null {
+  if (!WEAKNESS_PHASE_TAGS.has(tag)) return null;
+  const href = weaknessPatternGamesHref(occurrences);
+  if (!href) return null;
+  const params = new URLSearchParams(href.slice(href.indexOf("?") + 1));
+  params.set("phase", tag);
+  return `/dashboard/games?${params.toString()}`;
+}
+
+export function heatmapDrilldownHref(phase: "opening" | "middlegame" | "endgame", severity: "low" | "medium" | "high"): string {
+  return `/dashboard/games?${new URLSearchParams({ phase, severity }).toString()}`;
+}
+
+export type PatternsBias = BiasData;
 
 export interface PatternsData {
   openings: PatternsOpening[];
@@ -70,7 +104,7 @@ export interface PatternsData {
 }
 
 export async function getPatternsData(userId: string): Promise<PatternsData> {
-  const [games, flags, weaknessRow, biasRow] = await Promise.all([
+  const [games, flags, weaknessRow, bias] = await Promise.all([
     prisma.game.findMany({
       where: { userId },
       select: { id: true, openingName: true, openingEco: true },
@@ -86,7 +120,7 @@ export async function getPatternsData(userId: string): Promise<PatternsData> {
       },
     }),
     prisma.weaknessProfileRow.findUnique({ where: { userId } }),
-    prisma.biasProfile.findUnique({ where: { userId } }),
+    getBiasData(userId),
   ]);
 
   // --- Openings ranked by blunder rate ---------------------------------
@@ -157,21 +191,10 @@ export async function getPatternsData(userId: string): Promise<PatternsData> {
       description: pattern.description,
       tags: pattern.tags,
       occurrenceCount: pattern.occurrences.length,
+      occurrences: pattern.occurrences,
       firstSeenAt: pattern.firstSeenAt,
       lastSeenAt: pattern.lastSeenAt,
     }));
-
-  // --- Bias (rank/file/diagonal) -----------------------------------------
-  const bias: PatternsBias = biasRow
-    ? {
-        built: true,
-        rankBias: biasRow.rankBias,
-        fileBias: biasRow.fileBias,
-        diagonalBias: biasRow.diagonalBias,
-        sampleSize: biasRow.sampleSize,
-        confidence: biasRow.confidence,
-      }
-    : { built: false, reason: "bias engine not implemented yet" };
 
   return {
     openings,

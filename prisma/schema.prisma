@@ -138,9 +138,11 @@ model WeaknessProfileRow {
 model BiasProfile {
   userId      String   @id
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  rankBias    Json
-  fileBias    Json
-  diagonalBias Json
+  // Legacy aggregate columns retained for compatibility. They are no
+  // longer read; rank/file/diagonal views are derived from squareBias.
+  rankBias    Json     @default("{}")
+  fileBias    Json     @default("{}")
+  diagonalBias Json    @default("{}")
   // squareBias is the source of truth; aggregate views are derived from it.
   squareBias  Json     @default("{}")
   // Makes the per-game read/modify/write fold idempotent across retries.

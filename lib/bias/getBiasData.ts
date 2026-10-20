@@ -9,8 +9,9 @@ import {
 } from "./squareGeometry";
 import type { SquareBias, SquareStats } from "./updateBiasProfile";
 
-const MIN_PROFILE_SAMPLES = 20;
-const MIN_SQUARE_MOVES = 5;
+export const MIN_PROFILE_SAMPLES = 20;
+export const MIN_SQUARE_MOVES = 5;
+export const MIN_AXIS_MOVES = 10;
 const PRIOR_STRENGTH = 5;
 
 export type HeatmapTheme = "blunderDensity" | "timePressure" | "accuracy";
@@ -183,7 +184,7 @@ export function buildBiasData(
     add(diagonals, antiDiagonalLabel(antiDiagonalKey(coord)), squareStats);
   }
   const summarize = (map: Map<string, AxisAccumulator>): BiasAxisEntry[] => [...map.entries()]
-    .filter(([, item]) => item.moves >= 10)
+    .filter(([, item]) => item.moves >= MIN_AXIS_MOVES)
     .map(([label, item]) => ({
       label,
       moveCount: item.moves,
