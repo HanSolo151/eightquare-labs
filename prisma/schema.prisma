@@ -33,6 +33,7 @@ model User {
   weaknessProfile WeaknessProfileRow?
   biasProfile     BiasProfile?
   dailyPuzzleStates DailyPuzzleState[]
+  resolvedSparPositions ResolvedSparPosition[]
 }
 
 // --- Games --------------------------------------------------------------
@@ -58,6 +59,7 @@ model Game {
 
   eval             GameEval?
   flags            FlaggedMove[]
+  resolvedSparPositions ResolvedSparPosition[]
 
   createdAt        DateTime @default(now())
 
@@ -164,4 +166,20 @@ model DailyPuzzleState {
 
   @@unique([userId, gameId, ply])
   @@index([userId, status])
+}
+
+// Records a flagged position resolved through the spar flow. The game and
+// user relations keep the marker account-scoped and cascade with its data.
+model ResolvedSparPosition {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameId     String
+  game       Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  ply        Int
+  resolvedAt DateTime @default(now())
+
+  @@unique([userId, gameId, ply])
+  @@index([userId])
+  @@index([gameId])
 }

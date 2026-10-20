@@ -25,8 +25,7 @@ export default async function DashboardPage() {
 
   return <div className="space-y-8 pb-12">
     <header className="border-b border-white/10 pb-6">
-      <p className="text-xs uppercase tracking-[0.28em] text-emerald-300">Spar</p>
-      <h1 className="mt-3 text-2xl font-semibold sm:text-3xl">The moment it went wrong</h1>
+      <h1 className="text-2xl font-semibold sm:text-3xl">The moment it went wrong</h1>
       <p className="mt-2 text-sm text-neutral-400">Review a recent flagged position, then play it against Maia or an available opponent mimic.</p>
     </header>
 

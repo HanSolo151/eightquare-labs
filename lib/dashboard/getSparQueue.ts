@@ -9,9 +9,9 @@ export interface SparQueueItem {
 
 const SEVERITY_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
-/** Persisted flagged positions not already marked solved in Daily Puzzle. */
+/** Persisted flagged positions not already solved in Daily or the spar flow. */
 export async function getSparQueue(userId: string, limit = 8): Promise<SparQueueItem[]> {
-  const [flags, solved] = await Promise.all([
+  const [flags, dailySolved, sparResolved] = await Promise.all([
     prisma.flaggedMove.findMany({
       where: { game: { userId } },
       select: {
@@ -24,8 +24,15 @@ export async function getSparQueue(userId: string, limit = 8): Promise<SparQueue
       where: { userId, status: "solved" },
       select: { gameId: true, ply: true },
     }),
+    prisma.resolvedSparPosition.findMany({
+      where: { userId },
+      select: { gameId: true, ply: true },
+    }),
   ]);
-  const solvedKeys = new Set(solved.map((item) => `${item.gameId}:${item.ply}`));
+  const solvedKeys = new Set([
+    ...dailySolved.map((item) => `${item.gameId}:${item.ply}`),
+    ...sparResolved.map((item) => `${item.gameId}:${item.ply}`),
+  ]);
   const unresolved = flags.filter((flag) => !solvedKeys.has(`${flag.gameId}:${flag.ply}`));
   unresolved.sort((a, b) =>
     (SEVERITY_RANK[b.severity] ?? 0) - (SEVERITY_RANK[a.severity] ?? 0) ||

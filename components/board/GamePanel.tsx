@@ -166,6 +166,7 @@ export default function GamePanel({
 
   // --- Step 10: replay state ---
   const [replay, setReplay] = useState(false);
+  const [turnMode, setTurnMode] = useState<"base" | "mimic" | null>(null);
   const [replayStatus, setReplayStatus] = useState<
     "idle" | "your-turn" | "maia-thinking" | "maia-error" | "game-over"
   >("idle");
@@ -812,6 +813,7 @@ export default function GamePanel({
 
     try {
       setReplayStatus("maia-thinking");
+      setTurnMode(null);
 
       const { selfRating, oppRating } = maiaRatingsFor(g);
       const inferenceFen = chess.fen();
@@ -843,6 +845,17 @@ export default function GamePanel({
         openingTree,
       });
       if (stale()) return;
+
+      const phaseMoveCount = pieceActivityProfile
+        ? Object.values(pieceActivityProfile.byPieceType).reduce(
+            (sum, byPhase) => sum + byPhase[currentPhase].moveCount,
+            0
+          )
+        : 0;
+      const profileInfluencedTurn = result.openingBoostApplied ||
+        (!!pieceActivityProfile && phaseMoveCount >= 5) ||
+        (!!phaseBucket && phaseBucket.confidence !== "low" && (collapsing || !!phaseBucket.phaseAvgSec));
+      setTurnMode(profileInfluencedTurn ? "mimic" : "base");
 
       console.info("Maia replay choice", {
         gameId: g.id,
@@ -1017,8 +1030,9 @@ export default function GamePanel({
   if (!username) return <UsernameForm onSubmit={setUsername} />;
   if (loading) {
     return (
-      <div>
-        Loading games… <button type="button" onClick={switchAccount}>Switch account</button>
+      <div className="flex h-64 items-center justify-center gap-4 text-sm text-neutral-500">
+        <span className="animate-pulse">Loading games…</span>
+        <button type="button" className="text-neutral-400 underline-offset-4 hover:text-white hover:underline" onClick={switchAccount}>Switch account</button>
       </div>
     );
   }
@@ -1037,10 +1051,17 @@ export default function GamePanel({
   const liveChess = chessRef.current;
   const isInteractive = replay && replayStatus === "your-turn";
 
+  const flagClass = (severity: FlaggedMove["severity"]) => {
+    if (severity === "high") return "border-l-2 border-amber-500/80 bg-amber-500/15 text-amber-200";
+    if (severity === "medium") return "border-l-2 border-amber-500/50 bg-amber-500/10 text-amber-200/80";
+    return "border-l-2 border-amber-500/30 bg-amber-500/5 text-neutral-300";
+  };
+
   return (
-    <div style={{ display: "flex", gap: 24 }}>
-      <div>
-         <div style={{ fontSize: 12, color: "#666", marginBottom: 6 }}>
+    <div className="flex min-w-0 flex-col gap-6 xl:flex-row">
+      <div className="flex min-w-0 flex-1 flex-col gap-6 2xl:flex-row">
+         <div className="w-full max-w-[480px] shrink-0">
+         <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
           {dataFetchedAt && (
             <span>
               {username} · last updated{" "}
@@ -1054,15 +1075,15 @@ export default function GamePanel({
               <button type="button" onClick={switchAccount}>Switch account</button>
             </span>
           )}
-          {loadError && <span style={{ color: "#b00020", marginLeft: 8 }}>Refresh failed: {loadError}</span>}
-          {flagAnalysisStatus && <span style={{ marginLeft: 8 }}>{flagAnalysisStatus}</span>}
+          {loadError && <span className="text-rose-300">Refresh failed: {loadError}</span>}
+          {flagAnalysisStatus && <span>{flagAnalysisStatus}</span>}
           {flagAnalysisError && (
-            <span style={{ color: "#b00020", marginLeft: 8 }}>
+            <span className="text-rose-300">
               Flag analysis failed: {flagAnalysisError}
             </span>
           )}
           {attemptCount > 0 && (
-            <span style={{ marginLeft: 12 }}>
+            <span>
               You have {attemptCount} past attempt{attemptCount === 1 ? "" : "s"} logged.
             </span>
           )}
@@ -1086,6 +1107,23 @@ export default function GamePanel({
 
         {replay && liveChess ? (
           <>
+            {activeFlag && <div className="mb-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="text-sm font-medium text-neutral-100">Why this position</h2>
+                <span className="text-xs text-neutral-500">Move {activeFlag.moveNumber} · {activeFlag.san} · {activeFlag.severity} severity</span>
+              </div>
+              <p className="mt-2 text-sm leading-5 text-neutral-300">{activeFlag.explanation}</p>
+              <p className="mt-2 text-xs text-neutral-500">Eval loss: {(activeFlag.cpLoss / 100).toFixed(1)} pawns · played in {activeFlag.timeSpentSec.toFixed(1)}s</p>
+            </div>}
+            <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-neutral-400" aria-live="polite">
+              {turnMode === null ? <span className="text-neutral-500">Choosing Maia’s move…</span> : (
+                <span className="rounded border border-white/10 bg-white/5 px-2 py-1">
+                  {turnMode === "mimic" && game?.opponentUsername
+                    ? `Opponent mimic · ${game.opponentUsername}`
+                    : "Base Maia"}
+                </span>
+              )}
+            </div>
             <ChessgroundBoard
               fen={replayFen ?? liveChess.fen()}
               orientation={userColor}
@@ -1096,9 +1134,9 @@ export default function GamePanel({
               lastMove={lastMove}
               onUserMove={handleUserMove}
             />
-            <div style={{ marginTop: 8 }}>
-              <div>
-                Status:{" "}
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-neutral-300">
+              <div className="flex items-center gap-2">
+                <span className={`h-2 w-2 rounded-full ${replayStatus === "your-turn" ? "animate-pulse bg-amber-400" : "bg-neutral-600"}`} />
                 {replayStatus === "your-turn" && "Your move"}
                 {replayStatus === "maia-thinking" && "Maia is thinking…"}
                 {replayStatus === "maia-error" && (
@@ -1108,10 +1146,10 @@ export default function GamePanel({
                   </>
                 )}
                 {replayStatus === "game-over" && "Game over"}
-              </div> 
+              </div>
 
               {replayStatus !== "game-over" && (
-                 <button type="button" onClick={exitReplay}>Exit replay</button>
+                 <button type="button" className="text-xs text-neutral-500 hover:text-white" onClick={exitReplay}>Exit replay</button>
              )}
 
             </div>
@@ -1120,7 +1158,7 @@ export default function GamePanel({
                 shown while replay is in progress, not just at game-over. Null
                 until Phase 3's attribution logic exists — render nothing until then. */}
             {activeFlag?.pivotMove && (
-              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
+              <div className="mt-1 text-xs text-neutral-500">
                 Pivot: {activeFlag.pivotMove.san} (ply {activeFlag.pivotMove.ply})
               </div>
             )}
@@ -1140,7 +1178,7 @@ export default function GamePanel({
           </>
         ) : (
           fen && game && <>
-            <div style={{ width: 480, marginTop: 12 }}>
+            <div className="mt-3 w-full max-w-[480px]">
               <PositionSpar
                 fen={fen}
                 humanColor={game.playerColor}
@@ -1159,9 +1197,9 @@ export default function GamePanel({
         )}
       </div>
 
-      <div style={{ maxHeight: 480, overflowY: "auto", minWidth: 280 }}>
+      <div className="max-h-[480px] min-w-0 flex-1 overflow-y-auto">
         {data.warnings.length > 0 && (
-          <div style={{ color: "orange", marginBottom: 8 }}>
+          <div className="mb-2 text-amber-300/80">
             {data.warnings.map((w) => (
               <div key={w}>{w}</div>
             ))}
@@ -1178,29 +1216,21 @@ export default function GamePanel({
                   setPly(i + 1);
                   exitReplay();
                 }}
-                style={{
-                  cursor: "pointer",
-                  background: flag
-                    ? flag.severity === "high"
-                      ? "#ffb3b3"
-                      : flag.severity === "medium"
-                      ? "#ffe0b3"
-                      : "#fff6b3"
-                    : "transparent",
-                }}
+                className={`cursor-pointer border-l-2 px-2 py-1 font-mono text-sm transition-colors duration-150 hover:bg-white/5 ${flag ? flagClass(flag.severity) : "border-transparent text-neutral-400"}`}
               >
                 {i % 2 === 0 ? `${moveNumber}. ` : ""}
                 {san}
-                {flag && <span style={{ marginLeft: 6, fontSize: 12 }}>⚠ {flag.severity}</span>}
+                {flag && <span className="ml-2 text-xs text-neutral-500">· {flag.severity}</span>}
               </li>
             );
           })}
         </ol>
       </div>
+      </div>
 
-      <div style={{ minWidth: 260, maxHeight: 480, overflowY: "auto" }}>
-        <h3 style={{ marginTop: 0 }}>Flagged moves ({visibleFlags.length})</h3>
-        {visibleFlags.length === 0 && <div>Nothing flagged (or everything dismissed).</div>}
+      <div className="max-h-[480px] w-full shrink-0 overflow-y-auto xl:w-[320px]">
+        <h3 className="mb-3 text-base font-medium text-neutral-100">Flagged moves ({visibleFlags.length})</h3>
+        {visibleFlags.length === 0 && <div className="text-sm text-neutral-500">Nothing flagged (or everything dismissed).</div>}
         {visibleFlags.map((flag) => (
           <VerdictCard 
             key={dismissalId(flag.gameId, flag.ply, flag.flagType)}
