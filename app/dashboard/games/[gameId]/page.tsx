@@ -14,8 +14,8 @@ interface GamePageProps {
 
 export const instant = false;
 
-export default async function SavedGamePage({ params }: GamePageProps) {
-  const [{ gameId }, session] = await Promise.all([params, auth()]);
+export default async function SavedGamePage({ params, searchParams }: GamePageProps & { searchParams: Promise<{ ply?: string }> }) {
+  const [{ gameId }, query, session] = await Promise.all([params, searchParams, auth()]);
   const userId = getSessionUserId(session);
   if (!userId) notFound();
 
@@ -34,6 +34,8 @@ export default async function SavedGamePage({ params }: GamePageProps) {
   const moves = Array.isArray(game.moves)
     ? game.moves.filter((move): move is string => typeof move === "string")
     : [];
+  const requestedPly = query.ply && /^\d+$/.test(query.ply) ? Number.parseInt(query.ply, 10) : 0;
+  const initialPly = Number.isSafeInteger(requestedPly) && requestedPly <= moves.length ? requestedPly : 0;
   const flags = game.flags.map((flag) => ({
     ply: flag.ply,
     san: flag.san,
@@ -53,11 +55,14 @@ export default async function SavedGamePage({ params }: GamePageProps) {
         <h1 className="mt-3 text-2xl font-semibold sm:text-3xl">vs {game.opponentUsername}</h1>
         <p className="mt-2 text-sm text-neutral-400">
           {game.openingName ?? "Opening unavailable"}{game.openingEco ? ` · ${game.openingEco}` : ""}
-          {game.lichessCreatedAt ? ` · ${new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(game.lichessCreatedAt)}` : ""}
+          {game.lichessCreatedAt && <> · <time dateTime={game.lichessCreatedAt.toISOString()} suppressHydrationWarning>{new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(game.lichessCreatedAt)}</time></>}
           {` · ${game.playerColor} · ${game.result}`}
         </p>
       </header>
       <GameReplay
+        key={`${gameId}:${initialPly}`}
+        gameId={gameId}
+        initialPly={initialPly}
         moves={moves}
         flags={flags}
         playerColor={game.playerColor === "black" ? "black" : "white"}

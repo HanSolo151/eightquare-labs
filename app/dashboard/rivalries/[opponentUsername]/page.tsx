@@ -39,7 +39,7 @@ export default async function RivalryDetailPage({ params }: { params: Promise<{ 
     {detail.dangerMove && <section className="rounded-xl border border-white/10 bg-black/35 p-5">
       <p className="text-xs uppercase tracking-widest text-neutral-500">Drill the worst flagged position</p>
       <div className="mt-4 max-w-[420px]">
-        <PositionSpar fen={detail.dangerMove.fen} humanColor={detail.dangerMove.playerColor} maiaRating={detail.dangerMove.maiaRating} humanRating={detail.dangerMove.humanRating} opponentUsername={detail.dangerMove.opponentUsername} effectiveRatingFires={detail.effectiveRatingFires} />
+        <PositionSpar fen={detail.dangerMove.fen} humanColor={detail.dangerMove.playerColor} maiaRating={detail.dangerMove.maiaRating} humanRating={detail.dangerMove.humanRating} opponentUsername={detail.dangerMove.opponentUsername} effectiveRatingFires={detail.effectiveRatingFires} resolution={{ gameId: detail.dangerMove.gameId, ply: detail.dangerMove.ply }} />
       </div>
     </section>}
   </div>;

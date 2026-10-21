@@ -662,7 +662,7 @@ export default function GamePanel({
             if (!cancelled) {
               setFlagAnalysisStatus(
                 failed > 0
-                  ? `Saved ${saved}/${evalPushes.length} games — ${failed} failed to save, check console.`
+                  ? `Saved ${saved}/${evalPushes.length} games — ${failed} still need saving. Reopen analysis to retry.`
                   : null
               );
             }
@@ -691,27 +691,36 @@ export default function GamePanel({
     // Keep pushes sequential: the endpoint incrementally folds each game
     // into the user's weakness profile, so concurrent requests could race
     // while reading and writing that aggregate row.
-    for (const entry of entries) {
-      try {
-        const response = await fetch("/api/eval/push", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...entry, playerProfile: profile }),
-        });
-        if (response.status === 401) {
-          console.info("Skipping evaluation persistence: sign in to save results across devices.");
-          failed += entries.length - saved;
-          break;
+    for (let entryIndex = 0; entryIndex < entries.length; entryIndex++) {
+      const entry = entries[entryIndex];
+      let persisted = false;
+      for (let attempt = 0; attempt < 3 && !persisted; attempt++) {
+        try {
+          const response = await fetch("/api/eval/push", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...entry, playerProfile: profile }),
+          });
+          if (response.status === 401) {
+            console.info("Skipping evaluation persistence: sign in to save results across devices.");
+            failed += entries.length - entryIndex;
+            return { saved, failed };
+          }
+          if (!response.ok) {
+            const result = (await response.json().catch(() => ({}))) as { error?: string; detail?: string };
+            const reason = result.detail ? `${result.error ?? "request failed"}: ${result.detail}` : result.error;
+            throw new Error(reason ?? `request failed (${response.status})`);
+          }
+          saved++;
+          persisted = true;
+        } catch (error) {
+          if (attempt === 2) {
+            failed++;
+            console.error("Failed to persist evaluated game after retries:", entry.gameId, error);
+          } else {
+            await new Promise((resolve) => window.setTimeout(resolve, 500 * 2 ** attempt));
+          }
         }
-        if (!response.ok) {
-          const result = (await response.json().catch(() => ({}))) as { error?: string; detail?: string };
-          const reason = result.detail ? `${result.error ?? "request failed"}: ${result.detail}` : result.error;
-          throw new Error(reason ?? `request failed (${response.status})`);
-        }
-        saved++;
-      } catch (error) {
-        failed++;
-        console.error("Failed to persist evaluated game:", entry.gameId, error);
       }
     }
 

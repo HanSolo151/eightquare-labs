@@ -5,6 +5,7 @@ import { getEffectiveRatingSignal } from "@/lib/opponent/effectiveRating";
 export interface GhostMoment {
   gameId: string;
   ply: number;
+  moves: string[];
   fenBefore: string;
   playedSan: string;
   playedUci: string;
@@ -51,7 +52,7 @@ export async function getGhostMoment(userId: string, gameId: string, targetPly?:
   const effectiveRating = await getEffectiveRatingSignal(userId, game.opponentUsername);
 
   return {
-    gameId: game.id, ply: worst.ply, fenBefore, playedSan: played.san,
+    gameId: game.id, ply: worst.ply, moves, fenBefore, playedSan: played.san,
     playedUci: played.from + played.to + (played.promotion ?? ""), cpLoss: worst.cpLoss,
     playerColor: game.playerColor === "black" ? "black" : "white",
     playerRating: game.playerRating, opponentRating: game.opponentRating,

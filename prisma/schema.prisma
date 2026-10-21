@@ -138,10 +138,11 @@ model WeaknessProfileRow {
 model BiasProfile {
   userId      String   @id
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // Legacy aggregate columns retained for compatibility. They are no
-  // longer read; rank/file/diagonal views are derived from squareBias.
+  /// @deprecated Legacy aggregates are not maintained or read. Derive rank, file, and diagonal views from squareBias.
   rankBias    Json     @default("{}")
+  /// @deprecated Legacy aggregates are not maintained or read. Derive rank, file, and diagonal views from squareBias.
   fileBias    Json     @default("{}")
+  /// @deprecated Legacy aggregates are not maintained or read. Derive rank, file, and diagonal views from squareBias.
   diagonalBias Json    @default("{}")
   // squareBias is the source of truth; aggregate views are derived from it.
   squareBias  Json     @default("{}")

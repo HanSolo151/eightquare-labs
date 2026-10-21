@@ -28,7 +28,7 @@ export function OpeningDrilldownClient({ nodes, initialNode }: { nodes: Drilldow
       </section>
       {selected ? <section className="rounded-xl border border-white/10 bg-black/35 p-4 sm:p-5">
         <p className="mb-3 text-xs uppercase tracking-widest text-neutral-500">Spar from before {selected.san}</p>
-        <PositionSpar fen={selected.fenBefore} humanColor={selected.playerColor} maiaRating={selected.maiaRating} humanRating={selected.humanRating} opponentUsername={selected.opponentUsername} effectiveRatingFires={selected.effectiveRatingFires} />
+        <PositionSpar fen={selected.fenBefore} humanColor={selected.playerColor} maiaRating={selected.maiaRating} humanRating={selected.humanRating} opponentUsername={selected.opponentUsername} effectiveRatingFires={selected.effectiveRatingFires} resolution={selected.resolutionTarget} />
       </section> : <p className="rounded-xl border border-dashed border-white/10 p-5 text-sm text-neutral-500">No replayable positions in this opening.</p>}
     </div>
   );

@@ -79,7 +79,7 @@ export default async function PatternsPage() {
 
       <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
         <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
-          <SectionTitle eyebrow="Recurring signals" title="Weakness patterns" detail="Repeated patterns accumulated from evaluated games." />
+          <SectionTitle eyebrow="Phase level signals" title="Unrecovered eval losses" detail="Repeated large evaluation losses grouped by game phase; these are not tactical motif detections." />
           {data.weaknessPatterns.length === 0 ? <Empty>No repeated weakness patterns have been persisted yet.</Empty> : <div className="mt-5 grid gap-3 sm:grid-cols-2">
             {data.weaknessPatterns.map((pattern) => {
               const gamesHref = weaknessPatternGamesHref(pattern.occurrences);

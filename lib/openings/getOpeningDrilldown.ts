@@ -6,6 +6,7 @@ import { findWorstFlaggedMove } from "@/lib/flags/findWorstFlaggedMove";
 import { getEffectiveRatingSignal } from "@/lib/opponent/effectiveRating";
 
 export interface DrilldownNode {
+  resolutionTarget: { gameId: string; ply: number } | null;
   ply: number;
   san: string;
   fenBefore: string;
@@ -39,8 +40,8 @@ export async function getOpeningDrilldown(userId: string, eco: string): Promise<
   if (games.length === 0) return null;
   const effectiveRatings = await getEffectiveRatingSignals(userId, games.map((game) => game.opponentUsername));
 
-  type Aggregate = Omit<DrilldownNode, "occurrences" | "flaggedCount" | "avgCpLoss"> & {
-    occurrences: number; flaggedPlies: Map<number, number>;
+  type Aggregate = Omit<DrilldownNode, "occurrences" | "flaggedCount" | "avgCpLoss" | "resolutionTarget"> & {
+    occurrences: number; flaggedPositions: Map<string, { gameId: string; ply: number; cpLoss: number; fenBefore: string }>;
   };
   const byKey = new Map<string, Aggregate>();
   for (const game of games) {
@@ -61,7 +62,7 @@ export async function getOpeningDrilldown(userId: string, eco: string): Promise<
       let entry = byKey.get(key);
       if (!entry) {
         entry = {
-          ply, san: move.san, fenBefore, occurrences: 0, flaggedPlies: new Map(),
+          ply, san: move.san, fenBefore, occurrences: 0, flaggedPositions: new Map(),
           opponentUsername: game.opponentUsername, maiaRating: game.opponentRating,
           humanRating: game.playerRating,
           playerColor: game.playerColor === "black" ? "black" : "white",
@@ -72,17 +73,23 @@ export async function getOpeningDrilldown(userId: string, eco: string): Promise<
       entry.occurrences++;
       const moveFlags = flagsByPly.get(ply) ?? [];
       if (moveFlags.length) {
-        entry.flaggedPlies.set(ply, Math.max(entry.flaggedPlies.get(ply) ?? 0, ...moveFlags.map((flag) => flag.cpLoss)));
+        const cpLoss = Math.max(...moveFlags.map((flag) => flag.cpLoss));
+        entry.flaggedPositions.set(`${game.id}:${ply}`, { gameId: game.id, ply, cpLoss, fenBefore });
       }
     }
   }
 
   const nodes = [...byKey.values()].map((entry) => {
-    const losses = [...entry.flaggedPlies.values()];
+    const flaggedPositions = [...entry.flaggedPositions.values()].sort((a, b) => b.cpLoss - a.cpLoss);
+    const losses = flaggedPositions.map((position) => position.cpLoss);
+    const matchingResolutionTarget = flaggedPositions.find((position) => position.fenBefore === entry.fenBefore);
     return {
       ply: entry.ply, san: entry.san, fenBefore: entry.fenBefore, occurrences: entry.occurrences,
       flaggedCount: losses.length,
       avgCpLoss: losses.length ? losses.reduce((sum, value) => sum + value, 0) / losses.length : null,
+      resolutionTarget: matchingResolutionTarget
+        ? { gameId: matchingResolutionTarget.gameId, ply: matchingResolutionTarget.ply }
+        : null,
       opponentUsername: entry.opponentUsername, maiaRating: entry.maiaRating,
       humanRating: entry.humanRating, playerColor: entry.playerColor,
       effectiveRatingFires: entry.effectiveRatingFires,
@@ -93,6 +100,7 @@ export async function getOpeningDrilldown(userId: string, eco: string): Promise<
     ? await getEffectiveRatingSignal(userId, worst.opponentUsername)
     : null;
   const dangerMove: DrilldownNode | null = worst ? {
+    resolutionTarget: { gameId: worst.gameId, ply: worst.ply },
     ply: worst.ply,
     san: worst.san,
     fenBefore: worst.fen,

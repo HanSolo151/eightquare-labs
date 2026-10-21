@@ -71,5 +71,5 @@ function sameTagSet(a: string[], b: string[]): boolean {
 }
 
 function describePattern(tags: string[]): string {
-  return `Recurring eval collapses in the ${tags.join(", ")}`;
+  return `Repeated unrecovered eval losses in the ${tags.join(", ")}`;
 }

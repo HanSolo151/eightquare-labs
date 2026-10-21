@@ -37,9 +37,16 @@ export function LichessProvider(): OAuthConfig<LichessProfile> {
   };
 }
 
+const authSecrets = process.env.AUTH_SECRET
+  ? [process.env.AUTH_SECRET, process.env.AUTH_SECRET_PREVIOUS].filter((secret): secret is string => Boolean(secret))
+  : [];
+
 export const authConfig: NextAuthConfig = {
   providers: [LichessProvider()],
   pages: { signIn: "/login" },
+  // Auth.js uses the first secret for new tokens and tries all configured
+  // secrets when reading existing sessions during a planned rotation.
+  ...(authSecrets.length ? { secret: authSecrets } : {}),
   trustHost: true,
 };
 

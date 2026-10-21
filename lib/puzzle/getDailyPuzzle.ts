@@ -15,7 +15,7 @@ export interface DailyPuzzle {
 }
 
 export async function getDailyPuzzle(userId: string): Promise<DailyPuzzle | null> {
-  const [flags, states] = await Promise.all([
+  const [flags, states, resolved] = await Promise.all([
     prisma.flaggedMove.findMany({
       where: { game: { userId } },
       orderBy: { cpLoss: "desc" },
@@ -25,18 +25,20 @@ export async function getDailyPuzzle(userId: string): Promise<DailyPuzzle | null
       },
     }),
     prisma.dailyPuzzleState.findMany({ where: { userId } }),
+    prisma.resolvedSparPosition.findMany({ where: { userId }, select: { gameId: true, ply: true } }),
   ]);
   const severityRank: Record<string, number> = { high: 3, medium: 2, low: 1 };
   flags.sort((a, b) => (severityRank[b.severity] ?? 0) - (severityRank[a.severity] ?? 0) || b.cpLoss - a.cpLoss);
 
   const stateByKey = new Map(states.map((state) => [`${state.gameId}:${state.ply}`, state]));
+  const resolvedKeys = new Set(resolved.map((item) => `${item.gameId}:${item.ply}`));
   const cooldownMs = SKIP_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
   const now = Date.now();
   for (const flag of flags) {
     const { game } = flag;
     const key = `${game.id}:${flag.ply}`;
     const state = stateByKey.get(key);
-    if (state?.status === "solved" || state?.status === "deferred") continue;
+    if (resolvedKeys.has(key) || state?.status === "solved" || state?.status === "deferred") continue;
     if (state?.lastSkippedAt && now - state.lastSkippedAt.getTime() < cooldownMs) continue;
     if (flag.color !== game.playerColor) continue;
 

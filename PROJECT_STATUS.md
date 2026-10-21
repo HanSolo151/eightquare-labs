@@ -1,6 +1,6 @@
 # EightSquare Labs — Project Status and Governing-Agent Handoff
 
-**Snapshot:** 2026-10-20  
+**Snapshot:** 2026-10-21
 **Purpose:** Describe what the repository currently implements, how its data moves, and what remains before product polish or additional feature work. This is a source-grounded handoff, not a claim that every path has been verified against the live database or in a browser.
 
 ## 1. Executive overview
@@ -16,7 +16,7 @@ The product currently includes:
 - A database-backed Games archive, saved-game review, Ghost Replay, opening analytics, pattern views, a square heatmap, Daily Puzzle, and Rivalries.
 - Base Maia spar plus an opponent-mimic mode that uses locally built opponent signals when the tier resolver allows it.
 
-The feature set is substantial, but several areas remain “implemented in source, validation outstanding.” In particular, the latest square-bias and daily-puzzle migrations must be checked against the actual database, browser flows need a real-account pass, and some analytics are intentionally proxies or partial versions of the larger spec.
+The feature set is substantial, but several areas remain “implemented in source, validation outstanding.” All eight local migrations were applied to the configured database and verified on 2026-10-21. Browser flows still need a real-account pass, and some analytics are intentionally proxies or partial versions of the larger spec.
 
 ## 2. Technology and runtime layout
 
@@ -26,7 +26,7 @@ The feature set is substantial, but several areas remain “implemented in sourc
 - **Server/data:** Auth.js (NextAuth v5 beta), Prisma 6, PostgreSQL (configured for Supabase in this environment).
 - **External data:** Lichess public games/account APIs.
 - **Client persistence:** IndexedDB for game evaluations and profile caches; localStorage for some UI/account conveniences, dismissal state, and attempt logs.
-- **Tests/build commands:** `package.json` has `dev`, `build`, `start`, and `lint`; it has no `test` script. TypeScript is run separately with `npx tsc --noEmit`.
+- **Checks:** `package.json` has `dev`, `build`, `start`, `lint`, and Playwright `test:e2e`. TypeScript is run separately with `npx tsc --noEmit`.
 
 ## 3. Architecture and data flow
 
@@ -60,6 +60,7 @@ This distinction is intentional: the root page can inspect a username or opponen
 - The stable identity key is Lichess `providerAccountId`/account ID, stored as unique `User.lichessId`; username is display data and can change.
 - JWT sessions carry the internal database `userId`, username, and plan. Server reads use `getSessionUserId` rather than trusting a client-supplied user ID.
 - OAuth tokens are encrypted by `lib/auth/tokenEncryption.ts` before storage. `lib/auth.config.ts` is the edge-safe middleware config; `lib/auth.ts` adds database callbacks for Node/server routes.
+- For `AUTH_SECRET` rotation, configure the new value as `AUTH_SECRET` and the old value as `AUTH_SECRET_PREVIOUS`. Auth.js accepts sessions signed with either secret while issuing new sessions with the current secret. Run `npm run rotate:oauth-tokens` while both values are set to re-encrypt stored provider tokens, then remove `AUTH_SECRET_PREVIOUS` after the script succeeds.
 - Game rows use an internal database `id` and the external `lichessGameId`. Uniqueness is `(userId, lichessGameId)`, allowing the same Lichess game to be associated with multiple accounts without cross-account ownership collisions.
 - Dashboard game, puzzle, rivalry, and analysis APIs scope reads/writes to the authenticated account. The game-review page and Ghost Replay lookup also verify `userId`.
 
@@ -74,7 +75,8 @@ Defined in `prisma/schema.prisma`:
 - **`PlayerProfile`** — broad account aggregates such as phase timing, premove rate, opening counts, average opponent rating.
 - **`WeaknessProfileRow`** — incrementally accumulated patterns and evaluated game IDs.
 - **`BiasProfile`** — square-level bias JSON, evaluated game IDs, sample count, confidence, and legacy rank/file/diagonal JSON columns.
-- **`DailyPuzzleState`** — per-user, per-game, per-ply solve/defer/skip state.
+- **`DailyPuzzleState`** — per-user, per-game, per-ply skip/cooldown/defer state and compatibility markers for Daily Puzzle solves.
+- **`ResolvedSparPosition`** — account-owned resolved flagged positions across Daily Puzzle, Ghost Replay, opening drills, saved-game replay, and rivalry drills.
 
 The current migration folders are:
 
@@ -84,8 +86,10 @@ The current migration folders are:
 4. `20261018150100_clear_plaintext_oauth_tokens`
 5. `20261019100000_add_square_bias`
 6. `20261019120000_add_daily_puzzle_state`
+7. `20261020120000_replace_daily_puzzle_with_resolved_spar`
+8. `20261020140000_default_legacy_bias_axes`
 
-**Live database migration status has not been checked for this handoff.** Earlier terminal output confirmed the first four migrations were deployed at that time; the square-bias and daily-puzzle migrations were added later. Before relying on those two features in production, run `npx prisma migrate status` against the intended database and apply the pending migrations deliberately. Do not infer live DB state from the local folders.
+**Live database migration status was checked on 2026-10-21** using `npx prisma migrate status` against the configured database. All eight local migrations were up to date. The square-bias, Daily Puzzle, and resolved-spar migrations are applied.
 
 ## 6. Core analysis pipeline
 
@@ -95,6 +99,7 @@ The current migration folders are:
 - `lib/lichess/parseGame.ts` converts raw Lichess games into the app's `ParsedGame` shape.
 - `lib/features/extractFeatures.ts` replays SAN with `chess.js` and derives per-ply mover/color, move number, clock spent/remaining, game phase, captures/checks/forcing moves, likely premoves, and snap decisions.
 - `lib/eval/evalCache.ts` evaluates move sequences with Stockfish and stores/retrieves game results in browser IndexedDB. Quality checks detect incomplete or malformed cached evaluation sequences.
+- Browser evaluation checkpoints each completed ply in IndexedDB and resumes that game from its last checkpoint on the next analysis load. Completed cached games whose server push failed are retried on a later analysis load.
 - `lib/flags/causality.ts` checks whether a post-move eval deficit holds or recovers later in the game.
 - `lib/flags/flagEngine.ts` combines eval loss, timing, severity, recurring-pattern and cascade rules to emit flags such as `collapse`, `pattern_repeat`, `tilt_cascade`, and `time_paradox`.
 - `lib/flags/pivotMove.ts` provides on-demand MultiPV attribution for the opponent's preceding move; it is not part of the bulk eval sweep.
@@ -119,7 +124,7 @@ Stockfish and Maia computation is client-side. The server persists results but d
 ### `/dashboard` — Spar home
 
 - Selects the most recently dated flagged game and displays its worst flagged moment via Ghost Replay.
-- Shows a queue of unresolved flagged plies; “unresolved” currently means not marked solved in `DailyPuzzleState`.
+- Shows a queue of unresolved flagged plies; `ResolvedSparPosition` is the completion source, with legacy Daily Puzzle solves also honored.
 - Queue links include `gameId` and `ply`, so the Ghost page opens that exact flagged ply. If `ply` is absent, Ghost Replay uses the game's worst flag; malformed or `>=600` query values are rejected.
 - Links to Signature and Daily Puzzle.
 
@@ -137,8 +142,8 @@ Stockfish and Maia computation is client-side. The server persists results but d
 
 ### `/dashboard/games/[gameId]/ghost`
 
-- Ghost Replay compares the recorded move, Stockfish top choice, and base Maia top choice as three static post-move board positions.
-- Shows the stored cp-loss and Stockfish's search score. These are not yet a normalized three-way post-move evaluation comparison.
+- Ghost Replay compares the recorded move, Stockfish top choice, and base Maia's behavioral prediction as three post-move positions.
+- Stockfish evaluates each resulting position from the player's perspective, handles mate scores explicitly, and reports a played-vs-Stockfish delta when both scores are centipawns. Maia's move is labeled as a behavior prediction; its resulting position is evaluated by Stockfish.
 - “Drill this position” opens PositionSpar at the pre-move FEN. The spar can offer base Maia or opponent mimic according to available tier signals.
 - Full multi-ply continuation simulation, synchronized scrubber, and continuation graph are not implemented.
 
@@ -156,7 +161,7 @@ Stockfish and Maia computation is client-side. The server persists results but d
 ### `/dashboard/daily`
 
 - Chooses an unresolved own flagged move whose side-to-move matches the user, reconstructs its pre-move position, and presents an interactive puzzle.
-- The current client checks the played move against Stockfish's top move, then persists solved status. Skips are persisted; three skips defer a position, and a shorter skip cooldown is used before it is eligible again.
+- The current client checks the played move against Stockfish's top move, then persists both the Daily Puzzle state and shared resolved-position marker. Skips remain in `DailyPuzzleState`; three skips defer a position, and a shorter skip cooldown is used before it is eligible again.
 - This is a single best-move exercise, not a multi-line tactics trainer with a full solution tree.
 
 ### `/dashboard/rivalries` and `/dashboard/rivalries/[opponentUsername]`
@@ -187,8 +192,9 @@ Stockfish and Maia computation is client-side. The server persists results but d
 | `/api/patterns` | GET | Authenticated persisted pattern data. |
 | `/api/openings` | GET | Authenticated opening danger aggregates. |
 | `/api/bias` | GET | Authenticated square-bias/heatmap data. |
-| `/api/puzzle/solve` | POST | Persists solved state for an owned flagged ply. |
+| `/api/puzzle/solve` | POST | Persists Daily Puzzle solve state and the shared resolved marker for an owned flagged ply. |
 | `/api/puzzle/skip` | POST | Persists skip/cooldown/deferred state for an owned flagged ply. |
+| `/api/spar/resolve` | POST | Persists a win/draw resolution for an owned flagged ply; it does not verify whether Stockfish assist was used. |
 | `/api/opponent` | GET | Requires sign-in and recorded games against the named opponent, then fetches opponent features from Lichess. |
 | `/api/opponent/effective-rating` | GET | Returns effective-rating signal from the signed-in user's recorded matchup history. |
 | `/api/stockfish/[asset]` | GET | Serves/proxies engine assets used by browser evaluation. |
@@ -202,29 +208,28 @@ Several dashboard pages call the same server-side data functions directly rather
 - Verify actual migration state in the intended database; local folders include two migrations added after the last user-reported deploy status.
 - Browser-check sync, evaluation save, archive review, Ghost Replay, spar, Daily Puzzle solve/skip, rivalry drill, and heatmap on a real account.
 - Revisit historical game/profile backfill for square bias. Incremental profile folding does not itself guarantee old already-evaluated games were folded into newly introduced profile columns.
-- There is no server-side eval queue, scheduled sync job, or SparSession persistence/resume.
-- No automated test command is defined in `package.json`; there are debug/evaluation pages and standalone scripts, but this handoff does not claim CI coverage.
+- There is no server-side eval queue, scheduled sync job, or SparSession persistence/resume. Eval recovery is local to the browser's IndexedDB; it does not run while the browser is closed or on another device.
+- `package.json` provides a Playwright `test:e2e` command, but no unit-test command is defined; this handoff does not claim CI coverage.
 
 ### Product/analysis gaps
 
-- Ghost Replay has no common post-move eval bar or computed played-vs-Stockfish difference. Any comparison needs score-perspective normalization and mate handling.
-- Ghost Replay full-game link currently returns to the saved review but does not establish a persisted, synchronized scrub position in `GameReplay`.
+- Ghost Replay does not have a shared visual evaluation bar; it presents normalized per-position scores and the played-vs-Stockfish delta as text.
+- Ghost Replay's full-game link opens the saved replay at the flagged move. The scrub position is URL-seeded, not persisted as a separate session.
 - Ghost Replay scrub bar and multi-ply alternative continuations are deferred.
 - Opponent-specific mimic is partial and data-gated; its tier frequency and usefulness have not been validated across a broad sample.
 - Weakness patterns are coarse phase-level groupings, not tactical concepts such as forks or back-rank motifs.
 - Some bias schema columns (`rankBias`, `fileBias`, `diagonalBias`) are present, but the current square-based updater is the source of truth; do not assume each legacy aggregate is independently produced or validated.
-- The `DailyPuzzleState` row stores `gameId` as a scalar and scopes it by `userId` in API logic; it is not currently modeled as a Prisma relation to `Game`.
-- “Open” Spar queue means “not solved in Daily Puzzle state,” not “not attempted in any spar surface.” There is no shared drill-completion state.
+- `DailyPuzzleState` remains alongside `ResolvedSparPosition` because skip count, cooldown, and deferred status are Daily-Puzzle-specific. Daily Puzzle wins write both rows; other spar surfaces write the shared resolved marker on a win or draw.
+- Spar resolution records successful wins and draws, not losses or incomplete sessions. It does not persist a full SparSession or move history. The spar UI skips resolution after displaying a Stockfish hint, but this is a client-side honesty nudge, not server-enforced integrity; the API can still be called directly.
 
 ## 11. Working-tree and validation note
 
-At the time this document was prepared, the working tree had multiple modified and untracked feature files from the ongoing dashboard, heatmap, rivalry, puzzle, ambient-signal, and Ghost Replay work. They have not been committed as part of this handoff. The document is based on source inspection; it does not assert clean migrations, a passing full lint/typecheck after the latest route edits, a successful production build, or a live browser/database run.
+On 2026-10-21, `npx tsc --noEmit`, `npm run lint`, and `npm run build` passed after the resolved-spar and Ghost Replay changes. `npx prisma migrate status` reported all eight migrations applied. `npx prisma generate` remained blocked by Windows `EPERM` while renaming the Prisma query-engine DLL. No real-account browser walkthrough has been completed.
 
 ## 12. Recommended next actions for the governing agent
 
-1. Check `npx prisma migrate status` against the intended database; apply pending migrations only after confirming the target environment.
-2. Run `npx prisma generate`, `npx tsc --noEmit`, `npm run lint`, and a production build, recording exact output. Do this with no process holding Prisma's Windows query-engine DLL if generation reports `EPERM`.
-3. Browser-validate core data flow end-to-end: sync a game, let browser analysis finish, verify visible push status, then confirm the saved archive/review reads persisted results.
-4. Validate the current feature flow before expanding scope: open a queue item to the exact ply; test Maia and mimic spar separately; solve/skip a Daily Puzzle; inspect one opening and one rivalry drill.
-5. Decide whether Ghost Replay Option A requires the shared post-move eval bar and flagged-ply GameReplay positioning now. Keep the multi-ply continuation graph and SparSession persistence as explicitly separate work.
-6. Only after this baseline is verified, proceed with larger visual redesign work.
+1. Run `npx prisma generate` after closing any process holding Prisma's Windows query-engine DLL; typecheck, lint, and production build currently pass.
+2. Browser-validate core data flow: sync and evaluate a game, confirm save status and archive reads, then test resolved spar wins/draws and Daily Puzzle solve/skip behavior.
+3. Test Maia and mimic spar, an opening drill, a rivalry drill, Ghost Replay's normalized scores, and the flagged-ply full-game replay link.
+4. Measure mimic-tier coverage on a real account before using broad claims about opponent-mimic availability. Keep the multi-ply Ghost continuation graph and SparSession persistence as separate work.
+5. Only after this baseline is verified, proceed with larger visual redesign work.

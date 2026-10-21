@@ -29,6 +29,5 @@ export default async function GhostReplayPage({ params, searchParams }: { params
       <p className="mt-2 text-sm text-neutral-400">Move {Math.floor(moment.ply / 2) + 1}, vs {moment.opponentUsername} · {Math.round(moment.cpLoss)} cp loss</p>
     </header>
     <GhostReplay key={`${moment.gameId}:${moment.ply}`} moment={moment} />
-    <Link href={`/dashboard/games/${encodeURIComponent(gameId)}`} className="inline-flex rounded-lg border border-white/10 px-4 py-2 text-xs text-neutral-300 hover:bg-white/10">Replay full game</Link>
   </div>;
 }

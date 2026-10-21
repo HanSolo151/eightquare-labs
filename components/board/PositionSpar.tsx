@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Chess } from "chess.js";
 import type { Key } from "chessground/types";
 import { useMaiaWorker, type MaiaInferenceResult } from "@/lib/maia/useMaiaWorker";
@@ -9,6 +10,7 @@ import type { OpponentFeatures } from "@/lib/lichess/opponentFeatures";
 import { loadOpponentMimicProfiles } from "@/lib/profile/opponentMimicProfiles";
 import { resolveOpponentTier } from "@/lib/opponent/resolveTier";
 import { openingTreeHitsAt } from "@/lib/profile/openingTree";
+import { evalFenMultiPv } from "@/lib/eval/stockfishEngine";
 import type { OpeningTree, OpponentTimePressureProfile, PieceActivityProfile } from "@/types";
 import ChessgroundBoard from "./ChessgroundBoard";
 
@@ -70,6 +72,8 @@ export default function PositionSpar({
   prewarmMaia = true,
   inferOverride,
   viewLastMove,
+  resolution,
+  showPreviewBoard = true,
   boardClassName = "mx-auto w-full max-w-[480px] overflow-hidden rounded-lg border border-white/10 bg-[#1b1a18] p-1",
 }: {
   fen: string;
@@ -84,6 +88,8 @@ export default function PositionSpar({
   prewarmMaia?: boolean;
   inferOverride?: (fen: string, selfRating: number | null, oppRating: number | null) => Promise<MaiaInferenceResult>;
   viewLastMove?: [Key, Key];
+  resolution?: { gameId: string; ply: number } | null;
+  showPreviewBoard?: boolean;
   boardClassName?: string;
 }) {
   const localMaia = useMaiaWorker(!inferOverride);
@@ -109,6 +115,12 @@ export default function PositionSpar({
   const [lastMove, setLastMove] = useState<[Key, Key] | undefined>();
   const [dests, setDests] = useState<Map<Key, Key[]> | undefined>();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [resolutionMessage, setResolutionMessage] = useState<string | null>(null);
+  const resolutionAttemptedRef = useRef(false);
+  const assistSessionRef = useRef(0);
+  const assistWasUsedRef = useRef(false);
+  const [assistEnabled, setAssistEnabled] = useState(false);
+  const [assistLine, setAssistLine] = useState<{ san: string | null; cp: number | null; mate: number | null; fen: string | null; from: Key | null; to: Key | null } | null>(null);
   const [styleNotice, setStyleNotice] = useState<string | null>(null);
   const [mimicWarmState, setMimicWarmState] = useState<"idle" | "warming" | "ready" | "partial">(
     prewarmMimic && opponentUsername && opponentUsername.toLowerCase() !== "anonymous" ? "warming" : "idle"
@@ -137,9 +149,38 @@ export default function PositionSpar({
     return dests;
   }
 
+  async function saveResolution(outcome: "win" | "draw") {
+    if (!resolution || resolutionAttemptedRef.current) return;
+    if (assistWasUsedRef.current) {
+      setResolutionMessage("Stockfish assist was shown, so this result will not mark the position resolved. Restart and play without the hint to verify it.");
+      return;
+    }
+    resolutionAttemptedRef.current = true;
+    setResolutionMessage("Saving resolved position…");
+    try {
+      const response = await fetch("/api/spar/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...resolution, outcome }),
+      });
+      if (!response.ok) throw new Error("Could not save the resolved position.");
+      setResolutionMessage("Win or draw saved. This position is resolved.");
+      window.dispatchEvent(new CustomEvent("spar-position-resolved", { detail: resolution }));
+    } catch (error) {
+      resolutionAttemptedRef.current = false;
+      setResolutionMessage(error instanceof Error ? error.message : "Could not save the resolved position.");
+    }
+  }
+
   function finishIfOver(chess: Chess) {
     if (!chess.isGameOver()) return false;
     setStatus("game-over");
+    if (chess.history().length > 0) {
+      if (chess.isDraw()) void saveResolution("draw");
+      else if (chess.isCheckmate() && chess.turn() !== (humanColor === "white" ? "w" : "b")) {
+        void saveResolution("win");
+      }
+    }
     return true;
   }
 
@@ -184,12 +225,28 @@ export default function PositionSpar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeSpar();
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
   async function playMaia(chess: Chess, session: number) {
     const isStale = () => sessionRef.current !== session;
     setStatus("maia-thinking");
     setErrorMessage(null);
     try {
       const inferenceFen = chess.fen();
+      const shouldAssist = assistEnabled;
+      const assistRequest = assistSessionRef.current;
       const warm = warmInferenceRef.current;
       const warmed = warm?.fen === inferenceFen && warm.selfRating === maiaRating && warm.oppRating === humanRating
         ? warm.promise
@@ -237,6 +294,7 @@ export default function PositionSpar({
       if (!finishIfOver(chess)) {
         setDests(legalDests(chess));
         setStatus("your-turn");
+        if (shouldAssist) void runAssist(chess.fen(), session, assistRequest);
       }
     } catch (err) {
       if (isStale()) return;
@@ -246,8 +304,42 @@ export default function PositionSpar({
     }
   }
 
+  async function runAssist(
+    fenAfterBotMove: string,
+    session: number,
+    request: number,
+  ) {
+    try {
+      const afterLines = await evalFenMultiPv(fenAfterBotMove, 1);
+      if (request !== assistSessionRef.current || sessionRef.current !== session) return;
+      if (chessRef.current?.fen() !== fenAfterBotMove) return;
+      const top = afterLines[0];
+      let san: string | null = null;
+      let bestReplyFen: string | null = null;
+      let from: Key | null = null;
+      let to: Key | null = null;
+      if (top?.uci) {
+        const reply = new Chess(fenAfterBotMove);
+        const move = reply.move({ from: top.uci.slice(0, 2), to: top.uci.slice(2, 4), promotion: top.uci.slice(4) || undefined });
+        san = move?.san ?? null;
+        if (move) {
+          bestReplyFen = reply.fen();
+          from = move.from as Key;
+          to = move.to as Key;
+        }
+      }
+      setAssistLine({ san, cp: top?.cp ?? null, mate: top?.mate ?? null, fen: bestReplyFen, from, to });
+      if (san && bestReplyFen) assistWasUsedRef.current = true;
+    } catch {
+      if (request === assistSessionRef.current && sessionRef.current === session) setAssistLine(null);
+    }
+  }
+
   async function startSpar() {
     const session = ++sessionRef.current;
+    assistSessionRef.current++;
+    assistWasUsedRef.current = false;
+    setAssistLine(null);
     const selectedMode: SparMode = displayedMode === "mimic" && canMimic ? "mimic" : "maia";
     activeModeRef.current = selectedMode;
     setActiveSparMode(selectedMode);
@@ -256,6 +348,8 @@ export default function PositionSpar({
     setSparFen(chess.fen());
     setLastMove(undefined);
     setErrorMessage(null);
+    setResolutionMessage(null);
+    resolutionAttemptedRef.current = false;
     setOpen(true);
     setDests(undefined);
     setStyleNotice(null);
@@ -286,9 +380,13 @@ export default function PositionSpar({
 
   function closeSpar() {
     sessionRef.current++;
+    assistSessionRef.current++;
     chessRef.current = null;
     setOpen(false);
     setErrorMessage(null);
+    setAssistEnabled(false);
+    setAssistLine(null);
+    assistWasUsedRef.current = false;
   }
 
   function onUserMove(from: Key, to: Key) {
@@ -321,10 +419,10 @@ export default function PositionSpar({
 
   return (
     <>
-      <div className={boardClassName}>
+      {!open && showPreviewBoard && <div className={boardClassName}>
         <ChessgroundBoard {...boardProps} />
-      </div>
-      <section className="rounded-xl border border-white/10 bg-black/30 p-4">
+      </div>}
+      {!open && <section className="rounded-xl border border-white/10 bg-black/30 p-4">
       {!open ? (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="w-full">
@@ -374,10 +472,70 @@ export default function PositionSpar({
               {status === "game-over" && <button type="button" onClick={startSpar} className="rounded border border-white/10 px-3 py-1.5 text-neutral-300 hover:text-white">Restart from position</button>}
             </div>
           </div>
+          {resolution && resolutionMessage && <div className="flex flex-wrap items-center gap-3 text-[11px] text-neutral-400" aria-live="polite">
+            <span>{resolutionMessage}</span>
+            {resolutionMessage.startsWith("Could not save") && <button type="button" onClick={() => void saveResolution(chessRef.current?.isDraw() ? "draw" : "win")} className="underline hover:text-white">Retry save</button>}
+          </div>}
           {styleNotice && <p className="text-[11px] leading-5 text-amber-200/80">{styleNotice}</p>}
         </div>
       )}
-      </section>
+      </section>}
+      {open && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[1000] overflow-y-auto bg-black/85 p-3 sm:p-6" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeSpar(); }}>
+          <div className="mx-auto flex min-h-full max-w-3xl items-center justify-center">
+            <section role="dialog" aria-modal="true" aria-labelledby="position-spar-title" className="w-full rounded-2xl border border-white/10 bg-[#11110f] p-4 shadow-2xl sm:p-6">
+              <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                  <h2 id="position-spar-title" className="text-base font-medium text-white">Spar from this position</h2>
+                  <p className="mt-1 text-xs text-neutral-400">You play {humanColor}; {activeSparMode === "mimic" && opponentUsername ? `Maia mimics ${opponentUsername}` : "Maia uses its baseline style"}.</p>
+                </div>
+                <button type="button" onClick={closeSpar} className="rounded border border-white/10 px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/5">Close</button>
+              </div>
+              <div className={boardClassName}>
+                <ChessgroundBoard {...boardProps}
+                  ghostLayers={assistEnabled && assistLine?.fen ? [{ fen: assistLine.fen, tint: "#38bdf8", opacity: 0.58, label: "Stockfish best move" }] : undefined}
+                  ghostArrows={assistEnabled && assistLine?.from && assistLine.to ? [{ from: assistLine.from, to: assistLine.to, tint: "#38bdf8", label: "Stockfish best move" }] : undefined} />
+              </div>
+              <div className="mt-3 space-y-2 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <label className="flex items-center gap-2 text-neutral-300">
+                    <input type="checkbox" checked={assistEnabled} onChange={(event) => {
+                      const enabled = event.target.checked;
+                      assistSessionRef.current++;
+                      setAssistEnabled(enabled);
+                      setAssistLine(null);
+                      if (enabled && status === "your-turn" && chessRef.current) {
+                        void runAssist(chessRef.current.fen(), sessionRef.current, assistSessionRef.current);
+                      }
+                    }} />
+                    Show Stockfish&apos;s best move for you
+                  </label>
+                </div>
+                {assistEnabled && <p className="text-neutral-400">Engine assist: the blue arrow and ghost piece show Stockfish&apos;s top move for your turn. Once a hint appears, a win or draw here won&apos;t count as resolving the position.</p>}
+                {assistEnabled && assistLine && <p className="text-sky-300" aria-live="polite">
+                  Stockfish&apos;s top move for you: <strong>{assistLine.san ?? "unavailable"}</strong>
+                  {assistLine.mate !== null ? ` (mate in ${Math.abs(assistLine.mate)} ${assistLine.mate > 0 ? "for you" : "against you"})` : assistLine.cp !== null ? ` (${assistLine.cp > 0 ? "+" : ""}${(assistLine.cp / 100).toFixed(2)} pawns for you)` : ""}.
+                </p>}
+                <p aria-live="polite" className="text-neutral-300">
+                  {status === "loading-style" && "Loading opponent style locally. First-time profiling may take a while…"}
+                  {status === "your-turn" && "Your move"}
+                  {status === "maia-thinking" && "Maia is thinking…"}
+                  {status === "error" && (errorMessage ?? "Maia could not move.")}
+                  {status === "game-over" && "Game over"}
+                </p>
+                {status === "error" && <button type="button" onClick={() => chessRef.current && void playMaia(chessRef.current, sessionRef.current)} className="rounded border border-white/10 px-3 py-1.5 text-neutral-300 hover:text-white">Retry Maia</button>}
+                {status === "game-over" && <button type="button" onClick={startSpar} className="rounded border border-white/10 px-3 py-1.5 text-neutral-300 hover:text-white">Restart from position</button>}
+                {resolution && resolutionMessage && <div className="flex flex-wrap items-center gap-3 text-[11px] text-neutral-400" aria-live="polite">
+                  <span>{resolutionMessage}</span>
+                  {resolutionMessage.startsWith("Could not save") && <button type="button" onClick={() => void saveResolution(chessRef.current?.isDraw() ? "draw" : "win")} className="underline hover:text-white">Retry save</button>}
+                </div>}
+                {styleNotice && <p className="text-[11px] leading-5 text-amber-200/80">{styleNotice}</p>}
+              </div>
+            </section>
+          </div>
+        </div>,
+        document.body,
+      )}
     </>
   );
 }

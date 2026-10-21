@@ -8,6 +8,15 @@ import { evalFen, type EvalResult } from "./stockfishEngine";
 const ENGINE_VERSION = "stockfish-19-lite-single-depth16-v2";
 const DB_NAME = "eval-cache";
 const STORE = "games";
+const PARTIAL_STORE = "partials";
+
+interface PartialGameEval {
+  gameId: string;
+  engineVersion: string;
+  expectedPlyCount: number;
+  points: EvalPoint[];
+  evalBefore: EvalResult;
+}
 
 export interface EvalQualityReport {
   gameId: string;
@@ -114,13 +123,19 @@ export function normalizeEvalPoint(ply: number, before: EvalResult, after: EvalR
 /** Evaluate the initial position and each successive move position exactly once. */
 export async function evaluateMoveSequence(
   moves: string[],
-  evaluatePosition: (fen: string) => Promise<EvalResult> = evalFen
+  evaluatePosition: (fen: string) => Promise<EvalResult> = evalFen,
+  onPlyComplete?: (points: EvalPoint[], evalBefore: EvalResult) => Promise<void>,
+  checkpoint?: Pick<PartialGameEval, "points" | "evalBefore">
 ): Promise<EvalPoint[]> {
   const chess = new Chess();
-  const points: EvalPoint[] = [];
-  let evalBefore = await evaluatePosition(chess.fen());
+  const points: EvalPoint[] = checkpoint?.points.map((point) => ({ ...point })) ?? [];
+  for (let ply = 0; ply < points.length; ply++) {
+    const move = chess.move(moves[ply]);
+    if (!move) throw new Error(`Invalid SAN "${moves[ply]}" at ply ${ply}`);
+  }
+  let evalBefore = checkpoint?.evalBefore ?? await evaluatePosition(chess.fen());
 
-  for (let ply = 0; ply < moves.length; ply++) {
+  for (let ply = points.length; ply < moves.length; ply++) {
     const move = chess.move(moves[ply]);
     if (!move) {
       throw new Error(`Invalid SAN "${moves[ply]}" at ply ${ply}`);
@@ -128,14 +143,19 @@ export async function evaluateMoveSequence(
     const evalAfter = await evaluatePosition(chess.fen());
     points.push(normalizeEvalPoint(ply, evalBefore, evalAfter));
     evalBefore = evalAfter;
+    await onPlyComplete?.(points, evalBefore);
   }
   return points;
 }
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: "gameId" });
+    const req = indexedDB.open(DB_NAME, 2);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: "gameId" });
+      if (!db.objectStoreNames.contains(PARTIAL_STORE)) db.createObjectStore(PARTIAL_STORE, { keyPath: "gameId" });
+    };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
@@ -175,14 +195,52 @@ async function putCachedEval(evalResult: GameEval): Promise<void> {
   db.transaction(STORE, "readwrite").objectStore(STORE).put(evalResult);
 }
 
+async function getPartialEval(gameId: string, expectedPlyCount: number): Promise<PartialGameEval | null> {
+  const db = await openDb();
+  return new Promise((resolve) => {
+    const tx = db.transaction(PARTIAL_STORE, "readonly").objectStore(PARTIAL_STORE).get(gameId);
+    tx.onsuccess = () => {
+      const partial = tx.result as PartialGameEval | undefined;
+      const valid = partial?.gameId === gameId && partial.engineVersion === ENGINE_VERSION &&
+        partial.expectedPlyCount === expectedPlyCount && Array.isArray(partial.points) &&
+        partial.points.length <= expectedPlyCount &&
+        partial.points.every((point, index) => point?.ply === index) &&
+        Number.isFinite(partial.evalBefore?.depth) &&
+        (partial.evalBefore.cp === null || Number.isFinite(partial.evalBefore.cp)) &&
+        (partial.evalBefore.mate === null || Number.isFinite(partial.evalBefore.mate));
+      resolve(valid ? partial : null);
+    };
+    tx.onerror = () => resolve(null);
+  });
+}
+
+async function putPartialEval(partial: PartialGameEval): Promise<void> {
+  const db = await openDb();
+  db.transaction(PARTIAL_STORE, "readwrite").objectStore(PARTIAL_STORE).put(partial);
+}
+
+async function deletePartialEval(gameId: string): Promise<void> {
+  const db = await openDb();
+  db.transaction(PARTIAL_STORE, "readwrite").objectStore(PARTIAL_STORE).delete(gameId);
+}
+
 /** Evaluates every position in a game, ply by ply. Checks cache first. */
 export async function evalGame(gameId: string, moves: string[]): Promise<GameEval> {
   const cached = await getCachedEval(gameId, moves.length);
   if (cached) return cached;
 
+  const partial = await getPartialEval(gameId, moves.length);
   let points: EvalPoint[];
   try {
-    points = await evaluateMoveSequence(moves);
+    points = await evaluateMoveSequence(moves, evalFen, async (savedPoints, evalBefore) => {
+      await putPartialEval({
+        gameId,
+        engineVersion: ENGINE_VERSION,
+        expectedPlyCount: moves.length,
+        points: savedPoints,
+        evalBefore,
+      });
+    }, partial ?? undefined);
   } catch (error) {
     throw new Error(
       `Could not evaluate every ply for game ${gameId}: ${error instanceof Error ? error.message : String(error)}`
@@ -195,5 +253,6 @@ export async function evalGame(gameId: string, moves: string[]): Promise<GameEva
     console.warn("Stockfish evaluation contains missing or malformed per-ply data", quality);
   }
   await putCachedEval(result);
+  await deletePartialEval(gameId);
   return result;
 }

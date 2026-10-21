@@ -43,15 +43,18 @@ export function checkCausality(
   let recoveredAtPly: number | null = null;
 
   for (let ply = candidatePly + 1; ply < gameEval.points.length; ply++) {
-    // Known gap, not addressed here: a FUTURE ply that's itself mate-scored
-    // (cpAfter null) is silently skipped by this `continue`, same as before
-    // Phase 2. Only the candidate ply's own mate-after case is handled above.
-    // A genuine fix would need the same substitution applied per-ply here,
-    // not just at the one candidate — leaving that for whoever next touches
-    // the walk-forward loop, since it's a separate, pre-existing gap.
-    const cp = gameEval.points[ply].cpAfter;
-    if (cp === null) continue;
-    const ownCp = toPlayerPerspective(cp, ply, playerColor);
+    const point = gameEval.points[ply];
+    let ownCp: number;
+    if (point.cpAfter !== null) {
+      ownCp = toPlayerPerspective(point.cpAfter, ply, playerColor);
+    } else if (point.mateAfter !== null) {
+      // mateAfter uses the mover's perspective: negative means that mover
+      // faces mate, positive means they delivered mate.
+      const moverCp = point.mateAfter < 0 ? -MATE_EQUIVALENT_CP : MATE_EQUIVALENT_CP;
+      ownCp = toPlayerPerspective(moverCp, ply, playerColor);
+    } else {
+      continue;
+    }
     worst = Math.min(worst, ownCp);
     if (ownCp > -PARITY_THRESHOLD_CP) {
       recoveredAtPly = ply;

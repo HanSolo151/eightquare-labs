@@ -188,7 +188,9 @@ export async function getPatternsData(userId: string): Promise<PatternsData> {
     .slice(0, MAX_WEAKNESS_PATTERNS_RETURNED)
     .map((pattern) => ({
       id: pattern.id,
-      description: pattern.description,
+      description: pattern.description.startsWith("Recurring eval collapses in the ")
+        ? `Repeated unrecovered eval losses in the ${pattern.tags.join(", ")}`
+        : pattern.description,
       tags: pattern.tags,
       occurrenceCount: pattern.occurrences.length,
       occurrences: pattern.occurrences,

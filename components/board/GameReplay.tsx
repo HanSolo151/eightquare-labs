@@ -15,6 +15,7 @@ interface ReplayFlag {
 }
 
 export default function GameReplay({
+  gameId,
   moves,
   flags,
   playerColor,
@@ -22,7 +23,9 @@ export default function GameReplay({
   humanRating,
   opponentUsername,
   effectiveRatingFires,
+  initialPly = 0,
 }: {
+  gameId: string;
   moves: string[];
   flags: ReplayFlag[];
   playerColor: "white" | "black";
@@ -30,8 +33,9 @@ export default function GameReplay({
   humanRating: number | null;
   opponentUsername: string;
   effectiveRatingFires: boolean;
+  initialPly?: number;
 }) {
-  const [ply, setPly] = useState(0);
+  const [ply, setPly] = useState(() => Math.max(0, Math.min(moves.length, initialPly)));
   const { fen, invalidPly } = useMemo(() => {
     const chess = new Chess();
     let invalid: number | null = null;
@@ -52,12 +56,14 @@ export default function GameReplay({
     <div className="grid gap-6 xl:grid-cols-[minmax(0,480px)_minmax(280px,1fr)]">
       <section className="space-y-4">
         <PositionSpar
+          key={`${gameId}:${currentFlag?.ply ?? "none"}`}
           fen={fen}
           humanColor={playerColor}
           maiaRating={maiaRating}
           humanRating={humanRating}
           opponentUsername={opponentUsername}
           effectiveRatingFires={effectiveRatingFires}
+          resolution={currentFlag ? { gameId, ply: currentFlag.ply } : null}
           viewLastMove={lastMove(moves, ply)}
         />
         <div className="mx-auto flex w-full max-w-[480px] items-center justify-between rounded-lg border border-white/10 bg-black/35 px-3 py-2">

@@ -7,13 +7,10 @@
 // "raw logits + opponent profile -> ranked legal moves".
 //
 // IMPORTANT, read before changing thresholds:
-// - logits_maia is RAW, UNSOFTMAXED output (confirmed from maia.worker.ts
-//   and Step 1's validation, which never applied or checked a softmax).
-//   This file applies softmax itself. This was never cross-checked against
-//   the Python side's own notion of "probabilities" — if Python applies
-//   softmax differently (e.g. temperature-scaled), this will diverge
-//   slightly. Worth a Python-side sanity check if the rankings ever look
-//   off versus the Step 1 validation numbers.
+// - logits_maia is raw, unsoftmaxed model output (see maia.worker.ts). The
+//   softmax values below are relative move-selection weights at temperature
+//   1, not empirically calibrated probabilities. No Python reference output
+//   is included in this repository for cross-checking the temperature.
 // - Maia's raw argmax can be illegal (Step 7 flagged, never fixed). This
 //   file is now the ONLY place legality is enforced — baseTopMove and
 //   topMove below are both guaranteed legal. If you call the worker
@@ -32,8 +29,8 @@ import type { OpeningTree, PieceActivityProfile, PieceType } from "@/types";
 export interface RerankedMove {
   uci: string;
   san: string;
-  baseProbability: number;     // Maia alone, softmaxed + renormalized over legal moves only
-  adjustedProbability: number; // after opponent-feature boosts, renormalized over legal moves
+  baseProbability: number;     // Relative Maia selection weight over legal moves; not calibrated
+  adjustedProbability: number; // Relative weight after profile boosts; not calibrated
   boostFactor: number;         // adjustedProbability / baseProbability, for debugging/display
   isCapture: boolean;
   isQueenCapture: boolean;
@@ -97,6 +94,7 @@ export function gamePhaseFromFen(chess: Chess): "opening" | "middlegame" | "endg
 function softmax(logits: Float32Array): Float64Array {
   let maxVal = -Infinity;
   for (let i = 0; i < logits.length; i++) {
+    if (!Number.isFinite(logits[i])) throw new Error(`Maia returned a non-finite logit at index ${i}`);
     if (logits[i] > maxVal) maxVal = logits[i];
   }
   let sum = 0;

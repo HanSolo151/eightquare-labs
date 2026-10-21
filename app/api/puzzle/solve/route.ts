@@ -12,17 +12,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "valid gameId and non-negative integer ply are required" }, { status: 400 });
   }
   const gameId = body.gameId.trim();
-  const flag = await prisma.flaggedMove.findFirst({
-    where: { gameId, ply: body.ply, game: { userId } },
-    select: { id: true },
-  });
-  if (!flag) return NextResponse.json({ error: "puzzle not found" }, { status: 404 });
-
   const solvedAt = new Date();
-  await prisma.dailyPuzzleState.upsert({
-    where: { userId_gameId_ply: { userId, gameId, ply: body.ply } },
-    update: { status: "solved", solvedAt },
-    create: { userId, gameId, ply: body.ply, status: "solved", solvedAt },
+  const solved = await prisma.$transaction(async (tx) => {
+    const flag = await tx.flaggedMove.findFirst({
+      where: { gameId, ply: body.ply as number, game: { userId } },
+      select: { id: true },
+    });
+    if (!flag) return false;
+
+    await tx.dailyPuzzleState.upsert({
+      where: { userId_gameId_ply: { userId, gameId, ply: body.ply as number } },
+      update: { status: "solved", solvedAt },
+      create: { userId, gameId, ply: body.ply as number, status: "solved", solvedAt },
+    });
+    await tx.resolvedSparPosition.createMany({
+      data: [{ userId, gameId, ply: body.ply as number, resolvedAt: solvedAt }],
+      skipDuplicates: true,
+    });
+    return true;
   });
+  if (!solved) return NextResponse.json({ error: "puzzle not found" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }
