@@ -89,7 +89,7 @@ The current migration folders are:
 7. `20261020120000_replace_daily_puzzle_with_resolved_spar`
 8. `20261020140000_default_legacy_bias_axes`
 
-**Live database migration status was checked on 2026-10-21** using `npx prisma migrate status` against the configured database. All eight local migrations were up to date. The square-bias, Daily Puzzle, and resolved-spar migrations are applied.
+**Live database migration status is not confirmed.** This project status previously claimed all eight local migrations were applied, but the configured app database has since returned a missing `DailyPuzzleState` table error, and a fresh `prisma migrate status` check could not complete because the Windows Prisma schema engine failed to start. Treat square-bias, Daily Puzzle, and resolved-spar tables as unavailable until a successful status check confirms otherwise; do not infer deployment from local migration files.
 
 ## 6. Core analysis pipeline
 
@@ -145,7 +145,7 @@ Stockfish and Maia computation is client-side. The server persists results but d
 - Ghost Replay compares the recorded move, Stockfish top choice, and base Maia's behavioral prediction as three post-move positions.
 - Stockfish evaluates each resulting position from the player's perspective, handles mate scores explicitly, and reports a played-vs-Stockfish delta when both scores are centipawns. Maia's move is labeled as a behavior prediction; its resulting position is evaluated by Stockfish.
 - “Drill this position” opens PositionSpar at the pre-move FEN. The spar can offer base Maia or opponent mimic according to available tier signals.
-- Full multi-ply continuation simulation, synchronized scrubber, and continuation graph are not implemented.
+- Ghost Progression generates two continuations up to six plies (three full moves) from the selected game position: Stockfish vs. Stockfish and Maia for the side to move (using that side's saved game-time rating) vs. Stockfish. After the user generates once, the lines update as they navigate through the game. Decisive evaluations are marked without truncating the line; generation ends at six plies or when the game position is over. It reuses `GameReplay` and `PositionSpar`, and caches PGN/FEN data in device-local IndexedDB. A synchronized full-game scrubber and open-ended branching continuation graph are not implemented.
 
 ### `/dashboard/openings` and `/dashboard/openings/[eco]`
 
@@ -161,7 +161,7 @@ Stockfish and Maia computation is client-side. The server persists results but d
 ### `/dashboard/daily`
 
 - Chooses an unresolved own flagged move whose side-to-move matches the user, reconstructs its pre-move position, and presents an interactive puzzle.
-- The current client checks the played move against Stockfish's top move, then persists both the Daily Puzzle state and shared resolved-position marker. Skips remain in `DailyPuzzleState`; three skips defer a position, and a shorter skip cooldown is used before it is eligible again.
+- The current client defaults to Stockfish's exact top move, with an opt-in toggle to accept one of its top five moves within 0.25 pawns of the best line. It then persists both the Daily Puzzle state and shared resolved-position marker. Skips remain in `DailyPuzzleState`; three skips defer a position, and a shorter skip cooldown is used before it is eligible again.
 - This is a single best-move exercise, not a multi-line tactics trainer with a full solution tree.
 
 ### `/dashboard/rivalries` and `/dashboard/rivalries/[opponentUsername]`
@@ -215,7 +215,7 @@ Several dashboard pages call the same server-side data functions directly rather
 
 - Ghost Replay does not have a shared visual evaluation bar; it presents normalized per-position scores and the played-vs-Stockfish delta as text.
 - Ghost Replay's full-game link opens the saved replay at the flagged move. The scrub position is URL-seeded, not persisted as a separate session.
-- Ghost Replay scrub bar and multi-ply alternative continuations are deferred.
+- Ghost Replay's synchronized full-game scrub bar and open-ended branching continuations are deferred; its fixed six-ply progression lines are implemented and cached per device.
 - Opponent-specific mimic is partial and data-gated; its tier frequency and usefulness have not been validated across a broad sample.
 - Weakness patterns are coarse phase-level groupings, not tactical concepts such as forks or back-rank motifs.
 - Some bias schema columns (`rankBias`, `fileBias`, `diagonalBias`) are present, but the current square-based updater is the source of truth; do not assume each legacy aggregate is independently produced or validated.
@@ -224,12 +224,12 @@ Several dashboard pages call the same server-side data functions directly rather
 
 ## 11. Working-tree and validation note
 
-On 2026-10-21, `npx tsc --noEmit`, `npm run lint`, and `npm run build` passed after the resolved-spar and Ghost Replay changes. `npx prisma migrate status` reported all eight migrations applied. `npx prisma generate` remained blocked by Windows `EPERM` while renaming the Prisma query-engine DLL. No real-account browser walkthrough has been completed.
+On 2026-10-21, `npx tsc --noEmit` and `npm run lint` passed during this audit. The earlier claim that `prisma migrate status` confirmed all eight migrations is contradicted by the app's missing-table response and could not be re-verified because the Prisma schema engine failed to start. `npx prisma generate` previously remained blocked by Windows `EPERM` while renaming the Prisma query-engine DLL. No real-account browser walkthrough has been completed.
 
 ## 12. Recommended next actions for the governing agent
 
 1. Run `npx prisma generate` after closing any process holding Prisma's Windows query-engine DLL; typecheck, lint, and production build currently pass.
 2. Browser-validate core data flow: sync and evaluate a game, confirm save status and archive reads, then test resolved spar wins/draws and Daily Puzzle solve/skip behavior.
 3. Test Maia and mimic spar, an opening drill, a rivalry drill, Ghost Replay's normalized scores, and the flagged-ply full-game replay link.
-4. Measure mimic-tier coverage on a real account before using broad claims about opponent-mimic availability. Keep the multi-ply Ghost continuation graph and SparSession persistence as separate work.
+4. Measure mimic-tier coverage on a real account before using broad claims about opponent-mimic availability. Keep the open-ended Ghost continuation graph and SparSession persistence as separate work; browser-validate fixed-length Ghost Progression and its local cache.
 5. Only after this baseline is verified, proceed with larger visual redesign work.

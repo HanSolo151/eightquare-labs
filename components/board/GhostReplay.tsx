@@ -1,26 +1,27 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Chess } from "chess.js";
 import type { Key } from "chessground/types";
 import ChessgroundBoard from "./ChessgroundBoard";
+import GameReplay from "./GameReplay";
 import PositionSpar from "./PositionSpar";
 import { useMaiaWorker } from "@/lib/maia/useMaiaWorker";
 import { rerankMoves } from "@/lib/maia/rerank";
 import { evalFen, evalFenMultiPv, type EvalResult } from "@/lib/eval/stockfishEngine";
 import type { OpponentFeatures } from "@/lib/lichess/opponentFeatures";
 import type { GhostMoment } from "@/lib/ghost/getGhostMoment";
+import { generateEngineBaseline, generateMaiaVsEngine } from "@/lib/ghost/generateProgression";
+import { getCachedProgression, putCachedProgression, type CachedProgression, type ProgressionLine } from "@/lib/ghost/progressionCache";
+
+type ProgressionContent = Omit<CachedProgression, "key" | "version" | "generatedAt">;
 
 const NEUTRAL_FEATURES: OpponentFeatures = {
   username: "", gamesAnalyzed: 0, mostCommonOpenings: [], queenTradeRate: 0.5,
   aggressionIndex: 0.5, avgRating: null, fetchedAt: 0,
 };
-
-function subscribeToHydrationChange() { return () => {}; }
-function getHydratedSnapshot() { return true; }
-function getServerHydrationSnapshot() { return false; }
 
 interface ReplayLine {
   label: string;
@@ -106,19 +107,146 @@ function positionAtPly(moves: string[], ply: number): { fen: string; invalidPly:
   return { fen: chess.fen(), invalidPly: null };
 }
 
+function continuationPlyLabel(startingFen: string, ply: number, playerColor: "white" | "black") {
+  const fields = startingFen.split(" ");
+  let fullmove = Number.parseInt(fields[5] ?? "1", 10) || 1;
+  let color: "white" | "black" = fields[1] === "b" ? "black" : "white";
+  for (let index = 0; index < ply; index++) {
+    if (color === "black") fullmove++;
+    color = color === "white" ? "black" : "white";
+  }
+  return `${fullmove}${color === "black" ? "..." : "."} ${color === playerColor ? "You" : "Opponent"}`;
+}
+
 export default function GhostReplay({ moment }: { moment: GhostMoment }) {
   const { infer } = useMaiaWorker(true);
   const [lines, setLines] = useState<ReplayLine[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showSpar, setShowSpar] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [progression, setProgression] = useState<ProgressionContent | null>(null);
+  const [progressionStage, setProgressionStage] = useState<string | null>(null);
+  const [progressionError, setProgressionError] = useState<string | null>(null);
+  const [progressionNotice, setProgressionNotice] = useState<string | null>(null);
+  const [progressionFeedbackKey, setProgressionFeedbackKey] = useState<string | null>(null);
+  const [activeProgressionLine, setActiveProgressionLine] = useState<ProgressionLine | null>(null);
+  const [sparFromProgressionFen, setSparFromProgressionFen] = useState<string | null>(null);
+  const progressionRequestRef = useRef(0);
+  const continuationRequestedRef = useRef(false);
   const [currentPly, setCurrentPly] = useState(moment.ply);
-  const hydrated = useSyncExternalStore(subscribeToHydrationChange, getHydratedSnapshot, getServerHydrationSnapshot);
   const { fen: currentFen, invalidPly } = useMemo(() => positionAtPly(moment.moves, currentPly), [moment.moves, currentPly]);
   const currentSan = moment.moves[currentPly] ?? null;
+  const isGameFinished = currentPly >= moment.moves.length;
+  const predictionsAgree = Boolean(lines?.[1]?.san && lines[1].san === lines[2]?.san);
   const movingColor = currentFen.split(" ")[1] === "b" ? "black" : "white";
   const maiaRating = movingColor === moment.playerColor ? moment.playerRating : moment.opponentRating;
   const opponentRating = movingColor === moment.playerColor ? moment.opponentRating : moment.playerRating;
+  const continuationPositionKey = `${moment.gameId}:${currentPly}:${currentFen}:${maiaRating ?? "default"}`;
+  const showProgressionFeedback = progressionFeedbackKey === continuationPositionKey;
+  const currentProgressionStage = showProgressionFeedback ? progressionStage : null;
+  const currentProgressionError = showProgressionFeedback ? progressionError : null;
+  const currentProgressionNotice = showProgressionFeedback ? progressionNotice : null;
+  const visibleProgression = progression?.ply === currentPly && progression.startingFen === currentFen ? progression : null;
+
+  function navigateToPly(ply: number) {
+    setActiveProgressionLine(null);
+    setCurrentPly(ply);
+  }
+
+  useEffect(() => () => { progressionRequestRef.current++; }, []);
+
+  const generateContinuation = useCallback(async (force = false) => {
+    if (currentPly >= moment.moves.length || new Chess(currentFen).isGameOver()) return;
+    const request = ++progressionRequestRef.current;
+    const startingPly = currentPly;
+    const startingFen = currentFen;
+    const predictedColor = movingColor;
+    const predictedRating = maiaRating;
+    const otherRating = opponentRating;
+    setProgressionFeedbackKey(continuationPositionKey);
+    setProgressionStage(force ? "Regenerating the continuation…" : "Checking this browser for a saved continuation…");
+    setProgressionError(null);
+    setProgressionNotice(null);
+    try {
+      const cached = force ? null : await getCachedProgression(moment.gameId, startingPly).catch(() => null);
+      if (request !== progressionRequestRef.current) return;
+      if (cached && cached.startingFen === startingFen && cached.userRating === predictedRating) {
+        setProgression(cached);
+        setProgressionNotice("Loaded from this browser’s saved continuations.");
+        setProgressionStage(null);
+        return;
+      }
+
+      setProgression(null);
+      setProgressionStage("Generating Stockfish baseline…");
+      const engineLine = await generateEngineBaseline(startingFen, moment.playerColor);
+      if (request !== progressionRequestRef.current) return;
+      setProgressionStage("Generating Maia prediction and Stockfish replies…");
+      const maiaLine = await generateMaiaVsEngine(
+        startingFen,
+        predictedColor,
+        predictedRating,
+        otherRating,
+        infer,
+        moment.playerColor,
+      );
+      if (request !== progressionRequestRef.current) return;
+
+      const generated = {
+        gameId: moment.gameId,
+        ply: startingPly,
+        startingFen,
+        userRating: predictedRating,
+        lines: [engineLine, maiaLine] as [ProgressionLine, ProgressionLine],
+      };
+      setProgression(generated);
+      setProgressionStage("Saving this continuation on this device…");
+      try {
+        await putCachedProgression(generated);
+        setProgressionNotice("Saved in this browser. Continuations do not sync across devices.");
+      } catch {
+        setProgressionNotice("Continuation generated, but this browser could not save a local copy.");
+      }
+      if (request === progressionRequestRef.current) setProgressionStage(null);
+    } catch (err) {
+      if (request !== progressionRequestRef.current) return;
+      setProgressionError(err instanceof Error ? err.message : "Could not generate a continuation.");
+      setProgressionStage(null);
+    }
+  }, [continuationPositionKey, currentFen, currentPly, infer, maiaRating, moment.gameId, moment.moves.length, moment.playerColor, movingColor, opponentRating]);
+
+  useEffect(() => {
+    const request = ++progressionRequestRef.current;
+    let cancelled = false;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    if (currentPly >= moment.moves.length || new Chess(currentFen).isGameOver()) return () => { cancelled = true; };
+
+    void getCachedProgression(moment.gameId, currentPly).then((cached) => {
+      if (cancelled || request !== progressionRequestRef.current) return;
+      if (cached && cached.startingFen === currentFen && cached.userRating === maiaRating) {
+        setProgression(cached);
+        setProgressionFeedbackKey(continuationPositionKey);
+        setProgressionStage(null);
+        setProgressionError(null);
+        setProgressionNotice("Loaded from this browser’s saved continuations.");
+      } else if (continuationRequestedRef.current) {
+        debounceTimer = setTimeout(() => {
+          if (!cancelled && request === progressionRequestRef.current) void generateContinuation(false);
+        }, 250);
+      }
+    }).catch(() => {
+      if (!cancelled && request === progressionRequestRef.current && continuationRequestedRef.current) {
+        debounceTimer = setTimeout(() => {
+          if (!cancelled && request === progressionRequestRef.current) void generateContinuation(false);
+        }, 250);
+      }
+    });
+    return () => {
+      cancelled = true;
+      if (debounceTimer) clearTimeout(debounceTimer);
+    };
+  }, [continuationPositionKey, currentFen, currentPly, generateContinuation, maiaRating, moment.gameId, moment.moves.length]);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,6 +254,7 @@ export default function GhostReplay({ moment }: { moment: GhostMoment }) {
     async function run() {
       setLines(null);
       setError(null);
+      if (currentPly >= moment.moves.length) return;
       const maiaPromise = infer(currentFen, maiaRating, opponentRating).then((inference) =>
         rerankMoves({ fen: currentFen, logitsMaia: inference.logitsMaia, opponentFeatures: NEUTRAL_FEATURES })
       );
@@ -193,15 +322,18 @@ export default function GhostReplay({ moment }: { moment: GhostMoment }) {
       <nav className="mb-3 flex items-center justify-between rounded-lg border border-white/10 bg-black/35 px-3 py-2" aria-label="Game move navigation">
         <span className="font-mono text-xs text-neutral-400">{currentPly === moment.moves.length ? "Game end" : `Move ${Math.floor(currentPly / 2) + 1} · ${movingColor} to move`} <span className="text-neutral-600">({currentPly}/{moment.moves.length})</span></span>
         <span className="flex gap-1">
-          <button type="button" onClick={() => setCurrentPly((ply) => Math.max(0, ply - 1))} disabled={currentPly === 0} aria-label="Previous move" className="rounded border border-white/10 px-3 py-1 text-sm text-neutral-200 hover:bg-white/10 disabled:text-neutral-700">←</button>
-          <button type="button" onClick={() => setCurrentPly((ply) => Math.min(moment.moves.length, ply + 1))} disabled={currentPly >= moment.moves.length} aria-label="Next move" className="rounded border border-white/10 px-3 py-1 text-sm text-neutral-200 hover:bg-white/10 disabled:text-neutral-700">→</button>
+          <button type="button" onClick={() => navigateToPly(Math.max(0, currentPly - 1))} disabled={currentPly === 0} aria-label="Previous move" className="rounded border border-white/10 px-3 py-1 text-sm text-neutral-200 hover:bg-white/10 disabled:text-neutral-700">←</button>
+          <button type="button" onClick={() => navigateToPly(Math.min(moment.moves.length, currentPly + 1))} disabled={currentPly >= moment.moves.length} aria-label="Next move" className="rounded border border-white/10 px-3 py-1 text-sm text-neutral-200 hover:bg-white/10 disabled:text-neutral-700">→</button>
         </span>
       </nav>
-      {!hydrated || !lines ? <><ChessgroundBoard fen={currentFen} orientation={moment.playerColor} /><p className="mt-3 text-xs text-neutral-400">Loading Stockfish and Maia choices…</p></> : <>
+      {isGameFinished ? <>
+        <ChessgroundBoard fen={currentFen} orientation={moment.playerColor} />
+        <p role="status" className="mt-3 text-sm text-neutral-400">Game finished. There are no next moves to predict from this position.</p>
+      </> : !lines ? <><ChessgroundBoard fen={currentFen} orientation={moment.playerColor} /><p className="mt-3 text-xs text-neutral-400">Loading Stockfish and Maia choices…</p></> : <>
       <ChessgroundBoard fen={currentFen} orientation={moment.playerColor}
         ghostLayers={[
           ...(lines[1]?.fen ? [{ fen: lines[1].fen, tint: "#60a5fa", label: "Stockfish" }] : []),
-          ...(lines[2]?.fen ? [{ fen: lines[2].fen, tint: "#f472b6", label: "Maia" }] : []),
+          ...(lines[2]?.fen && lines[2].fen !== lines[1]?.fen ? [{ fen: lines[2].fen, tint: "#f472b6", label: "Maia" }] : []),
         ]}
         ghostArrows={[
           ...(lines[1]?.from && lines[1]?.to ? [{ from: lines[1].from, to: lines[1].to, tint: "#60a5fa", label: "Stockfish" }] : []),
@@ -211,10 +343,10 @@ export default function GhostReplay({ moment }: { moment: GhostMoment }) {
         <p className="text-sky-300"><span className="mr-2 inline-block h-2.5 w-2.5 rounded-sm bg-sky-400" />Stockfish: <strong>{lines[1]?.san ?? "unavailable"}</strong></p>
         <p className="text-pink-300"><span className="mr-2 inline-block h-2.5 w-2.5 rounded-sm bg-pink-400" />Maia: <strong>{lines[2]?.san ?? "unavailable"}</strong> <span className="text-xs text-neutral-500">(behavior prediction)</span></p>
       </div>
-      <p className="mt-2 text-xs text-neutral-500">{currentSan ? `Game move: ${currentSan}.` : "No game move from this position."} Blue arrow and ghost piece show Stockfish&apos;s top move; pink arrow and ghost piece show Maia&apos;s behavior prediction. A ghost piece marks its hypothetical destination.</p>
-      <div className="mt-3 flex justify-end">
+      <p className="mt-2 text-xs text-neutral-500">{currentSan ? `Game move: ${currentSan}.` : "No game move from this position."} {predictionsAgree ? "Stockfish and Maia agree on this move; both colored arrows mark the shared prediction." : "Blue arrow and ghost piece show Stockfish's top move; pink arrow and ghost piece show Maia's behavior prediction."} A ghost piece marks its hypothetical destination.</p>
+      {!isGameFinished && <div className="mt-3 flex justify-end">
         <button type="button" onClick={() => setCompareOpen(true)} className="rounded border border-white/10 px-2.5 py-1 text-[11px] text-neutral-400 hover:text-white">Compare boards</button>
-      </div>
+      </div>}
       </>}
     </div>
     {compareOpen && typeof document !== "undefined" && createPortal(
@@ -227,16 +359,19 @@ export default function GhostReplay({ moment }: { moment: GhostMoment }) {
           <nav className="mb-4 flex items-center justify-between rounded-lg border border-white/10 bg-black/35 px-3 py-2" aria-label="Game move navigation">
             <span className="font-mono text-xs text-neutral-400">{currentPly === moment.moves.length ? "Game end" : `Move ${Math.floor(currentPly / 2) + 1} · ${movingColor} to move`} <span className="text-neutral-600">({currentPly}/{moment.moves.length})</span></span>
             <span className="flex gap-1">
-              <button type="button" onClick={() => setCurrentPly((ply) => Math.max(0, ply - 1))} disabled={currentPly === 0} aria-label="Previous move" className="rounded border border-white/10 px-3 py-1 text-sm text-neutral-200 hover:bg-white/10 disabled:text-neutral-700">←</button>
-              <button type="button" onClick={() => setCurrentPly((ply) => Math.min(moment.moves.length, ply + 1))} disabled={currentPly >= moment.moves.length} aria-label="Next move" className="rounded border border-white/10 px-3 py-1 text-sm text-neutral-200 hover:bg-white/10 disabled:text-neutral-700">→</button>
+              <button type="button" onClick={() => navigateToPly(Math.max(0, currentPly - 1))} disabled={currentPly === 0} aria-label="Previous move" className="rounded border border-white/10 px-3 py-1 text-sm text-neutral-200 hover:bg-white/10 disabled:text-neutral-700">←</button>
+              <button type="button" onClick={() => navigateToPly(Math.min(moment.moves.length, currentPly + 1))} disabled={currentPly >= moment.moves.length} aria-label="Next move" className="rounded border border-white/10 px-3 py-1 text-sm text-neutral-200 hover:bg-white/10 disabled:text-neutral-700">→</button>
             </span>
           </nav>
-          {!hydrated || !lines ? <p className="py-12 text-center text-sm text-neutral-400">Loading Stockfish and Maia choices…</p> : <>
+          {isGameFinished ? <>
+            <div className="mx-auto max-w-[560px]"><ChessgroundBoard fen={currentFen} orientation={moment.playerColor} /></div>
+            <p role="status" className="py-6 text-center text-sm text-neutral-400">Game finished. There are no next moves to predict from this position.</p>
+          </> : !lines ? <p className="py-12 text-center text-sm text-neutral-400">Loading Stockfish and Maia choices…</p> : <>
           <div className="mx-auto mb-5 max-w-[560px]">
             <ChessgroundBoard fen={currentFen} orientation={moment.playerColor}
               ghostLayers={[
                 ...(lines[1]?.fen ? [{ fen: lines[1].fen, tint: "#60a5fa", label: "Stockfish" }] : []),
-                ...(lines[2]?.fen ? [{ fen: lines[2].fen, tint: "#f472b6", label: "Maia" }] : []),
+                ...(lines[2]?.fen && lines[2].fen !== lines[1]?.fen ? [{ fen: lines[2].fen, tint: "#f472b6", label: "Maia" }] : []),
               ]}
               ghostArrows={[
                 ...(lines[1]?.from && lines[1]?.to ? [{ from: lines[1].from, to: lines[1].to, tint: "#60a5fa", label: "Stockfish" }] : []),
@@ -264,6 +399,78 @@ export default function GhostReplay({ moment }: { moment: GhostMoment }) {
       </button>
       <Link href={`/dashboard/games/${encodeURIComponent(moment.gameId)}?ply=${currentPly}`} className="inline-flex items-center rounded-lg border border-white/10 px-4 py-2 text-xs text-neutral-300 hover:bg-white/10">Replay full game from here</Link>
     </div>
+
+    <section className="mt-7 border-t border-white/10 pt-5" aria-labelledby="ghost-progression-title">
+      <div className="max-w-2xl">
+        <p className="text-xs uppercase tracking-[0.22em] text-emerald-300">What happens next</p>
+        <h2 id="ghost-progression-title" className="mt-2 text-lg font-medium text-neutral-100">Explore a short continuation</h2>
+        <p className="mt-1 text-xs leading-5 text-neutral-500">Project the next three full moves for you and your opponent. Generate once to update the lines as you move through the game.</p>
+        {!isGameFinished && <p className="mt-2 font-mono text-[11px] text-neutral-400">Starting from ply {currentPly} · {movingColor} to move</p>}
+      </div>
+      {!isGameFinished && <button type="button" onClick={() => { continuationRequestedRef.current = true; void generateContinuation(!!visibleProgression); }} disabled={currentProgressionStage !== null} className="mt-4 rounded-lg border border-emerald-300/30 bg-emerald-300/10 px-4 py-2 text-xs text-emerald-100 hover:bg-emerald-300/15 disabled:cursor-wait disabled:opacity-60">
+        {currentProgressionStage ? "Working…" : visibleProgression ? "Regenerate Continuation" : "Generate Continuation"}
+      </button>}
+      {isGameFinished && <p className="mt-4 text-xs text-neutral-400">Game finished. There are no next moves to continue from this position.</p>}
+      {currentProgressionStage && <p className="mt-2 text-xs text-neutral-400" role="status" aria-live="polite">{currentProgressionStage}</p>}
+      {currentProgressionError && <p className="mt-2 text-xs text-amber-200" role="alert">{currentProgressionError}</p>}
+      {currentProgressionNotice && <p className="mt-2 text-xs text-neutral-500" role="status">{currentProgressionNotice}</p>}
+
+      {visibleProgression && <div className="mt-5 space-y-3">
+        {visibleProgression.lines.map((line) => <button key={line.id} type="button" onClick={() => setActiveProgressionLine(line)} disabled={line.moves.length === 0} className="block w-full rounded-xl border border-white/10 bg-black/25 p-4 text-left transition hover:border-white/20 hover:bg-white/[0.03] disabled:cursor-default disabled:opacity-60">
+          <span className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm font-medium text-neutral-100">{line.label}</span>
+            {line.decisive && <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-1 text-[10px] text-amber-200">Decisive evaluation in line</span>}
+          </span>
+          <span className="mt-1 block text-xs leading-5 text-neutral-500">{line.description}</span>
+          <span className="mt-3 flex gap-2 overflow-x-auto pb-1" aria-label={`${line.moves.length}-ply continuation timeline`}>
+            {line.moves.map((move, index) => <span key={`${index}-${move.uci}`} className="min-w-14 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5 text-center font-mono text-xs text-neutral-200" style={{ opacity: index < 2 ? 1 : index < 4 ? 0.8 : 0.5 }}>
+              <span className="block text-[9px] text-neutral-500">{continuationPlyLabel(visibleProgression.startingFen, index, moment.playerColor)}</span>{move.san}
+            </span>)}
+          </span>
+          {line.stopReason && <span className={`mt-2 block text-[11px] ${line.decisive ? "text-amber-200/80" : "text-neutral-500"}`}>{line.stopReason}</span>}
+        </button>)}
+        <p className="text-[11px] text-neutral-500">Predictions degrade the further they run from the actual game. Move tiles fade to show that uncertainty.</p>
+        <p className="text-[10px] text-neutral-600">Generated continuations are saved in this browser only and do not sync across devices.</p>
+      </div>}
+    </section>
+
+    {activeProgressionLine && visibleProgression && createPortal(
+      <div className="fixed inset-0 z-[1100] overflow-y-auto bg-black/85 p-3 sm:p-6" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveProgressionLine(null); }}>
+        <section role="dialog" aria-modal="true" aria-labelledby="progression-review-title" className="mx-auto my-5 max-w-6xl rounded-2xl border border-white/10 bg-[#11110f] p-4 shadow-2xl sm:p-6">
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <h2 id="progression-review-title" className="text-base font-medium text-white">{activeProgressionLine.label}</h2>
+              <p className="mt-1 text-xs text-neutral-400">{activeProgressionLine.description}</p>
+              {activeProgressionLine.id === "maia" && <p className="mt-1 text-[11px] text-pink-300/80">Maia behavior prediction, not a recorded game or certainty about how you would play.</p>}
+            </div>
+            <button type="button" onClick={() => setActiveProgressionLine(null)} className="rounded border border-white/10 px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/5">Close</button>
+          </div>
+          <GameReplay
+            gameId={`${moment.gameId}-${currentPly}-continuation-${activeProgressionLine.id}`}
+            moves={activeProgressionLine.moves.map((move) => move.san)}
+            pgn={activeProgressionLine.pgn}
+            flags={[]}
+            playerColor={movingColor}
+            maiaRating={opponentRating}
+            humanRating={maiaRating}
+            opponentUsername={moment.opponentUsername}
+            effectiveRatingFires={moment.effectiveRatingFires}
+            initialFen={visibleProgression.startingFen}
+            showSparControls={false}
+          />
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+            <p className="text-[11px] text-neutral-500">Stockfish evaluations use browser-side analysis. Maia&apos;s moves are rating-conditioned behavioral predictions.</p>
+            <button type="button" onClick={() => {
+              const finalMove = activeProgressionLine.moves[activeProgressionLine.moves.length - 1];
+              setSparFromProgressionFen(finalMove?.fen ?? visibleProgression.startingFen);
+              setActiveProgressionLine(null);
+            }} className="rounded-lg border border-emerald-300/30 bg-emerald-300/10 px-4 py-2 text-xs text-emerald-100 hover:bg-emerald-300/15">Spar from this position</button>
+          </div>
+        </section>
+      </div>,
+      document.body,
+    )}
+    {sparFromProgressionFen && <div className="mt-5"><PositionSpar key={sparFromProgressionFen} fen={sparFromProgressionFen} humanColor={moment.playerColor} maiaRating={moment.opponentRating} humanRating={moment.playerRating} opponentUsername={moment.opponentUsername} effectiveRatingFires={moment.effectiveRatingFires} resolution={null} showPreviewBoard={false} autoStart /></div>}
     {showSpar && <div className="mt-5 max-w-[420px]"><PositionSpar fen={currentFen} humanColor={moment.playerColor} maiaRating={moment.opponentRating} humanRating={moment.playerRating} opponentUsername={moment.opponentUsername} effectiveRatingFires={moment.effectiveRatingFires} resolution={currentPly === moment.ply ? { gameId: moment.gameId, ply: moment.ply } : null} showPreviewBoard={false} /></div>}
   </div>;
 }

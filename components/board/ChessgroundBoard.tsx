@@ -149,10 +149,22 @@ export default function ChessgroundBoard({
       {ghostArrows.map((arrow, index) => {
         const origin = squareOffset(arrow.from, orientation);
         const destination = squareOffset(arrow.to, orientation);
-        const x1 = Number.parseFloat(origin.left) + 6.25;
-        const y1 = Number.parseFloat(origin.top) + 6.25;
-        const x2 = Number.parseFloat(destination.left) + 6.25;
-        const y2 = Number.parseFloat(destination.top) + 6.25;
+        const baseX1 = Number.parseFloat(origin.left) + 6.25;
+        const baseY1 = Number.parseFloat(origin.top) + 6.25;
+        const baseX2 = Number.parseFloat(destination.left) + 6.25;
+        const baseY2 = Number.parseFloat(destination.top) + 6.25;
+        const matchingArrows = ghostArrows.filter((candidate) => candidate.from === arrow.from && candidate.to === arrow.to);
+        const duplicateIndex = matchingArrows.findIndex((candidate) => candidate.label === arrow.label);
+        const length = Math.hypot(baseX2 - baseX1, baseY2 - baseY1) || 1;
+        const perpendicularOffset = matchingArrows.length > 1
+          ? (duplicateIndex - (matchingArrows.length - 1) / 2) * 1.4
+          : 0;
+        const offsetX = -((baseY2 - baseY1) / length) * perpendicularOffset;
+        const offsetY = ((baseX2 - baseX1) / length) * perpendicularOffset;
+        const x1 = baseX1 + offsetX;
+        const y1 = baseY1 + offsetY;
+        const x2 = baseX2 + offsetX;
+        const y2 = baseY2 + offsetY;
         return <line key={arrow.label} x1={x1} y1={y1} x2={x2} y2={y2} stroke={arrow.tint} strokeWidth="1.2" strokeOpacity=".82" markerEnd={`url(#${arrowId}-arrow-${index})`} />;
       })}
     </svg>}

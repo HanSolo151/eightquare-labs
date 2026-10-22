@@ -53,6 +53,9 @@ export function parseGame(raw: unknown, forUsername: string): ParsedGame | null 
     raw.clocks.every((clock): clock is number => typeof clock === "number" && Number.isFinite(clock))
     ? raw.clocks // Lichess returns clocks in centiseconds, one per ply
     : null;
+  const clock = record(raw.clock);
+  const clockInitialSec = rating(clock.initial);
+  const clockIncrementSec = rating(clock.increment);
   const opening = record(raw.opening);
   const opponentUser = record(opponent.user);
 
@@ -64,6 +67,8 @@ export function parseGame(raw: unknown, forUsername: string): ParsedGame | null 
     playerRating: rating(isWhite ? white.rating : black.rating),
     moves: moveArray,
     clocks: clockArray,
+    clockInitialSec: clockInitialSec !== null && clockInitialSec >= 0 ? clockInitialSec : null,
+    clockIncrementSec: clockIncrementSec !== null && clockIncrementSec >= 0 ? clockIncrementSec : null,
     openingName: text(opening.name),
     openingEco: text(opening.eco),
     result: deriveResult(raw, playerColor),

@@ -9,6 +9,7 @@ import { evalFenMultiPv } from "@/lib/eval/stockfishEngine";
 import type { DailyPuzzle as DailyPuzzleData } from "@/lib/puzzle/getDailyPuzzle";
 
 type Status = "idle" | "checking" | "saving" | "correct" | "incorrect" | "error";
+const DAILY_PUZZLE_NEAR_EQUAL_CP = 25;
 
 export default function DailyPuzzle({ puzzle }: { puzzle: DailyPuzzleData }) {
   const router = useRouter();
@@ -16,6 +17,7 @@ export default function DailyPuzzle({ puzzle }: { puzzle: DailyPuzzleData }) {
   const [boardFen, setBoardFen] = useState(puzzle.fenBefore);
   const [solved, setSolved] = useState(false);
   const [busySkipping, setBusySkipping] = useState(false);
+  const [acceptNearEqual, setAcceptNearEqual] = useState(false);
   const dests = useMemo(() => {
     const chess = new Chess(boardFen);
     const map = new Map<Key, Key[]>();
@@ -36,8 +38,14 @@ export default function DailyPuzzle({ puzzle }: { puzzle: DailyPuzzleData }) {
     setBoardFen(chess.fen());
     setStatus("checking");
     try {
-      const [best] = await evalFenMultiPv(puzzle.fenBefore, 1);
-      if (best?.uci !== playedUci) {
+      const lines = await evalFenMultiPv(puzzle.fenBefore, 5);
+      const best = lines.find((line) => line.multipv === 1) ?? lines[0];
+      const isTopMove = best?.uci === playedUci;
+      const isNearEqual = acceptNearEqual && best?.cp !== null && best?.cp !== undefined && lines.some((line) =>
+        line.uci === playedUci && line.cp !== null && line.cp !== undefined &&
+        best.cp! - line.cp <= DAILY_PUZZLE_NEAR_EQUAL_CP
+      );
+      if (!isTopMove && !isNearEqual) {
         setBoardFen(puzzle.fenBefore);
         setStatus("incorrect");
         return;
@@ -77,6 +85,10 @@ export default function DailyPuzzle({ puzzle }: { puzzle: DailyPuzzleData }) {
   const interactive = !solved && status !== "checking" && status !== "saving" && !busySkipping;
   return <div className="rounded-xl border border-white/10 bg-black/35 p-4">
     <p className="text-xs text-neutral-400">Your {puzzle.severity}-severity missed move from a game against {puzzle.opponentUsername}.</p>
+    <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-xs text-neutral-400">
+      <input type="checkbox" checked={acceptNearEqual} onChange={(event) => setAcceptNearEqual(event.target.checked)} disabled={solved || status === "checking" || status === "saving"} />
+      Accept a top-five move within 0.25 pawns of Stockfish’s best
+    </label>
     <div className="mx-auto mt-3 max-w-[320px]">
       <ChessgroundBoard fen={boardFen} orientation={puzzle.playerColor} interactive={interactive} turnColor={puzzle.playerColor} dests={dests} onUserMove={(from, to) => void onUserMove(from, to)} />
     </div>
@@ -84,7 +96,7 @@ export default function DailyPuzzle({ puzzle }: { puzzle: DailyPuzzleData }) {
       {status === "checking" && "Checking your move…"}
       {status === "saving" && "Correct. Saving progress…"}
       {status === "correct" && "Solved and saved."}
-      {status === "incorrect" && "Not the engine’s top choice. Try again."}
+      {status === "incorrect" && (acceptNearEqual ? "That move is outside Stockfish’s top-five 0.25-pawn margin. Try again." : "Not the engine’s top choice. Try again.")}
       {status === "error" && "Could not complete that action. You can try again."}
     </p>
     <div className="mt-3 flex justify-center gap-3">

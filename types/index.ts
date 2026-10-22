@@ -6,6 +6,8 @@ export interface ParsedGame {
   playerRating: number | null;
   moves: string[]; // SAN moves, index 0 = white's first move
   clocks: number[] | null; // centiseconds remaining, one per ply, null if not requested
+  clockInitialSec?: number | null;
+  clockIncrementSec?: number | null;
   openingName: string | null;
   openingEco: string | null;
   result: "win" | "loss" | "draw";
@@ -68,6 +70,7 @@ export interface PhaseTimePressure {
 
 export interface OpponentTimePressureProfile {
   username: string;
+  timingVersion?: number;
   gamesAnalyzed: number;
   evaluatedGameIds: string[];
   byPhase: Record<GamePhase, PhaseTimePressure>;

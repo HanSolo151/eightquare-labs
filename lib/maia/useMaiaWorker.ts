@@ -9,6 +9,16 @@ export interface MaiaInferenceResult {
 type PendingResolve = (result: MaiaInferenceResult) => void;
 type PendingReject = (err: Error) => void;
 
+export function isMaiaWorkerStopped(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+function stoppedError(): Error {
+  const error = new Error("Maia inference was cancelled because its worker stopped.");
+  error.name = "AbortError";
+  return error;
+}
+
 export function useMaiaWorker(enabled = true) {
   const workerRef = useRef<Worker | null>(null);
   const pendingRef = useRef<Map<string, { resolve: PendingResolve; reject: PendingReject }>>(new Map());
@@ -30,13 +40,25 @@ export function useMaiaWorker(enabled = true) {
         pending.reject(new Error(e.data.error));
       }
     };
+    worker.onerror = (event) => {
+      const error = new Error(event.message || "Maia worker failed to load or run.");
+      for (const request of pendingRequests.values()) request.reject(error);
+      pendingRequests.clear();
+      if (workerRef.current === worker) workerRef.current = null;
+    };
+    worker.onmessageerror = () => {
+      const error = new Error("Maia worker returned a message that could not be read.");
+      for (const request of pendingRequests.values()) request.reject(error);
+      pendingRequests.clear();
+      if (workerRef.current === worker) workerRef.current = null;
+    };
 
     return () => {
       worker.terminate();
       if (workerRef.current === worker) workerRef.current = null;
       const pending = [...pendingRequests.values()];
       pendingRequests.clear();
-      for (const request of pending) request.reject(new Error("Maia worker stopped."));
+      for (const request of pending) request.reject(stoppedError());
     };
   }, [enabled]);
 
@@ -50,7 +72,12 @@ export function useMaiaWorker(enabled = true) {
         }
         const id = crypto.randomUUID();
         pendingRef.current.set(id, { resolve, reject });
-        worker.postMessage({ id, fen, selfRating, oppRating });
+        try {
+          worker.postMessage({ id, fen, selfRating, oppRating });
+        } catch (error) {
+          pendingRef.current.delete(id);
+          reject(error instanceof Error ? error : new Error(String(error)));
+        }
       });
     },
     []

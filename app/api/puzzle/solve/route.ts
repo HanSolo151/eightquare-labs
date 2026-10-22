@@ -13,24 +13,33 @@ export async function POST(request: NextRequest) {
   }
   const gameId = body.gameId.trim();
   const solvedAt = new Date();
-  const solved = await prisma.$transaction(async (tx) => {
-    const flag = await tx.flaggedMove.findFirst({
-      where: { gameId, ply: body.ply as number, game: { userId } },
-      select: { id: true },
-    });
-    if (!flag) return false;
+  try {
+    const solved = await prisma.$transaction(async (tx) => {
+      const flag = await tx.flaggedMove.findFirst({
+        where: { gameId, ply: body.ply as number, game: { userId } },
+        select: { id: true },
+      });
+      if (!flag) return false;
 
-    await tx.dailyPuzzleState.upsert({
-      where: { userId_gameId_ply: { userId, gameId, ply: body.ply as number } },
-      update: { status: "solved", solvedAt },
-      create: { userId, gameId, ply: body.ply as number, status: "solved", solvedAt },
+      await tx.dailyPuzzleState.upsert({
+        where: { userId_gameId_ply: { userId, gameId, ply: body.ply as number } },
+        update: { status: "solved", solvedAt },
+        create: { userId, gameId, ply: body.ply as number, status: "solved", solvedAt },
+      });
+      await tx.resolvedSparPosition.createMany({
+        data: [{ userId, gameId, ply: body.ply as number, resolvedAt: solvedAt }],
+        skipDuplicates: true,
+      });
+      return true;
     });
-    await tx.resolvedSparPosition.createMany({
-      data: [{ userId, gameId, ply: body.ply as number, resolvedAt: solvedAt }],
-      skipDuplicates: true,
-    });
-    return true;
-  });
-  if (!solved) return NextResponse.json({ error: "puzzle not found" }, { status: 404 });
-  return NextResponse.json({ ok: true });
+    if (!solved) return NextResponse.json({ error: "puzzle not found" }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Daily puzzle solve failed:", error);
+    const missingTable = typeof error === "object" && error !== null && "code" in error && error.code === "P2021";
+    return NextResponse.json(
+      { error: missingTable ? "puzzle tracking is unavailable until the database migrations are applied" : "could not save puzzle solve" },
+      { status: missingTable ? 503 : 500 }
+    );
+  }
 }

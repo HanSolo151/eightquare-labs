@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Chess } from "chess.js";
 import type { Key } from "chessground/types";
-import { useMaiaWorker, type MaiaInferenceResult } from "@/lib/maia/useMaiaWorker";
+import { isMaiaWorkerStopped, useMaiaWorker, type MaiaInferenceResult } from "@/lib/maia/useMaiaWorker";
 import { gamePhaseFromFen, rerankMoves } from "@/lib/maia/rerank";
 import type { OpponentFeatures } from "@/lib/lichess/opponentFeatures";
 import { loadOpponentMimicProfiles } from "@/lib/profile/opponentMimicProfiles";
@@ -74,6 +74,8 @@ export default function PositionSpar({
   viewLastMove,
   resolution,
   showPreviewBoard = true,
+  autoStart = false,
+  showControls = true,
   boardClassName = "mx-auto w-full max-w-[480px] overflow-hidden rounded-lg border border-white/10 bg-[#1b1a18] p-1",
 }: {
   fen: string;
@@ -90,6 +92,8 @@ export default function PositionSpar({
   viewLastMove?: [Key, Key];
   resolution?: { gameId: string; ply: number } | null;
   showPreviewBoard?: boolean;
+  autoStart?: boolean;
+  showControls?: boolean;
   boardClassName?: string;
 }) {
   const localMaia = useMaiaWorker(!inferOverride);
@@ -117,6 +121,7 @@ export default function PositionSpar({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [resolutionMessage, setResolutionMessage] = useState<string | null>(null);
   const resolutionAttemptedRef = useRef(false);
+  const autoStartHandledRef = useRef(false);
   const assistSessionRef = useRef(0);
   const assistWasUsedRef = useRef(false);
   const [assistEnabled, setAssistEnabled] = useState(false);
@@ -297,7 +302,7 @@ export default function PositionSpar({
         if (shouldAssist) void runAssist(chess.fen(), session, assistRequest);
       }
     } catch (err) {
-      if (isStale()) return;
+      if (isStale() || isMaiaWorkerStopped(err)) return;
       console.error("Maia spar move failed:", err);
       setErrorMessage(err instanceof Error ? err.message : String(err));
       setStatus("error");
@@ -378,6 +383,14 @@ export default function PositionSpar({
     }
   }
 
+  useEffect(() => {
+    if (!autoStart || autoStartHandledRef.current) return;
+    autoStartHandledRef.current = true;
+    void startSpar();
+    // autoStart is a mount-time command; do not rerun for the function's render-time identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart]);
+
   function closeSpar() {
     sessionRef.current++;
     assistSessionRef.current++;
@@ -422,7 +435,7 @@ export default function PositionSpar({
       {!open && showPreviewBoard && <div className={boardClassName}>
         <ChessgroundBoard {...boardProps} />
       </div>}
-      {!open && <section className="rounded-xl border border-white/10 bg-black/30 p-4">
+      {!open && showControls && <section className="rounded-xl border border-white/10 bg-black/30 p-4">
       {!open ? (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="w-full">

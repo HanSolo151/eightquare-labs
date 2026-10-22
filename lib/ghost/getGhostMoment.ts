@@ -26,13 +26,17 @@ export async function getGhostMoment(userId: string, gameId: string, targetPly?:
       opponentRating: true, opponentUsername: true,
       flags: {
         where: targetPly === undefined ? undefined : { ply: targetPly },
-        orderBy: [{ cpLoss: "desc" }, { ply: "asc" }], take: 1,
-        select: { ply: true, cpLoss: true },
+        orderBy: [{ cpLoss: "desc" }, { ply: "asc" }],
+        select: { ply: true, cpLoss: true, color: true },
       },
     },
   });
   if (!game || game.flags.length === 0) return null;
-  const worst = game.flags[0];
+  // Older saved analyses can contain a flag for the opponent's move. Ghost
+  // replay is a drill for the signed-in player's decisions, so never use one
+  // of those rows as the starting point.
+  const worst = game.flags.find((flag) => flag.color === game.playerColor);
+  if (!worst) return null;
   const moves = Array.isArray(game.moves) ? game.moves.filter((move): move is string => typeof move === "string") : [];
   if (!Number.isInteger(worst.ply) || worst.ply < 0 || worst.ply >= moves.length) return null;
 

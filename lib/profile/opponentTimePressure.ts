@@ -7,6 +7,7 @@ import { getTimePressureProfile, saveTimePressureProfile } from "./timePressureP
 import type { OpponentTimePressureProfile, GamePhase, ParsedGame } from "@/types";
 
 const MAX_OPPONENT_GAMES = 20;
+const TIMING_PROFILE_VERSION = 2; // clock increments and initial clocks are now included
 const PHASES: GamePhase[] = ["opening", "middlegame", "endgame"];
 const MEDIUM_SAMPLE = 5;
 const HIGH_SAMPLE = 15;
@@ -16,7 +17,7 @@ export function emptyTimePressureProfile(username: string): OpponentTimePressure
   for (const phase of PHASES) {
     byPhase[phase] = { phaseAvgSec: null, sampleSize: 0, collapseCount: 0, collapseRate: 0, confidence: "low" };
   }
-  return { username, gamesAnalyzed: 0, evaluatedGameIds: [], byPhase };
+  return { username, timingVersion: TIMING_PROFILE_VERSION, gamesAnalyzed: 0, evaluatedGameIds: [], byPhase };
 }
 
 export async function buildOpponentTimePressureProfile(
@@ -25,7 +26,9 @@ export async function buildOpponentTimePressureProfile(
   providedGames?: ParsedGame[]
 ): Promise<OpponentTimePressureProfile> {
   const cached = await getTimePressureProfile(opponentUsername);
-  const profile = cached ?? emptyTimePressureProfile(opponentUsername);
+  const profile = cached?.timingVersion === TIMING_PROFILE_VERSION
+    ? cached
+    : emptyTimePressureProfile(opponentUsername);
   const games = providedGames ?? parseGames(
     await fetchGames({ username: opponentUsername, max: MAX_OPPONENT_GAMES, rated: true, perfType: "rapid" }),
     opponentUsername

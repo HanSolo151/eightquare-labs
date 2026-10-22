@@ -147,24 +147,27 @@ export function extractMoveFeatures(game: ParsedGame): MoveFeature[] {
     const replyCount = chess.moves().length;
     const isForcing = isCapture || isCheck || replyCount <= FORCING_REPLY_LIMIT;
 
-    // Timing: clock[i] is the clock AFTER the move at ply i was made, but
-    // the array alternates colors — clock[i] and clock[i-1] belong to
-    // DIFFERENT players. To get time spent on THIS move, compare against
-    // the same color's own previous reading, which is two plies back:
-    // clock[ply - 2], not clock[ply - 1]. (Originally got this wrong —
-    // comparing adjacent plies mixes white's and black's clocks and
-    // produces nonsense, including impossible negative values even with
-    // no increment on the clock, which is what surfaced the bug.)
+    // Clock readings alternate colors, so a later move compares with the
+    // same side's reading two plies back. The first move for each side uses
+    // the game's initial clock when that metadata is available.
     let timeSpentSec: number | null = null;
     let clockRemainingSec: number | null = null;
     if (clocks && ply < clocks.length) {
       clockRemainingSec = clocks[ply] / 100;
-      // ply 0 and ply 1 have no same-color prior reading in the array
-      // (each color's very first move), so time spent is left null rather
-      // than guessed.
-      if (ply >= 2 && ply - 2 < clocks.length) {
-        const prevSameColorClockCs = clocks[ply - 2];
-        timeSpentSec = (prevSameColorClockCs - clocks[ply]) / 100;
+      // Lichess reports remaining clock after each move and adds the clock
+      // increment after the move. Include that increment when deriving think
+      // time; otherwise increment games can produce negative durations. The
+      // initial clock also lets us measure each side's first move.
+      const incrementCs = game.clockIncrementSec === undefined || game.clockIncrementSec === null
+        ? null
+        : game.clockIncrementSec * 100;
+      const previousClockCs = ply >= 2
+        ? clocks[ply - 2]
+        : game.clockInitialSec === undefined || game.clockInitialSec === null
+          ? null
+          : game.clockInitialSec * 100;
+      if (incrementCs !== null && previousClockCs !== null) {
+        timeSpentSec = Math.max(0, (previousClockCs + incrementCs - clocks[ply]) / 100);
       }
     }
 

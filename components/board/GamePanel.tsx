@@ -8,7 +8,7 @@ import PositionSpar from "./PositionSpar";
 import UsernameForm from "./UsernameForm";
 import VerdictCard from "./VerdictCard";
 import { dismissalId, isDismissed, loadDismissed, saveDismissed } from "@/lib/dismissals";
-import { useMaiaWorker } from "@/lib/maia/useMaiaWorker";
+import { isMaiaWorkerStopped, useMaiaWorker } from "@/lib/maia/useMaiaWorker";
 import { rerankMoves, gamePhaseFromFen } from "@/lib/maia/rerank";
 import type { RerankedMove } from "@/lib/maia/rerank";
 import { useOpponentFeatures } from "@/lib/useOpponentFeatures";
@@ -933,6 +933,7 @@ export default function GamePanel({
         setReplayStatus("your-turn");
       }
     } catch (err) {
+      if (isMaiaWorkerStopped(err)) return;
       console.error("runMaiaTurn failed:", err);
       if (!stale()) setReplayStatus("maia-error");
     } finally {

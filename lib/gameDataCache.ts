@@ -12,6 +12,7 @@ export interface GameData {
 }
 
 interface CachedGameData extends GameData {
+  cacheVersion: number;
   fetchedAt: number;
 }
 
@@ -32,6 +33,7 @@ interface CachedGameData extends GameData {
  */
 
 const TTL_MS = 60 * 60 * 1000; // 1 hour
+const CACHE_VERSION = 2; // invalidate entries calculated without Lichess clock increments
 
 function cacheKey(username: string): string {
   return `game-data:${username}`;
@@ -43,21 +45,21 @@ export function loadCachedGameData(username: string): CachedGameData | null {
     const raw = window.localStorage.getItem(cacheKey(username));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CachedGameData;
-    if (!parsed || typeof parsed.fetchedAt !== "number") return null;
+    if (!parsed || parsed.cacheVersion !== CACHE_VERSION || typeof parsed.fetchedAt !== "number") return null;
     return parsed; // caller decides whether it's stale (see isStale below) — we don't drop it here, since "stale but show it anyway with a Refresh option" is a valid use
   } catch {
     return null;
   }
 }
 
-export function isStale(cached: CachedGameData): boolean {
+export function isStale(cached: Pick<CachedGameData, "fetchedAt">): boolean {
   return Date.now() - cached.fetchedAt > TTL_MS;
 }
 
 export function saveCachedGameData(username: string, data: GameData): void {
   if (typeof window === "undefined") return;
   try {
-    const toStore: CachedGameData = { ...data, fetchedAt: Date.now() };
+    const toStore: CachedGameData = { ...data, cacheVersion: CACHE_VERSION, fetchedAt: Date.now() };
     window.localStorage.setItem(cacheKey(username), JSON.stringify(toStore));
   } catch {
     // storage full/disabled — silently skip, matches every other cache
