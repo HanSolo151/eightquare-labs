@@ -3,7 +3,7 @@
 // Lichess fetcher dependencies for local in-memory fakes.
 
 import { runSync } from "../../lib/sync/runSync";
-import { __gameCount, __reset, __seedUser } from "./fakes/prisma";
+import { __gameCount, __reset, __seedUser, __vanityJobCount } from "./fakes/prisma";
 import {
   __resetSpy,
   __setNextBatch,
@@ -166,11 +166,30 @@ async function scenarioConcurrentFirstSync() {
   );
 }
 
+async function scenarioVanityEvaluationEnqueue() {
+  console.log("\n[Scenario 5] sync enqueues only rated wins across speeds, idempotently");
+  __reset();
+  __resetSpy();
+  __seedUser({ id: "u5", username: "maverick151", lastSyncedAt: null, lastGameCreatedAt: null });
+  __setNextBatch([
+    { id: "rated-rapid-win", moves: "e4 e5", players: { white: { user: { name: "maverick151" } }, black: { user: { name: "opp" } } }, rated: true, speed: "rapid", winner: "white", status: "mate", createdAt: 3000 },
+    { id: "rated-blitz-win", moves: "d4 d5", players: { white: { user: { name: "opp" } }, black: { user: { name: "maverick151" } } }, rated: true, speed: "blitz", winner: "black", status: "mate", createdAt: 2000 },
+    { id: "rated-loss", moves: "c4 e5", players: { white: { user: { name: "maverick151" } }, black: { user: { name: "opp" } } }, rated: true, speed: "bullet", winner: "black", status: "mate", createdAt: 1000 },
+    { id: "unrated-win", moves: "Nf3 Nf6", players: { white: { user: { name: "maverick151" } }, black: { user: { name: "opp" } } }, rated: false, speed: "classical", winner: "white", status: "mate", createdAt: 500 },
+  ]);
+  const result = await runSync("u5", { force: true });
+  check("all four games are synced", result.ok && result.synced === 4, JSON.stringify(result));
+  check("two rated wins (rapid and blitz) are queued", __vanityJobCount("u5") === 2, `got ${__vanityJobCount("u5")}`);
+  const again = await runSync("u5", { force: true });
+  check("repeat sync does not duplicate queued jobs", again.ok && __vanityJobCount("u5") === 2);
+}
+
 (async () => {
   await scenarioThrottle();
   await scenarioForceAndWatermark();
   await scenarioThrottleRespectsForceFalseDefault();
   await scenarioConcurrentFirstSync();
+  await scenarioVanityEvaluationEnqueue();
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail > 0 ? 1 : 0);

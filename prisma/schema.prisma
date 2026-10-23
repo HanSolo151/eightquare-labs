@@ -7,7 +7,6 @@ generator client {
   provider = "prisma-client-js"
 }
 
-
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
@@ -17,55 +16,63 @@ datasource db {
 // --- Auth -------------------------------------------------------------
 
 model User {
-  id                String   @id @default(cuid())
-  lichessId         String   @unique // Lichess account id — stable, unlike username
+  id                String    @id @default(cuid())
+  lichessId         String    @unique // Lichess account id — stable, unlike username
   username          String // Lichess username — display only, can change
-  plan              String   @default("free")
+  plan              String    @default("free")
   accessToken       String? // AES-GCM encrypted; derived key requires stable AUTH_SECRET
   refreshToken      String? // AES-GCM encrypted; derived key requires stable AUTH_SECRET
   tokenExpiresAt    DateTime?
   lastSyncedAt      DateTime?
   lastGameCreatedAt DateTime? // watermark for incremental sync
-  createdAt         DateTime @default(now())
+  createdAt         DateTime  @default(now())
 
-  games           Game[]
-  profile         PlayerProfile?
-  weaknessProfile WeaknessProfileRow?
-  biasProfile     BiasProfile?
-  dailyPuzzleStates DailyPuzzleState[]
-  resolvedSparPositions ResolvedSparPosition[]
+  games                  Game[]
+  profile                PlayerProfile?
+  weaknessProfile        WeaknessProfileRow?
+  biasProfile            BiasProfile?
+  dailyPuzzleStates      DailyPuzzleState[]
+  resolvedSparPositions  ResolvedSparPosition[]
+  gameMoments            GameMoment[]
+  notificationPreference NotificationPreference?
+  emailSends             EmailSendLog[]
+  vanityEvaluationJobs   VanityEvaluationJob[]
 }
 
 // --- Games --------------------------------------------------------------
 
 model Game {
-  id               String   @id @default(cuid()) // Internal database identity
-  lichessGameId    String   // External game id; unique per account because games can be shared
-  userId           String
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String @id @default(cuid()) // Internal database identity
+  lichessGameId String // External game id; unique per account because games can be shared
+  userId        String
+  user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  playerColor      String
-  opponentUsername String
-  opponentRating   Int?
-  playerRating     Int?
-  moves            Json
-  clocks           Json?
-  openingName      String?
-  openingEco       String?
-  result           String
-  rated            Boolean
-  speed            String?
-  lichessCreatedAt DateTime?
+  playerColor       String
+  opponentUsername  String
+  opponentRating    Int?
+  playerRating      Int?
+  moves             Json
+  clocks            Json?
+  clockInitialSec   Float?
+  clockIncrementSec Float?
+  openingName       String?
+  openingEco        String?
+  result            String
+  rated             Boolean
+  speed             String?
+  lichessCreatedAt  DateTime?
 
-  eval             GameEval?
-  flags            FlaggedMove[]
+  eval                  GameEval?
+  flags                 FlaggedMove[]
   resolvedSparPositions ResolvedSparPosition[]
+  gameMoments           GameMoment[]
+  vanityEvaluationJob   VanityEvaluationJob?
 
-  createdAt        DateTime @default(now())
+  createdAt DateTime @default(now())
 
+  @@unique([userId, lichessGameId])
   @@index([userId])
   @@index([userId, lichessCreatedAt])
-  @@unique([userId, lichessGameId])
 }
 
 model GameEval {
@@ -77,22 +84,22 @@ model GameEval {
 }
 
 model FlaggedMove {
-  id                   String   @id @default(cuid())
-  gameId               String
-  game                 Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  gameId String
+  game   Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
 
-  ply                  Int
-  moveNumber           Int
-  san                  String
-  color                String
-  flagType             String
+  ply        Int
+  moveNumber Int
+  san        String
+  color      String
+  flagType   String
 
-  timeSpentSec         Float
-  phaseAvgSec          Float
-  timeRatio            Float
-  ratio                Float
-  clockRemainingSec    Float
-  gamePhase            String
+  timeSpentSec      Float
+  phaseAvgSec       Float
+  timeRatio         Float
+  ratio             Float
+  clockRemainingSec Float
+  gamePhase         String
 
   cpLoss               Float
   causality            Json
@@ -100,14 +107,14 @@ model FlaggedMove {
   styleDeviationScore  Float
   absoluteAnomalyScore Float
 
-  severity             String
-  severityBreakdown    Json
+  severity          String
+  severityBreakdown Json
 
-  pivotMove            Json?
-  cascadeMeta          Json?
-  evalConfidence       String
+  pivotMove      Json?
+  cascadeMeta    Json?
+  evalConfidence String
 
-  explanation          String
+  explanation String
 
   @@index([gameId])
   @@index([matchedWeaknessId])
@@ -136,36 +143,36 @@ model WeaknessProfileRow {
 }
 
 model BiasProfile {
-  userId      String   @id
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String   @id
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// @deprecated Legacy aggregates are not maintained or read. Derive rank, file, and diagonal views from squareBias.
-  rankBias    Json     @default("{}")
+  rankBias         Json     @default("{}")
   /// @deprecated Legacy aggregates are not maintained or read. Derive rank, file, and diagonal views from squareBias.
-  fileBias    Json     @default("{}")
+  fileBias         Json     @default("{}")
   /// @deprecated Legacy aggregates are not maintained or read. Derive rank, file, and diagonal views from squareBias.
-  diagonalBias Json    @default("{}")
+  diagonalBias     Json     @default("{}")
   // squareBias is the source of truth; aggregate views are derived from it.
-  squareBias  Json     @default("{}")
+  squareBias       Json     @default("{}")
   // Makes the per-game read/modify/write fold idempotent across retries.
-  evaluatedGameIds Json @default("[]")
-  sampleSize  Int      @default(0)
-  confidence  String   @default("low")
-  builtAt     DateTime @default(now())
+  evaluatedGameIds Json     @default("[]")
+  sampleSize       Int      @default(0)
+  confidence       String   @default("low")
+  builtAt          DateTime @default(now())
 }
 
 // Keyed by the stable game + ply pair because FlaggedMove rows are replaced
 // on re-evaluation. Progress therefore survives analysis refreshes.
 model DailyPuzzleState {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   gameId        String
   ply           Int
-  status        String   @default("active") // active | solved | deferred
-  skipCount     Int      @default(0)
+  status        String    @default("active") // active | solved | deferred
+  skipCount     Int       @default(0)
   lastSkippedAt DateTime?
   solvedAt      DateTime?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime  @default(now())
 
   @@unique([userId, gameId, ply])
   @@index([userId, status])
@@ -185,4 +192,130 @@ model ResolvedSparPosition {
   @@unique([userId, gameId, ply])
   @@index([userId])
   @@index([gameId])
+}
+
+model Bigshot {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  gameCount Int
+  createdAt DateTime @default(now())
+
+  profiles    BigshotPhaseProfile[]
+  sampleGames BigshotSampleGame[]
+  gameMoments GameMoment[]
+}
+
+model BigshotPhaseProfile {
+  id         String @id @default(cuid())
+  bigshotId  String
+  phase      String
+  vector     Json
+  sampleSize Int
+
+  bigshot Bigshot @relation(fields: [bigshotId], references: [id], onDelete: Cascade)
+
+  @@unique([bigshotId, phase])
+}
+
+model BigshotVectorCalibration {
+  id         String   @id @default(cuid())
+  phase      String   @unique
+  means      Json
+  stdDevs    Json
+  sampleSize Int
+  updatedAt  DateTime @updatedAt
+}
+
+model BigshotSampleGame {
+  id             String  @id @default(cuid())
+  bigshotId      String
+  phase          String
+  pgn            String
+  sourceRef      String
+  sourceType     String
+  attribution    String?
+  motifTag       String?
+  featureDetails Json?
+
+  bigshot Bigshot @relation(fields: [bigshotId], references: [id], onDelete: Cascade)
+
+  @@index([bigshotId, phase])
+}
+
+model GameMoment {
+  id                String    @id @default(cuid())
+  userId            String
+  gameId            String
+  ply               Int
+  phase             String
+  moveNumber        Int
+  san               String
+  fenBeforeMove     String
+  evalBefore        Float?
+  evalAfter         Float?
+  soundness         String    @default("unverified")
+  matchedBigshotId  String?
+  matchDistance     Float?
+  motifMatch        Boolean   @default(false)
+  sampleGameId      String?
+  rerankScore       Float?
+  status            String    @default("pending")
+  feedback          Boolean?
+  deepLinkTokenHash String?   @unique
+  deepLinkExpiresAt DateTime?
+  sendClaimedAt     DateTime?
+  createdAt         DateTime  @default(now())
+
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game           Game          @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  matchedBigshot Bigshot?      @relation(fields: [matchedBigshotId], references: [id], onDelete: SetNull)
+  emailSendLog   EmailSendLog?
+
+  @@unique([userId, gameId, ply])
+  @@index([userId, status, createdAt])
+  @@index([gameId])
+}
+
+model NotificationPreference {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  vanityMatchOptIn Boolean  @default(false)
+  emailAddress     String?
+  unsubscribeToken String   @unique @default(cuid())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model EmailSendLog {
+  id           String   @id @default(cuid())
+  userId       String
+  gameMomentId String   @unique
+  sentAt       DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameMoment GameMoment @relation(fields: [gameMomentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, sentAt])
+}
+
+model VanityEvaluationJob {
+  id          String    @id @default(cuid())
+  userId      String
+  gameId      String    @unique
+  status      String    @default("queued") // queued | processing | complete | failed
+  attempts    Int       @default(0)
+  availableAt DateTime  @default(now())
+  lockedAt    DateTime?
+  checkpoint  Json?
+  lastError   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@index([status, availableAt])
+  @@index([userId, status])
 }

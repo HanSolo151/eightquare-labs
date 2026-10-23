@@ -4,6 +4,7 @@ import { getSessionUserId } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { getGhostMoment } from "@/lib/ghost/getGhostMoment";
 import { getSparQueue } from "@/lib/dashboard/getSparQueue";
+import { getNearMisses } from "@/lib/ghost/getNearMisses";
 import GhostReplay from "@/components/board/GhostReplay";
 
 export const instant = false;
@@ -13,7 +14,7 @@ export default async function DashboardPage() {
   const userId = getSessionUserId(session);
   if (!userId) return <p className="text-sm text-neutral-400">Sign in to continue.</p>;
 
-  const [recentGame, progress] = await Promise.all([
+  const [recentGame, progress, nearMisses] = await Promise.all([
     prisma.game.findFirst({
       where: {
         userId,
@@ -26,6 +27,7 @@ export default async function DashboardPage() {
       select: { id: true },
     }),
     getSparQueue(userId),
+    getNearMisses(userId),
   ]);
   const moment = recentGame ? await getGhostMoment(userId, recentGame.id) : null;
 
@@ -36,7 +38,7 @@ export default async function DashboardPage() {
     </header>
 
     {moment ? <section>
-      <GhostReplay key={`${moment.gameId}:${moment.ply}`} moment={moment} />
+      <GhostReplay key={`${moment.gameId}:${moment.ply}`} moment={moment} nearMisses={nearMisses} />
       <div className="mt-5">
         <Link href={`/dashboard/games/${encodeURIComponent(moment.gameId)}/ghost?ply=${moment.ply}`} className="inline-flex rounded-lg border border-amber-400/30 bg-amber-400/10 px-5 py-2.5 text-sm text-amber-200 hover:bg-amber-400/20">
           Start this spar

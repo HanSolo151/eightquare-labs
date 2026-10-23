@@ -15,6 +15,10 @@
 /playwright/.auth/
 /playwright-report/
 /test-results/
+/data/bigshots/*
+!/data/bigshots/README.md
+/artifacts/profile-matcher-dry-run.json
+/backups/
 
 # next.js
 /.next/

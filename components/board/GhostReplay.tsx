@@ -7,12 +7,14 @@ import { Chess } from "chess.js";
 import type { Key } from "chessground/types";
 import ChessgroundBoard from "./ChessgroundBoard";
 import GameReplay from "./GameReplay";
+import NearMisses from "./NearMisses";
 import PositionSpar from "./PositionSpar";
 import { useMaiaWorker } from "@/lib/maia/useMaiaWorker";
 import { rerankMoves } from "@/lib/maia/rerank";
 import { evalFen, evalFenMultiPv, type EvalResult } from "@/lib/eval/stockfishEngine";
 import type { OpponentFeatures } from "@/lib/lichess/opponentFeatures";
 import type { GhostMoment } from "@/lib/ghost/getGhostMoment";
+import type { NearMissItem } from "@/lib/ghost/getNearMisses";
 import { generateEngineBaseline, generateMaiaVsEngine } from "@/lib/ghost/generateProgression";
 import { getCachedProgression, putCachedProgression, type CachedProgression, type ProgressionLine } from "@/lib/ghost/progressionCache";
 
@@ -118,12 +120,13 @@ function continuationPlyLabel(startingFen: string, ply: number, playerColor: "wh
   return `${fullmove}${color === "black" ? "..." : "."} ${color === playerColor ? "You" : "Opponent"}`;
 }
 
-export default function GhostReplay({ moment }: { moment: GhostMoment }) {
+export default function GhostReplay({ moment, nearMisses }: { moment: GhostMoment; nearMisses: NearMissItem[] }) {
   const { infer } = useMaiaWorker(true);
   const [lines, setLines] = useState<ReplayLine[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showSpar, setShowSpar] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [autopsyOpen, setAutopsyOpen] = useState(false);
   const [progression, setProgression] = useState<ProgressionContent | null>(null);
   const [progressionStage, setProgressionStage] = useState<string | null>(null);
   const [progressionError, setProgressionError] = useState<string | null>(null);
@@ -345,16 +348,57 @@ export default function GhostReplay({ moment }: { moment: GhostMoment }) {
       </div>
       <p className="mt-2 text-xs text-neutral-500">{currentSan ? `Game move: ${currentSan}.` : "No game move from this position."} {predictionsAgree ? "Stockfish and Maia agree on this move; both colored arrows mark the shared prediction." : "Blue arrow and ghost piece show Stockfish's top move; pink arrow and ghost piece show Maia's behavior prediction."} A ghost piece marks its hypothetical destination.</p>
       {!isGameFinished && <div className="mt-3 flex justify-end">
-        <button type="button" onClick={() => setCompareOpen(true)} className="rounded border border-white/10 px-2.5 py-1 text-[11px] text-neutral-400 hover:text-white">Compare boards</button>
+        <span className="flex gap-2">
+          {currentPly === moment.ply && <button type="button" onClick={() => setAutopsyOpen(true)} className="rounded border border-white/10 px-2.5 py-1 text-[11px] text-neutral-400 hover:text-white">Blunder Autopsy card</button>}
+          <button type="button" onClick={() => setCompareOpen(true)} className="rounded border border-white/10 px-2.5 py-1 text-[11px] text-neutral-400 hover:text-white">Compare boards</button>
+        </span>
       </div>}
       </>}
     </div>
+    {autopsyOpen && typeof document !== "undefined" && createPortal(
+      <div className="ghost-share-overlay fixed inset-0 z-[1200] overflow-y-auto bg-black/85 p-4 sm:p-8" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setAutopsyOpen(false); }}>
+        <section className="mx-auto my-4 max-w-3xl rounded-2xl border border-white/15 bg-[#10100f] p-5 text-white shadow-2xl sm:p-8">
+          <div className="mb-5 flex justify-end gap-2 ghost-share-controls">
+            <button type="button" onClick={() => window.print()} className="rounded-lg border border-emerald-300/30 bg-emerald-300/10 px-3 py-2 text-xs text-emerald-100 hover:bg-emerald-300/15">Print / save PDF</button>
+            <button type="button" onClick={() => setAutopsyOpen(false)} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-neutral-300 hover:bg-white/5">Close</button>
+          </div>
+          <article className="ghost-autopsy-card grid gap-6 sm:grid-cols-[minmax(0,1fr)_minmax(220px,0.8fr)] sm:items-center">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.28em] text-emerald-300">EightSquare · Blunder Autopsy</p>
+              <h2 className="mt-3 text-3xl font-semibold">The moment it went wrong</h2>
+              <p className="mt-2 text-sm text-neutral-400">Move {Math.floor(moment.ply / 2) + 1} · vs {moment.opponentUsername}</p>
+              <div className="mt-6 border-t border-white/10 pt-4">
+                <p className="text-xs text-neutral-500">Played move</p>
+                <p className="mt-1 font-mono text-xl">{moment.playedSan}</p>
+                <p className="mt-4 text-xs text-neutral-500">Saved evaluation loss</p>
+                <p className="mt-1 text-2xl font-semibold text-amber-200">{Math.round(moment.cpLoss)} cp</p>
+                <p className="mt-4 text-xs text-sky-200">Stockfish: {lines?.[1]?.san ?? "Unavailable"}</p>
+                <p className="mt-1 text-xs text-pink-200">Maia: {lines?.[2]?.san ?? "Unavailable"} <span className="text-neutral-500">(behavior prediction)</span></p>
+              </div>
+            </div>
+            <div className="mx-auto w-full max-w-[340px]">
+              <ChessgroundBoard fen={moment.fenBefore} orientation={moment.playerColor}
+                ghostLayers={[
+                  ...(lines?.[1]?.fen ? [{ fen: lines[1].fen, tint: "#60a5fa", label: "Stockfish" }] : []),
+                  ...(lines?.[2]?.fen && lines[2].fen !== lines[1]?.fen ? [{ fen: lines[2].fen, tint: "#f472b6", label: "Maia" }] : []),
+                ]}
+                ghostArrows={[
+                  ...(lines?.[1]?.from && lines[1]?.to ? [{ from: lines[1].from, to: lines[1].to, tint: "#60a5fa", label: "Stockfish" }] : []),
+                  ...(lines?.[2]?.from && lines[2]?.to ? [{ from: lines[2].from, to: lines[2].to, tint: "#f472b6", label: "Maia" }] : []),
+                ]} />
+            </div>
+          </article>
+          <p className="mt-6 border-t border-white/10 pt-4 text-[10px] text-neutral-500">Stockfish is an engine recommendation. Maia is a rating-conditioned behavior prediction.</p>
+        </section>
+      </div>,
+      document.body,
+    )}
     {compareOpen && typeof document !== "undefined" && createPortal(
-      <div className="fixed inset-0 z-[1000] overflow-y-auto bg-black/85 p-3 sm:p-6" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCompareOpen(false); }}>
+      <div className="ghost-share-overlay fixed inset-0 z-[1000] overflow-y-auto bg-black/85 p-3 sm:p-6" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCompareOpen(false); }}>
         <section role="dialog" aria-modal="true" aria-labelledby="ghost-compare-title" className="mx-auto my-8 max-w-6xl rounded-2xl border border-white/10 bg-[#11110f] p-4 shadow-2xl sm:p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
-            <div><h2 id="ghost-compare-title" className="text-sm font-medium text-white">Compare predictions</h2><p className="mt-1 text-xs text-neutral-500">Move navigation stays synced with the main board.</p></div>
-            <button type="button" onClick={() => setCompareOpen(false)} className="rounded border border-white/10 px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/5">Close</button>
+            <div><h2 id="ghost-compare-title" className="text-sm font-medium text-white">Sliding Doors · What happened vs. Stockfish</h2><p className="mt-1 text-xs text-neutral-500">Compare the played move with the engine line from this position.</p></div>
+            <span className="flex gap-2 ghost-share-controls"><button type="button" onClick={() => window.print()} className="rounded border border-emerald-300/20 px-3 py-1.5 text-xs text-emerald-100 hover:bg-emerald-300/10">Print / save PDF</button><button type="button" onClick={() => setCompareOpen(false)} className="rounded border border-white/10 px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/5">Close</button></span>
           </div>
           <nav className="mb-4 flex items-center justify-between rounded-lg border border-white/10 bg-black/35 px-3 py-2" aria-label="Game move navigation">
             <span className="font-mono text-xs text-neutral-400">{currentPly === moment.moves.length ? "Game end" : `Move ${Math.floor(currentPly / 2) + 1} · ${movingColor} to move`} <span className="text-neutral-600">({currentPly}/{moment.moves.length})</span></span>
@@ -367,7 +411,7 @@ export default function GhostReplay({ moment }: { moment: GhostMoment }) {
             <div className="mx-auto max-w-[560px]"><ChessgroundBoard fen={currentFen} orientation={moment.playerColor} /></div>
             <p role="status" className="py-6 text-center text-sm text-neutral-400">Game finished. There are no next moves to predict from this position.</p>
           </> : !lines ? <p className="py-12 text-center text-sm text-neutral-400">Loading Stockfish and Maia choices…</p> : <>
-          <div className="mx-auto mb-5 max-w-[560px]">
+          <div className="ghost-compare-start-board mx-auto mb-5 max-w-[560px]">
             <ChessgroundBoard fen={currentFen} orientation={moment.playerColor}
               ghostLayers={[
                 ...(lines[1]?.fen ? [{ fen: lines[1].fen, tint: "#60a5fa", label: "Stockfish" }] : []),
@@ -378,8 +422,8 @@ export default function GhostReplay({ moment }: { moment: GhostMoment }) {
                 ...(lines[2]?.from && lines[2]?.to ? [{ from: lines[2].from, to: lines[2].to, tint: "#f472b6", label: "Maia" }] : []),
               ]} />
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            {lines.map((line, index) => <div key={line.label} className="rounded-xl border border-white/10 bg-black/30 p-3">
+          <div className="ghost-compare-lines grid gap-4 md:grid-cols-3">
+            {lines.map((line, index) => <div key={line.label} className={`rounded-xl border border-white/10 bg-black/30 p-3 ${index === 2 ? "ghost-compare-maia" : ""}`}>
               <p className="text-xs text-neutral-400">{line.label}</p>
               {line.fen ? <div className="mt-2"><ChessgroundBoard fen={line.fen} orientation={moment.playerColor} /></div> : <p className="mt-2 aspect-square content-center text-xs text-neutral-600">Unavailable</p>}
               <p className="mt-2 font-mono text-sm text-white">{line.san ?? "—"}</p>
@@ -423,16 +467,21 @@ export default function GhostReplay({ moment }: { moment: GhostMoment }) {
           </span>
           <span className="mt-1 block text-xs leading-5 text-neutral-500">{line.description}</span>
           <span className="mt-3 flex gap-2 overflow-x-auto pb-1" aria-label={`${line.moves.length}-ply continuation timeline`}>
-            {line.moves.map((move, index) => <span key={`${index}-${move.uci}`} className="min-w-14 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5 text-center font-mono text-xs text-neutral-200" style={{ opacity: index < 2 ? 1 : index < 4 ? 0.8 : 0.5 }}>
+            {line.moves.map((move, index) => <span key={`${index}-${move.uci}`} className={`min-w-14 rounded-md border px-2 py-1.5 text-center font-mono text-xs text-neutral-200 ${line.decisiveAtPly === index + 1 ? "border-amber-300/60 bg-amber-300/10" : "border-white/10 bg-white/[0.03]"}`} style={{ opacity: index < 2 ? 1 : index < 4 ? 0.8 : 0.5 }}>
               <span className="block text-[9px] text-neutral-500">{continuationPlyLabel(visibleProgression.startingFen, index, moment.playerColor)}</span>{move.san}
+              {line.decisiveAtPly === index + 1 && <span className="mt-1 block text-[8px] uppercase tracking-wide text-amber-200">Decisive</span>}
             </span>)}
           </span>
+          {line.decisiveAtPly === 0 && <span className="mt-2 block text-[11px] text-amber-200">{line.decisiveNote ?? "Position already decisive before this line."}</span>}
+          {line.decisiveAtPly !== null && line.decisiveAtPly > 0 && line.decisiveNote && <span className="mt-2 block text-[11px] text-amber-200">{line.decisiveNote}</span>}
           {line.stopReason && <span className={`mt-2 block text-[11px] ${line.decisive ? "text-amber-200/80" : "text-neutral-500"}`}>{line.stopReason}</span>}
         </button>)}
         <p className="text-[11px] text-neutral-500">Predictions degrade the further they run from the actual game. Move tiles fade to show that uncertainty.</p>
         <p className="text-[10px] text-neutral-600">Generated continuations are saved in this browser only and do not sync across devices.</p>
       </div>}
     </section>
+
+    <NearMisses items={nearMisses} />
 
     {activeProgressionLine && visibleProgression && createPortal(
       <div className="fixed inset-0 z-[1100] overflow-y-auto bg-black/85 p-3 sm:p-6" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveProgressionLine(null); }}>

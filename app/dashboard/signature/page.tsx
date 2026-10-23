@@ -1,12 +1,4 @@
-/**
- * PROVISIONAL HOME PAGE — see BUILD_ORDER.md, step 3a.
- * This is pre-revision "Player dossier" content. Per spec §8, /dashboard
- * is supposed to be the Spar hero (Ghost Replay for the most recent
- * unresolved flagged moment + flagged-moment queue), with this page's
- * metrics/tempo/repertoire content relocated to /dashboard/signature.
- * Do not treat this layout as final — replace once Ghost Replay (step 3)
- * ships, per BUILD_ORDER.md.
- */
+/** Signature overview: account metrics, tempo, openings, patterns, and recent flags. */
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { getSessionUserId, getSessionPlan } from "@/lib/auth/session";
@@ -15,6 +7,10 @@ import { prisma } from "@/lib/prisma";
 import { SyncPanel } from "@/components/dashboard/SyncPanel";
 import { getBiasData } from "@/lib/bias/getBiasData";
 import BlindSpotHeatmap from "@/components/dashboard/BlindSpotHeatmap";
+import PatternProgress from "@/components/dashboard/PatternProgress";
+import SignatureShareCard from "@/components/dashboard/SignatureShareCard";
+import OpeningFingerprint from "@/components/dashboard/OpeningFingerprint";
+import { getAmbientPaceAggregate, getPatternProgressDeltas, getSelfCpLossTrend } from "@/lib/dashboard/getSignatureSignals";
 
 export const instant = false;
 
@@ -34,13 +30,17 @@ function formatDate(date: Date | null) {
   return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
-export default async function DashboardPage() {
+export default async function SignaturePage() {
   const session = await auth();
   const userId = getSessionUserId(session);
-  const [data, totalGames, biasData] = await Promise.all([
+  const [data, totalGames, openingGames, biasData, patternProgress, ambientPace, cpLossTrend] = await Promise.all([
     userId ? getDashboardData(userId) : Promise.resolve(null),
     userId ? prisma.game.count({ where: { userId } }) : Promise.resolve(0),
+    userId ? prisma.game.count({ where: { userId, openingName: { not: null } } }) : Promise.resolve(0),
     userId ? getBiasData(userId) : Promise.resolve(null),
+    userId ? getPatternProgressDeltas(userId) : Promise.resolve([]),
+    userId ? getAmbientPaceAggregate(userId) : Promise.resolve(null),
+    userId ? getSelfCpLossTrend(userId) : Promise.resolve(null),
   ]);
 
   return (
@@ -53,9 +53,19 @@ export default async function DashboardPage() {
             A record of your decisions, timing, and recurring patterns, built from games you have synced and evaluated.
           </p>
         </div>
-        <div className="text-left sm:text-right">
-          <p className="text-xs uppercase tracking-widest text-neutral-500">Plan</p>
-          <p className="mt-1 text-sm capitalize text-neutral-200">{getSessionPlan(session)}</p>
+        <div className="flex items-end justify-between gap-4 sm:flex-col sm:items-end">
+          {data && <SignatureShareCard
+            username={data.username}
+            games={data.totalGames}
+            evaluatedGames={data.evaluatedGames}
+            patternCount={data.weaknessSummary.patternCount}
+            topOpenings={(data.playerProfile?.mostCommonOpenings ?? []).slice(0, 3)}
+            tempo={PHASES.map((phase) => ({ phase, seconds: data.playerProfile?.avgMoveTimeSecByPhase[phase] ?? null }))}
+          />}
+          <div className="text-left sm:text-right">
+            <p className="text-xs uppercase tracking-widest text-neutral-500">Plan</p>
+            <p className="mt-1 text-sm capitalize text-neutral-200">{getSessionPlan(session)}</p>
+          </div>
         </div>
       </section>
 
@@ -76,6 +86,14 @@ export default async function DashboardPage() {
             <Metric label="Evaluated" value={data.evaluatedGames.toLocaleString()} note={`${data.unevaluatedGames} waiting for analysis`} />
             <Metric label="Premove rate" value={data.playerProfile ? pct(data.playerProfile.premoveRate) : "—"} note="Estimated from clock data" />
             <Metric label="Average opponent" value={data.playerProfile?.avgOpponentRating?.toLocaleString() ?? "—"} note="Rating at game time" />
+          </section>
+
+          <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
+            <SectionHeading eyebrow="Move quality history" title="Flagged move CP-loss trend" detail="Compares your most recent flagged moves with the preceding flagged moves. Three moves per period are required; differences under 25 cp are labeled steady. This is descriptive history, not a rating estimate." />
+            {cpLossTrend ? <div className="mt-4 flex flex-wrap items-center gap-3">
+              <span className={`rounded-full border px-3 py-1 text-xs ${cpLossTrend.trend === "improving" ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-200" : cpLossTrend.trend === "worsening" ? "border-amber-300/25 bg-amber-300/10 text-amber-200" : "border-white/10 text-neutral-300"}`}>{cpLossTrend.trend === "improving" ? "↓ Improving" : cpLossTrend.trend === "worsening" ? "↑ Worsening" : "→ Steady"}</span>
+              <p className="text-xs text-neutral-400">Previous {cpLossTrend.previousAvgCp} cp ({cpLossTrend.previousCount} moves) → recent {cpLossTrend.recentAvgCp} cp ({cpLossTrend.recentCount} moves)</p>
+            </div> : <p className="mt-4 text-xs text-neutral-500">At least three recent and three preceding flagged player moves are needed to show a trend.</p>}
           </section>
 
           <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
@@ -101,6 +119,7 @@ export default async function DashboardPage() {
 
             <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
               <SectionHeading eyebrow="Opening repertoire" title="Most played" detail="Your most frequent recorded openings." />
+              <OpeningFingerprint openings={data.playerProfile?.mostCommonOpenings ?? []} games={openingGames} />
               {!data.playerProfile?.mostCommonOpenings.length ? <Empty>No opening profile yet. Sync games and let analysis finish to build this section.</Empty> : (
                 <ol className="mt-5 divide-y divide-white/10">
                   {data.playerProfile.mostCommonOpenings.slice(0, 5).map((opening, index) => (
@@ -148,6 +167,13 @@ export default async function DashboardPage() {
               )}
             </section>
           </div>
+
+          <PatternProgress items={patternProgress} />
+
+          {ambientPace && <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
+            <SectionHeading eyebrow="Ambient pace · this month (UTC)" title="A recurring pace-collapse pattern" detail="Retrospective signal from evaluated games, grouped by opening and phase. It is not a live-game warning." />
+            <p className="mt-4 text-sm text-neutral-200">Seen in <strong className="font-semibold text-emerald-200">{ambientPace.gameCount} games</strong>, most often in {ambientPace.openingName} during the {ambientPace.phase}.</p>
+          </section>}
         </>
       )}
     </div>

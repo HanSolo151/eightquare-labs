@@ -5,6 +5,13 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "convert:bigshots": "tsx scripts/convert-bigshot-archives.ts",
+    "ingest:bigshots": "tsx scripts/ingest-bigshots.ts",
+    "test:ingest-bigshots-smoke": "tsx scripts/test-ingest-bigshots-smoke.ts",
+    "test:matching-unit": "tsx scripts/test-matching-unit.ts",
+    "test:matching-gates": "tsx scripts/test-matching-gates.ts",
+    "test:matching-rerank": "tsx scripts/test-rerank-selection.ts",
+    "test:matching-concurrency": "tsx scripts/test-rerank-concurrency.ts",
     "start": "next start",
     "lint": "eslint",
     "rotate:oauth-tokens": "tsx scripts/rotateOAuthTokens.ts",
@@ -14,13 +21,16 @@
     "@prisma/client": "^6.19.3",
     "chess.js": "^1.4.0",
     "chessground": "^9.2.1",
-    "next": "16.4.0",
+    "next": "^16.4.1",
     "next-auth": "^5.0.0-beta.32",
     "onnxruntime-web": "^1.30.0",
     "prisma": "^6.19.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "stockfish": "^19.0.1"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.2"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

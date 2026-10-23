@@ -34,3 +34,53 @@ body {
     repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.06) 0, rgba(255, 255, 255, 0.06) 1px, transparent 1px, transparent 32px);
   background-size: 32px 32px;
 }
+
+@media print {
+  body:has(.ghost-share-overlay, .signature-share-overlay) * { visibility: hidden !important; }
+  .ghost-share-overlay,
+  .ghost-share-overlay *,
+  .signature-share-overlay,
+  .signature-share-overlay * { visibility: visible !important; }
+  .ghost-share-overlay {
+    position: absolute !important;
+    inset: 0 !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  .ghost-share-overlay > section {
+    max-width: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #10100f !important;
+    box-shadow: none !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .signature-share-overlay {
+    position: absolute !important;
+    inset: 0 !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  .signature-share-overlay > section {
+    max-width: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #10100f !important;
+    box-shadow: none !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .ghost-share-controls { display: none !important; }
+  .signature-share-controls { display: none !important; }
+  .ghost-share-overlay nav,
+  .ghost-compare-start-board,
+  .ghost-compare-maia { display: none !important; }
+  .ghost-compare-lines { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .ghost-autopsy-card { break-inside: avoid; }
+  .signature-share-card { break-inside: avoid; }
+}

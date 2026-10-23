@@ -1,6 +1,6 @@
 import type { GameEval, EvalPoint } from "@/types";
-import { Chess } from "chess.js";
 import { evalFen, type EvalResult } from "./stockfishEngine";
+import { evaluateMoveSequenceWith } from "./moveSequence";
 
 // Phase 2e: SEARCH_DEPTH in stockfishEngine.ts bumped 14 -> 16, so this must
 // change too to invalidate every depth-14 cached eval (same cache-busting
@@ -121,31 +121,13 @@ export function normalizeEvalPoint(ply: number, before: EvalResult, after: EvalR
 }
 
 /** Evaluate the initial position and each successive move position exactly once. */
-export async function evaluateMoveSequence(
+export function evaluateMoveSequence(
   moves: string[],
   evaluatePosition: (fen: string) => Promise<EvalResult> = evalFen,
   onPlyComplete?: (points: EvalPoint[], evalBefore: EvalResult) => Promise<void>,
   checkpoint?: Pick<PartialGameEval, "points" | "evalBefore">
 ): Promise<EvalPoint[]> {
-  const chess = new Chess();
-  const points: EvalPoint[] = checkpoint?.points.map((point) => ({ ...point })) ?? [];
-  for (let ply = 0; ply < points.length; ply++) {
-    const move = chess.move(moves[ply]);
-    if (!move) throw new Error(`Invalid SAN "${moves[ply]}" at ply ${ply}`);
-  }
-  let evalBefore = checkpoint?.evalBefore ?? await evaluatePosition(chess.fen());
-
-  for (let ply = points.length; ply < moves.length; ply++) {
-    const move = chess.move(moves[ply]);
-    if (!move) {
-      throw new Error(`Invalid SAN "${moves[ply]}" at ply ${ply}`);
-    }
-    const evalAfter = await evaluatePosition(chess.fen());
-    points.push(normalizeEvalPoint(ply, evalBefore, evalAfter));
-    evalBefore = evalAfter;
-    await onPlyComplete?.(points, evalBefore);
-  }
-  return points;
+  return evaluateMoveSequenceWith(moves, evaluatePosition, onPlyComplete, checkpoint);
 }
 
 function openDb(): Promise<IDBDatabase> {

@@ -10,6 +10,7 @@ type GameRow = { id?: string; userId: string; lichessGameId: string; [key: strin
 
 const users = new Map<string, UserRow>();
 const games = new Map<string, GameRow>();
+const vanityJobs = new Map<string, { gameId: string; userId: string }>();
 
 export function __seedUser(user: UserRow) {
   users.set(user.id, { ...user });
@@ -18,10 +19,15 @@ export function __seedUser(user: UserRow) {
 export function __reset() {
   users.clear();
   games.clear();
+  vanityJobs.clear();
 }
 
 export function __gameCount(userId: string) {
   return [...games.values()].filter((game) => game.userId === userId).length;
+}
+
+export function __vanityJobCount(userId: string) {
+  return [...vanityJobs.values()].filter((job) => job.userId === userId).length;
 }
 
 function gameKey(game: Pick<GameRow, "userId" | "lichessGameId">) {
@@ -65,6 +71,29 @@ export const prisma = {
       }
       return { count };
     },
+    findMany: async ({ where }: { where: { userId: string; lichessGameId: { in: string[] } } }) =>
+      [...games.values()]
+        .filter((game) => game.userId === where.userId && where.lichessGameId.in.includes(game.lichessGameId))
+        .map((game) => ({ id: game.id!, userId: game.userId })),
   },
-  $transaction: async (operations: Promise<unknown>[]) => Promise.all(operations),
+  vanityEvaluationJob: {
+    createMany: async ({ data, skipDuplicates }: { data: { gameId: string; userId: string }[]; skipDuplicates?: boolean }) => {
+      let count = 0;
+      for (const job of data) {
+        if (vanityJobs.has(job.gameId)) {
+          if (!skipDuplicates) throw new Error("duplicate vanity evaluation job");
+          continue;
+        }
+        vanityJobs.set(job.gameId, job);
+        count++;
+      }
+      return { count };
+    },
+  },
+  $transaction: async (operation: unknown): Promise<unknown> => {
+    if (typeof operation === "function") {
+      return (operation as (tx: unknown) => Promise<unknown>)(prisma);
+    }
+    return Promise.all(operation as Promise<unknown>[]);
+  },
 };

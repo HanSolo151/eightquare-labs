@@ -16,7 +16,7 @@ The product currently includes:
 - A database-backed Games archive, saved-game review, Ghost Replay, opening analytics, pattern views, a square heatmap, Daily Puzzle, and Rivalries.
 - Base Maia spar plus an opponent-mimic mode that uses locally built opponent signals when the tier resolver allows it.
 
-The feature set is substantial, but several areas remain “implemented in source, validation outstanding.” All eight local migrations were applied to the configured database and verified on 2026-10-21. Browser flows still need a real-account pass, and some analytics are intentionally proxies or partial versions of the larger spec.
+The feature set is substantial, but several areas remain “implemented in source, validation outstanding.” All eight local migrations were reported applied to the configured database on 2026-10-22. Browser flows still need a real-account pass, and some analytics are intentionally proxies or partial versions of the larger spec.
 
 ## 2. Technology and runtime layout
 
@@ -205,31 +205,35 @@ Several dashboard pages call the same server-side data functions directly rather
 
 ### Validation and operations
 
-- Verify actual migration state in the intended database; local folders include two migrations added after the last user-reported deploy status.
+- The configured database reported all eight migrations applied on 2026-10-22; re-check before a future release if the deployment target changes.
 - Browser-check sync, evaluation save, archive review, Ghost Replay, spar, Daily Puzzle solve/skip, rivalry drill, and heatmap on a real account.
 - Revisit historical game/profile backfill for square bias. Incremental profile folding does not itself guarantee old already-evaluated games were folded into newly introduced profile columns.
 - There is no server-side eval queue, scheduled sync job, or SparSession persistence/resume. Eval recovery is local to the browser's IndexedDB; it does not run while the browser is closed or on another device.
+- Because Ghost Progression adds on-demand browser-side Stockfish and Maia work, prioritize a resumable evaluation-queue design before increasing client compute or making generated lines a durable product record. No queue is being introduced in this pass.
 - `package.json` provides a Playwright `test:e2e` command, but no unit-test command is defined; this handoff does not claim CI coverage.
 
 ### Product/analysis gaps
 
 - Ghost Replay does not have a shared visual evaluation bar; it presents normalized per-position scores and the played-vs-Stockfish delta as text.
 - Ghost Replay's full-game link opens the saved replay at the flagged move. The scrub position is URL-seeded, not persisted as a separate session.
-- Ghost Replay's synchronized full-game scrub bar and open-ended branching continuations are deferred; its fixed six-ply progression lines are implemented and cached per device.
-- Opponent-specific mimic is partial and data-gated; its tier frequency and usefulness have not been validated across a broad sample.
+- Ghost Replay's synchronized full-game scrub bar and open-ended branching continuations are deferred; its fixed six-ply progression lines are implemented and cached per device. Decisive positions are marked at the first decisive ply, but the line continues to six plies to satisfy the requested projection length.
+- Opponent-specific mimic is partial and data-gated; its tier frequency and usefulness have not been validated across a broad sample. Keep it a secondary Spar option with honest availability copy until real-account tier coverage is measured; do not make it a primary product promise yet.
 - Weakness patterns are coarse phase-level groupings, not tactical concepts such as forks or back-rank motifs.
 - Some bias schema columns (`rankBias`, `fileBias`, `diagonalBias`) are present, but the current square-based updater is the source of truth; do not assume each legacy aggregate is independently produced or validated.
 - `DailyPuzzleState` remains alongside `ResolvedSparPosition` because skip count, cooldown, and deferred status are Daily-Puzzle-specific. Daily Puzzle wins write both rows; other spar surfaces write the shared resolved marker on a win or draw.
+- Personal progress already has a shared read path: `getSparQueue` unions solved Daily Puzzle keys with spar-resolution keys for the resolved count and unresolved queue. Keep that personal progress display unified while retaining the separate Daily Puzzle scheduling state; no schema merge is currently needed.
+- Resolved-position integrity remains personal-only and client-nudged. Do not surface resolved counts as a public trust or rivalry signal without moving assist-use enforcement server-side.
 - Spar resolution records successful wins and draws, not losses or incomplete sessions. It does not persist a full SparSession or move history. The spar UI skips resolution after displaying a Stockfish hint, but this is a client-side honesty nudge, not server-enforced integrity; the API can still be called directly.
+- Scout Report stays blocked until there is a consent/privacy policy for profiles of named third parties. Persona Gauntlet, if pursued, must use fictional personas rather than real public figures. Mirror Match is explicitly parked until server-side evaluation and mid-session re-profiling exist.
 
 ## 11. Working-tree and validation note
 
-On 2026-10-21, `npx tsc --noEmit` and `npm run lint` passed during this audit. The earlier claim that `prisma migrate status` confirmed all eight migrations is contradicted by the app's missing-table response and could not be re-verified because the Prisma schema engine failed to start. `npx prisma generate` previously remained blocked by Windows `EPERM` while renaming the Prisma query-engine DLL. No real-account browser walkthrough has been completed.
+On 2026-10-22, `npx tsc --noEmit`, `npm run lint`, and `npm run build` passed. `npx prisma migrate status` reported the configured database up to date with all eight migrations; no migration was applied during the check. The `ResolvedSparPosition` P2021 catch is fallback behavior and did not trigger in that environment. No real-account browser walkthrough has been completed.
 
 ## 12. Recommended next actions for the governing agent
 
-1. Run `npx prisma generate` after closing any process holding Prisma's Windows query-engine DLL; typecheck, lint, and production build currently pass.
-2. Browser-validate core data flow: sync and evaluate a game, confirm save status and archive reads, then test resolved spar wins/draws and Daily Puzzle solve/skip behavior.
-3. Test Maia and mimic spar, an opening drill, a rivalry drill, Ghost Replay's normalized scores, and the flagged-ply full-game replay link.
+1. Browser-validate core data flow: sync and evaluate a game, confirm save status and archive reads, then test resolved spar wins/draws and Daily Puzzle solve/skip behavior.
+2. Measure mimic-tier coverage on real accounts before increasing its UI prominence.
+3. Scope the resumable server-side evaluation queue before expanding browser-side compute further.
 4. Measure mimic-tier coverage on a real account before using broad claims about opponent-mimic availability. Keep the open-ended Ghost continuation graph and SparSession persistence as separate work; browser-validate fixed-length Ghost Progression and its local cache.
 5. Only after this baseline is verified, proceed with larger visual redesign work.

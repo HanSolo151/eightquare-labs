@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getGhostMoment } from "@/lib/ghost/getGhostMoment";
 import GhostReplay from "@/components/board/GhostReplay";
+import { getNearMisses } from "@/lib/ghost/getNearMisses";
 
 export const instant = false;
 
@@ -18,7 +19,10 @@ export default async function GhostReplayPage({ params, searchParams }: { params
     if (!/^\d+$/.test(query.ply) || Number(query.ply) >= 600) notFound();
     requestedPly = Number.parseInt(query.ply, 10);
   }
-  const moment = await getGhostMoment(userId, gameId, requestedPly);
+  const [moment, nearMisses] = await Promise.all([
+    getGhostMoment(userId, gameId, requestedPly),
+    getNearMisses(userId),
+  ]);
   if (!moment) notFound();
 
   return <div className="space-y-6 pb-12">
@@ -28,6 +32,6 @@ export default async function GhostReplayPage({ params, searchParams }: { params
       <h1 className="mt-3 text-2xl font-semibold sm:text-3xl">The moment it went wrong</h1>
       <p className="mt-2 text-sm text-neutral-400">Move {Math.floor(moment.ply / 2) + 1}, vs {moment.opponentUsername} · {Math.round(moment.cpLoss)} cp loss</p>
     </header>
-    <GhostReplay key={`${moment.gameId}:${moment.ply}`} moment={moment} />
+    <GhostReplay key={`${moment.gameId}:${moment.ply}`} moment={moment} nearMisses={nearMisses} />
   </div>;
 }

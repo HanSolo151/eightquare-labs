@@ -82,6 +82,8 @@ export async function generateEngineBaseline(
   const moves: ProgressionMove[] = [];
   let evaluation = await evalFen(chess.fen());
   let decisive = evaluation.mate !== null || (evaluation.cp !== null && Math.abs(evaluation.cp) > DECISIVE_CP);
+  let decisiveAtPly: number | null = decisive ? 0 : null;
+  let decisiveNote = decisive ? decisiveReason(evaluation, chess.fen(), playerColor) : null;
   let stopReason: string | null = null;
 
   while (moves.length < MAX_PLIES && !chess.isGameOver()) {
@@ -97,7 +99,14 @@ export async function generateEngineBaseline(
     }
     evaluation = await evalFen(nextFen);
     moves[moves.length - 1] = { ...moves[moves.length - 1], cp: evaluation.cp, mate: evaluation.mate };
-    if (decisiveReason(evaluation, nextFen, playerColor)) decisive = true;
+    const reason = decisiveReason(evaluation, nextFen, playerColor);
+    if (reason) {
+      decisive = true;
+      if (decisiveAtPly === null) {
+        decisiveAtPly = moves.length;
+        decisiveNote = reason;
+      }
+    }
   }
   if (!stopReason && chess.isGameOver() && moves.length < MAX_PLIES) stopReason = "The game ended before the full line was complete.";
 
@@ -108,6 +117,8 @@ export async function generateEngineBaseline(
     pgn: continuationPgn(startingFen, moves),
     moves,
     decisive,
+    decisiveAtPly,
+    decisiveNote,
     stopReason,
   };
 }
@@ -128,6 +139,8 @@ export async function generateMaiaVsEngine(
   const moves: ProgressionMove[] = [];
   let nextEngineEvaluation: EvalResult | null = null;
   let decisive = false;
+  let decisiveAtPly: number | null = null;
+  let decisiveNote: string | null = null;
   let stopReason: string | null = null;
 
   while (moves.length < MAX_PLIES && !chess.isGameOver()) {
@@ -155,7 +168,13 @@ export async function generateMaiaVsEngine(
     nextEngineEvaluation = await evalFen(nextFen);
     moves[moves.length - 1] = { ...moves[moves.length - 1], cp: nextEngineEvaluation.cp, mate: nextEngineEvaluation.mate };
     const reason = decisiveReason(nextEngineEvaluation, nextFen, evaluationPerspective);
-    if (reason) decisive = true;
+    if (reason) {
+      decisive = true;
+      if (decisiveAtPly === null) {
+        decisiveAtPly = moves.length;
+        decisiveNote = reason;
+      }
+    }
   }
   if (!stopReason && chess.isGameOver() && moves.length < MAX_PLIES) stopReason = "The game ended before the full line was complete.";
 
@@ -168,6 +187,8 @@ export async function generateMaiaVsEngine(
     pgn: continuationPgn(startingFen, moves),
     moves,
     decisive,
+    decisiveAtPly,
+    decisiveNote,
     stopReason,
   };
 }

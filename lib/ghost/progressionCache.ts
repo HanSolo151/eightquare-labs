@@ -13,12 +13,14 @@ export interface ProgressionLine {
   pgn: string;
   moves: ProgressionMove[];
   decisive: boolean;
+  decisiveAtPly: number | null;
+  decisiveNote: string | null;
   stopReason: string | null;
 }
 
 export interface CachedProgression {
   key: string;
-  version: 2;
+  version: 3;
   gameId: string;
   ply: number;
   startingFen: string;
@@ -29,7 +31,7 @@ export interface CachedProgression {
 
 const DB_NAME = "ghost-progression-cache";
 const STORE_NAME = "continuations";
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 
 function progressionKey(gameId: string, ply: number) {
   return `${gameId}:${ply}`;
