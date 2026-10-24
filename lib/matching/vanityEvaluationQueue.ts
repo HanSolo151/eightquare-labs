@@ -234,7 +234,7 @@ export async function processNextVanityEvaluation(now = new Date()): Promise<Van
       });
     }
 
-    const createdMoments = await createGameMoments(job.userId, job.game, gameEval, flags);
+    const createdMoments = await createGameMoments(job.userId, job.game, gameEval);
     await prisma.vanityEvaluationJob.update({
       where: { id: job.id },
       data: { status: "complete", lockedAt: null, checkpoint: Prisma.DbNull, lastError: null },

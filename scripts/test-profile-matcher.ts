@@ -8,7 +8,11 @@ import { MATCHING_CONFIG } from "../config/matching";
 import { isStyleVector, PHASES, type MatchPhase, type VectorCalibration } from "../lib/matching/vectorSchema";
 import type { EvalPoint, GameEval, ParsedGame } from "../types";
 
-const countArg = Number.parseInt(process.argv[2] ?? "50", 10);
+const args = process.argv.slice(2);
+const validationMode = args.includes("--validation");
+const countArgs = args.filter((arg) => arg !== "--validation");
+if (countArgs.length > 1) throw new Error("Provide at most one game count, plus optional --validation.");
+const countArg = Number.parseInt(countArgs[0] ?? "50", 10);
 const take = Number.isInteger(countArg) && countArg > 0 ? Math.min(countArg, 500) : 50;
 const outputPath = path.join(process.cwd(), "artifacts", "profile-matcher-dry-run.json");
 
@@ -56,16 +60,20 @@ function phaseForPly(ply: number): MatchPhase {
 }
 
 async function main(): Promise<void> {
-  const [calibrationRows, profileRows, games] = await Promise.all([
+  const [calibrationRows, allProfileRows, games] = await Promise.all([
     prisma.bigshotVectorCalibration.findMany(),
     prisma.bigshotPhaseProfile.findMany({ include: { bigshot: { select: { name: true } } } }),
     prisma.game.findMany({
       where: { result: "win", eval: { isNot: null }, flags: { some: {} } },
-      include: { eval: true, flags: true },
+      include: { eval: true },
       orderBy: { lichessCreatedAt: "desc" },
       take,
     }),
   ]);
+  const validationNames = new Set<string>(MATCHING_CONFIG.BIGSHOT_VALIDATION_NAMES);
+  const profileRows = validationMode
+    ? allProfileRows.filter((row) => validationNames.has(row.bigshot.name))
+    : allProfileRows;
   const calibration = calibrationForRows(calibrationRows);
   const bigshotById = new Map<string, string>();
   const profilesByPhase = new Map<MatchPhase, Array<{ bigshotId: string; phase: MatchPhase; vector: unknown }>>();
@@ -102,8 +110,7 @@ async function main(): Promise<void> {
       evaluatedAt: row.eval.evaluatedAt.getTime(),
       engineVersion: row.eval.engineVersion,
     };
-    const flags = row.flags.map((flag) => ({ ply: flag.ply, gamePhase: flag.gamePhase as MatchPhase, color: flag.color as "white" | "black" }));
-    const { vectors, diagnostics } = computeGameVectorDetails(game, evaluation, flags);
+    const { vectors, diagnostics } = computeGameVectorDetails(game, evaluation);
     const perPhase = PHASES.map((phase) => {
       const raw = vectors[phase];
       if (!raw) return { phase, top3: [], rawVector: null };
@@ -112,13 +119,19 @@ async function main(): Promise<void> {
         ? findNearestBigshots(normalized, phase, profilesByPhase.get(phase) ?? []).slice(0, 3)
         : [];
       if (!workedExample) {
-        const flag = flags.find((candidate) => phaseForPly(candidate.ply) === phase);
+        const samplePly = game.moves.findIndex((_, ply) =>
+          (ply % 2 === 0 ? "white" : "black") === game.playerColor && phaseForPly(ply) === phase,
+        );
         workedExample = {
           gameId: game.id,
           phase,
-          flagPly: flag?.ply ?? null,
-          flagSan: flag ? game.moves[flag.ply] : null,
-          fenBeforeMove: flag ? fenBeforePly(game.moves, flag.ply) : null,
+          vectorScope: "aggregate across all of this player's moves in the phase",
+          representativeMove: samplePly < 0 ? null : {
+            ply: samplePly,
+            san: game.moves[samplePly],
+            fenBeforeMove: fenBeforePly(game.moves, samplePly),
+            note: "Illustrative position only; the vectors and diagnostics below are phase aggregates.",
+          },
           rawVector: raw,
           normalizedVector: normalized,
           diagnostics: diagnostics[phase],
@@ -138,8 +151,10 @@ async function main(): Promise<void> {
   const report = {
     generatedAt: new Date().toISOString(),
     requestedGames: take,
+    profileScope: validationMode ? MATCHING_CONFIG.BIGSHOT_VALIDATION_NAMES : "all",
     analyzedGames: results.length,
     bigshotProfileCount: profileRows.length,
+    bigshotNames: [...new Set(profileRows.map((row) => row.bigshot.name))],
     calibrationAvailable: calibration !== null,
     status: calibration && profileRows.length > 0 ? "ready_for_human_review" : "blocked_missing_corpus_or_calibration",
     workedExample,
@@ -148,7 +163,13 @@ async function main(): Promise<void> {
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
   for (const result of results) console.log(JSON.stringify({ gameId: result.gameId, phases: result.phases }));
-  console.log(JSON.stringify({ outputPath, status: report.status, analyzedGames: results.length, bigshotProfileCount: profileRows.length }));
+  console.log(JSON.stringify({
+    outputPath,
+    status: report.status,
+    analyzedGames: results.length,
+    bigshotProfileCount: profileRows.length,
+    bigshotNames: report.bigshotNames,
+  }));
 }
 
 main().catch((error) => {

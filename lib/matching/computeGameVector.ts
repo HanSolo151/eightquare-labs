@@ -1,7 +1,7 @@
 import { Chess, type Square } from "chess.js";
 import { extractMoveFeatures } from "@/lib/features/extractFeatures";
 import { emptyPieceActivityProfile, updatePieceActivityProfile } from "@/lib/profile/pieceActivityProfile";
-import type { EvalPoint, FlaggedMove, GameEval, ParsedGame, PieceType } from "@/types";
+import type { EvalPoint, GameEval, ParsedGame, PieceType } from "@/types";
 import { MATCHING_CONFIG } from "@/config/matching";
 import { PHASES, VECTOR_DIMENSIONS, type MatchPhase, type StyleVector, type VectorCalibration } from "./vectorSchema";
 
@@ -9,7 +9,10 @@ const PIECE_VALUE: Record<PieceType, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k
 const KING_ZONE_WEIGHT: Record<PieceType, number> = { p: 0, n: 1, b: 1, r: 2, q: 3, k: 0 };
 const CENTRAL_FILES = new Set(["c", "d", "e", "f"]);
 
-type MatchFlag = Pick<FlaggedMove, "ply" | "gamePhase" | "color">;
+interface StyleMoment {
+  ply: number;
+  color: ParsedGame["playerColor"];
+}
 type PhaseMetrics = Record<MatchPhase, StyleVector | null>;
 type PhaseDiagnostics = Record<MatchPhase, {
   kingZoneAttackers: number | null;
@@ -22,16 +25,16 @@ type PhaseDiagnostics = Record<MatchPhase, {
 /**
  * Computes raw per-game vectors. Apply corpus calibration with
  * normalizeGameVectors before persistence or matching.
- * Returns null for phases without any eligible own flagged moment.
+ * Style moments are all of the player's own moves, independently of
+ * FlaggedMove, which remains an error-detection input for weakness coaching.
  */
-export function computeGameVector(game: ParsedGame, evaluation: GameEval, flaggedMoves: MatchFlag[]): PhaseMetrics {
-  return computeGameVectorDetails(game, evaluation, flaggedMoves).vectors;
+export function computeGameVector(game: ParsedGame, evaluation: GameEval): PhaseMetrics {
+  return computeGameVectorDetails(game, evaluation).vectors;
 }
 
 export function computeGameVectorDetails(
   game: ParsedGame,
   evaluation: GameEval,
-  flaggedMoves: MatchFlag[],
 ): { vectors: PhaseMetrics; diagnostics: PhaseDiagnostics } {
   const chess = new Chess();
   const fenBefore: string[] = [];
@@ -69,17 +72,20 @@ export function computeGameVectorDetails(
     game.playerColor,
   );
 
-  const flagsByPhase = Object.fromEntries(PHASES.map((phase) => [phase,
-    flaggedMoves.filter((flag) => flag.color === game.playerColor && phaseForPly(flag.ply) === phase),
-  ])) as Record<MatchPhase, MatchFlag[]>;
+  const momentsByPhase = Object.fromEntries(PHASES.map((phase) => [phase,
+    game.moves.flatMap((_, ply) => {
+      const color = ply % 2 === 0 ? "white" : "black";
+      return color === game.playerColor && phaseForPly(ply) === phase ? [{ ply, color }] : [];
+    }),
+  ])) as Record<MatchPhase, StyleMoment[]>;
   const pointsByPly = new Map(evaluation.points.map((point) => [point.ply, point]));
   const vectors = {} as PhaseMetrics;
   const diagnostics = {} as PhaseDiagnostics;
 
   for (const phase of PHASES) {
-    const flags = flagsByPhase[phase];
+    const moments = momentsByPhase[phase];
     const phasePlies = game.moves.map((_, ply) => ply).filter((ply) => phaseForPly(ply) === phase);
-    if (flags.length === 0 || phasePlies.length === 0) {
+    if (moments.length === 0 || phasePlies.length === 0) {
       vectors[phase] = null;
       diagnostics[phase] = {
         kingZoneAttackers: null, materialAcceptedLosses: [], kingShieldDeltas: [],
@@ -88,13 +94,13 @@ export function computeGameVectorDetails(
       continue;
     }
 
-    const materialAggression = computeMaterialAggression(flags, game, fenBefore, fenAfter, moveResults);
-    const shieldDeltas = flags.map((flag) => {
-      const before = new Chess(fenBefore[flag.ply]);
-      const after = new Chess(fenAfter[flag.ply]);
+    const materialAggression = computeMaterialAggression(moments, game, fenBefore, fenAfter, moveResults);
+    const shieldDeltas = moments.map((moment) => {
+      const before = new Chess(fenBefore[moment.ply]);
+      const after = new Chess(fenAfter[moment.ply]);
       return pawnShieldScore(after, game.playerColor) - pawnShieldScore(before, game.playerColor);
     });
-    const kingZoneCounts = flags.map((flag) => kingZoneAttackers(new Chess(fenAfter[flag.ply]), game.playerColor));
+    const kingZoneCounts = moments.map((moment) => kingZoneAttackers(new Chess(fenAfter[moment.ply]), game.playerColor));
     const bucket = pieceProfile.byPieceType;
     const activityDifferential = computePieceActivityDifferential(bucket, phase);
     const midpointPly = phasePlies[Math.floor((phasePlies.length - 1) / 2)];
@@ -141,19 +147,19 @@ export function normalizeGameVectors(vectors: PhaseMetrics, calibration: VectorC
 
 /** Named proxy: sacrificed material is measured after the opponent's reply. */
 export function computeMaterialAggression(
-  flags: MatchFlag[], game: ParsedGame, fenBefore: string[], fenAfter: string[],
+  moments: StyleMoment[], game: ParsedGame, fenBefore: string[], fenAfter: string[],
   moveResults: Array<ReturnType<Chess["move"]> | null>,
 ): number[] {
   const acceptedLosses: number[] = [];
-  for (const flag of flags) {
-    const replyPly = flag.ply + 1;
+  for (const moment of moments) {
+    const replyPly = moment.ply + 1;
     if (replyPly >= game.moves.length || !fenAfter[replyPly]) continue;
-    const ownMove = moveResults[flag.ply];
-    const priorMove = moveResults[flag.ply - 1];
+    const ownMove = moveResults[moment.ply];
+    const priorMove = moveResults[moment.ply - 1];
     // A matching prior opponent capture followed by our equal-value capture
     // is a recapture inside an exchange, not accepted material aggression.
     if (priorMove?.captured && ownMove?.captured && priorMove.captured === ownMove.captured) continue;
-    const before = materialBalance(new Chess(fenBefore[flag.ply]), game.playerColor);
+    const before = materialBalance(new Chess(fenBefore[moment.ply]), game.playerColor);
     const afterReply = materialBalance(new Chess(fenAfter[replyPly]), game.playerColor);
     const delta = afterReply - before;
     if (delta < 0) acceptedLosses.push(Math.abs(delta));

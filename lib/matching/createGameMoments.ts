@@ -1,7 +1,7 @@
 import { Chess } from "chess.js";
 import { MATCHING_CONFIG } from "@/config/matching";
 import { prisma } from "@/lib/prisma";
-import type { EvalPoint, FlaggedMove, GameEval, ParsedGame } from "@/types";
+import type { EvalPoint, GameEval, ParsedGame } from "@/types";
 import { computeGameVector, normalizeStyleVector } from "./computeGameVector";
 import { gateBigshotMatch, type PhaseCorpusProfile, type RecentBigshotMoment } from "./gates";
 import { findNearestBigshots } from "./profileMatcher";
@@ -82,7 +82,6 @@ export async function createGameMoments(
   userId: string,
   game: PersistableGame,
   rawEvaluation: unknown,
-  flags: FlaggedMove[],
 ): Promise<number> {
   if (game.result !== "win" && !(game.result === "draw" && MATCHING_CONFIG.INCLUDE_DRAW_RESULTS)) return 0;
   if (game.playerColor !== "white" && game.playerColor !== "black") return 0;
@@ -93,7 +92,7 @@ export async function createGameMoments(
   const [calibrationRows, profileRows, sampleRows] = await Promise.all([
     prisma.bigshotVectorCalibration.findMany(),
     prisma.bigshotPhaseProfile.findMany({ include: { bigshot: { select: { name: true } } } }),
-    prisma.bigshotSampleGame.findMany({ select: { id: true, bigshotId: true, phase: true } }),
+    prisma.bigshotSampleGame.findMany({ select: { id: true, bigshotId: true, phase: true, featureDetails: true } }),
   ]);
 
   const calibrations = new Map<MatchPhase, PhaseVectorCalibration>();
@@ -129,14 +128,12 @@ export async function createGameMoments(
     speed: game.speed,
     createdAt: game.lichessCreatedAt?.getTime() ?? null,
   };
-  const validFlags = flags.filter((flag) => flag.color === game.playerColor && flag.ply >= 0 && flag.ply < moves.length);
-  if (validFlags.length === 0) return 0;
   const rawVectors = computeGameVector(parsed, {
     gameId: game.lichessGameId,
     points,
     evaluatedAt: Date.now(),
     engineVersion: typeof jsonRecord(rawEvaluation)?.engineVersion === "string" ? jsonRecord(rawEvaluation)!.engineVersion as string : "unknown",
-  } satisfies GameEval, validFlags);
+  } satisfies GameEval);
   const positions = positionsBeforeMoves(moves);
   const recentCutoff = new Date(Date.now() - MATCHING_CONFIG.VARIETY_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
   const recentRows = await prisma.gameMoment.findMany({
@@ -154,14 +151,24 @@ export async function createGameMoments(
     status: "matched"; createdAt: Date;
   }> = [];
 
-  for (const flag of validFlags) {
-    const phase = phaseAt(flag.ply);
+  for (const phase of PHASES) {
     const rawVector = rawVectors[phase];
     const calibration = calibrations.get(phase);
     if (!rawVector || !calibration) continue;
     const normalized = normalizeStyleVector(rawVector, calibration);
     const ranked = findNearestBigshots(normalized, phase, candidatesByPhase[phase]);
-    const point = points[flag.ply];
+    const phasePlies = moves.flatMap((_, ply) =>
+      phaseAt(ply) === phase && (ply % 2 === 0 ? "white" : "black") === game.playerColor ? [ply] : [],
+    );
+    const scoredPlies = phasePlies.flatMap((ply) => {
+      const point = points[ply];
+      return point && point.cpBefore !== null && point.cpAfter !== null
+        ? [{ ply, point, gain: point.cpAfter - point.cpBefore }]
+        : [];
+    });
+    const standout = scoredPlies.sort((a, b) => b.gain - a.gain || a.ply - b.ply)[0];
+    if (!standout) continue;
+    const { ply, point } = standout;
     if (!point) continue;
     const decision = gateBigshotMatch({
       result: parsed.result,
@@ -173,17 +180,27 @@ export async function createGameMoments(
       recentMoments,
       now: createdAt,
     });
-    if (!decision.pass) continue;
-    const sample = sampleRows.find((item) => item.bigshotId === decision.value.match.bigshotId && item.phase === phase);
+    if (!decision.pass || decision.value.soundness !== "sound") continue;
+    const candidateSamples = sampleRows.flatMap((item) => {
+      if (item.bigshotId !== decision.value.match.bigshotId || item.phase !== phase) return [];
+      const details = jsonRecord(item.featureDetails);
+      const rawSampleVector = details?.rawStyleVector;
+      if (!isStyleVector(rawSampleVector)) return [];
+      return [{ item, vector: normalizeStyleVector(rawSampleVector, calibration) }];
+    });
+    const nearestSample = candidateSamples
+      .map(({ item, vector }) => ({ item, distance: euclideanDistance(normalized, vector) }))
+      .sort((a, b) => a.distance - b.distance)[0]?.item;
+    const sample = nearestSample ?? sampleRows.find((item) => item.bigshotId === decision.value.match.bigshotId && item.phase === phase);
     if (!sample) continue;
     rows.push({
       userId,
       gameId: game.id,
-      ply: flag.ply,
+      ply,
       phase,
-      moveNumber: flag.moveNumber,
-      san: flag.san,
-      fenBeforeMove: positions[flag.ply],
+      moveNumber: Math.floor(ply / 2) + 1,
+      san: moves[ply]!,
+      fenBeforeMove: positions[ply]!,
       evalBefore: point.cpBefore === null ? null : point.cpBefore / 100,
       evalAfter: point.cpAfter === null ? null : point.cpAfter / 100,
       soundness: decision.value.soundness,
@@ -194,11 +211,13 @@ export async function createGameMoments(
       status: "matched",
       createdAt,
     });
-    recentMoments.unshift({ matchedBigshotId: decision.value.match.bigshotId, createdAt });
-    recentMoments.splice(MATCHING_CONFIG.VARIETY_LOOKBACK_COUNT);
   }
 
   if (rows.length === 0) return 0;
   const result = await prisma.gameMoment.createMany({ data: rows, skipDuplicates: true });
   return result.count;
+}
+
+function euclideanDistance(a: Record<string, number>, b: Record<string, number>): number {
+  return Math.sqrt(Object.keys(a).reduce((sum, key) => sum + (a[key]! - b[key]!) ** 2, 0));
 }

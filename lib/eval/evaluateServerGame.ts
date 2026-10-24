@@ -14,6 +14,7 @@ export async function evaluateServerGame(
   evaluatePosition: (fen: string) => Promise<ServerEvalResult>,
   checkpoint?: ServerEvalCheckpoint,
   onPlyComplete?: (progress: ServerEvalCheckpoint) => Promise<void>,
+  engineVersion = "stockfish-19-lite-single-depth16-v2",
 ): Promise<GameEval> {
   const points = await evaluateMoveSequenceWith(moves, evaluatePosition, async (savedPoints, evalBefore) => {
     await onPlyComplete?.({ points: savedPoints.map((point) => ({ ...point })), evalBefore });
@@ -22,7 +23,7 @@ export async function evaluateServerGame(
     gameId,
     points,
     evaluatedAt: Date.now(),
-    engineVersion: "stockfish-19-lite-single-depth16-v2",
+    engineVersion,
   };
   // Ensure the saved evaluation corresponds to the entire synced mainline.
   const replay = new Chess();

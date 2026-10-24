@@ -13,7 +13,7 @@ const game: ParsedGame = {
   opponentUsername: "fixture",
   opponentRating: null,
   playerRating: null,
-  moves: ["e4", "d5", "exd5", "Qxd5"],
+  moves: Array.from({ length: 12 }, () => ["Nf3", "Nf6", "Ng1", "Ng8"]).flat(),
   clocks: [6000, 6000, 5900, 5900],
   openingName: null,
   openingEco: null,
@@ -31,13 +31,11 @@ const evaluation: GameEval = {
     mateBefore: null, mateAfter: null, depth: 16, bestMoveUci: null,
   })),
 };
-const vectors = computeGameVector(game, evaluation, [
-  { ply: 2, gamePhase: "opening", color: "white" },
-]);
+const vectors = computeGameVector(game, evaluation);
 assert.ok(vectors.opening);
 assert.deepEqual(Object.keys(vectors.opening!).sort(), [...VECTOR_DIMENSIONS].sort());
-assert.equal(vectors.middlegame, null);
-assert.equal(vectors.endgame, null);
+assert.ok(vectors.middlegame, "style vector sampling must include phase moves independently of flagged errors");
+assert.ok(vectors.endgame, "style vector sampling must include phase moves independently of flagged errors");
 
 const self: StyleVector = {
   materialAggression: 0,

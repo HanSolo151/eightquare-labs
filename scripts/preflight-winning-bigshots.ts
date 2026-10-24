@@ -13,13 +13,23 @@ function surname(name: string): string {
 }
 
 async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  if (args.some((arg) => arg !== "--validation")) throw new Error("Only the explicit --validation option is supported.");
+  const validationMode = args.includes("--validation");
   const config = JSON.parse(await readFile(path.join(process.cwd(), "config", "bigshots.json"), "utf8")) as { bigshots: BigshotConfig[] };
+  const targets = validationMode
+    ? MATCHING_CONFIG.BIGSHOT_VALIDATION_NAMES.map((name) => {
+        const target = config.bigshots.find((entry) => entry.name === name);
+        if (!target) throw new Error(`Validation target "${name}" is missing from config/bigshots.json.`);
+        return target;
+      })
+    : config.bigshots;
   const manifest = JSON.parse(await readFile(path.join(process.cwd(), "data", "bigshots", "converted", "conversion-manifest.json"), "utf8")) as Array<{ output: string; gameHeaders: number }>;
   const targetRows = [];
   let selectedGames = 0;
   let selectedPliesEstimate = 0;
 
-  for (const target of config.bigshots) {
+  for (const target of targets) {
     const filePath = path.resolve(process.cwd(), target.pgnPath!);
     const pgn = await readFile(filePath, "utf8");
     const chunks = pgn.split(/(?=^\[Event\s)/m).map((chunk) => chunk.trim()).filter(Boolean);
@@ -50,7 +60,8 @@ async function main(): Promise<void> {
       wins.push({ result: "win", pliesEstimate: Math.max(1, fullMoveCount * 2) });
     }
 
-    const selection = selectWinningCorpusGames(wins);
+    const minimumWins = target.minWins ?? MATCHING_CONFIG.BIGSHOT_INGEST_MIN_WINS;
+    const selection = selectWinningCorpusGames(wins, minimumWins);
     const sourceGames = manifest.find((entry) => entry.output === path.basename(filePath))?.gameHeaders ?? chunks.length;
     selectedGames += selection.games.length;
     const plies = selection.games.reduce((sum, game) => sum + game.pliesEstimate, 0);
@@ -60,23 +71,27 @@ async function main(): Promise<void> {
       sourceGames,
       matchedPlayerGames,
       wonGames: selection.availableWins,
+      minimumWins,
       selectedForIngestion: selection.games.length,
       plies,
-      preliminaryDecision: selection.skipped ? "skip: fewer than minimum wins" : "attempt capped win subset",
+      preliminaryDecision: selection.skipped ? `skip: fewer than ${minimumWins} wins` : "attempt capped win subset",
     });
   }
 
   const estimatedEnginePositions = selectedPliesEstimate + selectedGames;
   console.log(JSON.stringify({
-    mode: "read-only PGN header/result scan; no Stockfish or database access",
+    mode: validationMode
+      ? `read-only validation batch scan at depth ${MATCHING_CONFIG.INGEST_EVAL_DEPTH_VALIDATION}; no Stockfish or database access`
+      : "read-only PGN header/result scan; no Stockfish or database access",
+    evaluationDepth: validationMode ? MATCHING_CONFIG.INGEST_EVAL_DEPTH_VALIDATION : MATCHING_CONFIG.INGEST_EVAL_DEPTH,
     minimumSourceWinsToAttempt: MATCHING_CONFIG.BIGSHOT_INGEST_MIN_WINS,
     maximumSelectedWinsPerBigshot: MATCHING_CONFIG.BIGSHOT_INGEST_MAX_WINS,
-    bigshots: config.bigshots.length,
+    bigshots: targets.length,
+    selectedNames: targets.map((target) => target.name),
     selectedBigshots: targetRows.filter((row) => row.selectedForIngestion > 0).length,
     skippedNamesUnderMinimumWins: targetRows.filter((row) => row.selectedForIngestion === 0).map((row) => `${row.name} (${row.wonGames} wins)`),
     selectedGames,
     estimatedEnginePositions,
-    roughSerialHoursAtMeasured1_81PositionsPerSecond: Number((estimatedEnginePositions / 1.81 / 3600).toFixed(1)),
     targets: targetRows,
   }, null, 2));
 }

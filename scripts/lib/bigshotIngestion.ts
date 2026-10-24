@@ -9,6 +9,8 @@ import { BIGSHOT_SOURCE_TYPES, type BigshotSourceType } from "../../lib/matching
 export interface BigshotConfig {
   enabled?: boolean;
   note?: string;
+  /** Per-target exception for sources intentionally retained below the corpus default. */
+  minWins?: number;
   name: string;
   aliases: string[];
   sourceType: BigshotSourceType;
@@ -61,11 +63,14 @@ export function meetsGameFloor(gameCount: number, minimumGames: number = MATCHIN
   return gameCount >= minimumGames;
 }
 
-export function selectWinningCorpusGames<T extends { result: string }>(games: T[]): { games: T[]; availableWins: number; skipped: boolean } {
+export function selectWinningCorpusGames<T extends { result: string }>(
+  games: T[],
+  minimumWins: number = MATCHING_CONFIG.BIGSHOT_INGEST_MIN_WINS,
+): { games: T[]; availableWins: number; skipped: boolean } {
   const wins = MATCHING_CONFIG.BIGSHOT_INGEST_WINS_ONLY
     ? games.filter((game) => game.result === "win")
     : games;
-  const skipped = wins.length < MATCHING_CONFIG.BIGSHOT_INGEST_MIN_WINS;
+  const skipped = wins.length < minimumWins;
   if (skipped) return { games: [], availableWins: wins.length, skipped };
   if (wins.length <= MATCHING_CONFIG.BIGSHOT_INGEST_MAX_WINS) return { games: wins, availableWins: wins.length, skipped: false };
 
@@ -88,6 +93,9 @@ export function validateBigshotConfig(value: unknown): asserts value is BigshotC
     throw new Error("sourceType is unsupported");
   }
   if (typeof target.sourceRef !== "string" || !target.sourceRef.trim()) throw new Error("sourceRef is required");
+  if (target.minWins !== undefined && (!Number.isInteger(target.minWins) || target.minWins < MATCHING_CONFIG.BIGSHOT_MIN_GAMES)) {
+    throw new Error(`minWins must be an integer at least ${MATCHING_CONFIG.BIGSHOT_MIN_GAMES}`);
+  }
 }
 
 /** Process each configured corpus independently; one invalid source must not cancel the rest. */
@@ -251,17 +259,24 @@ export async function persistCorpus(tx: Prisma.TransactionClient, eligible: Elig
     await tx.bigshotSampleGame.deleteMany({ where: { bigshotId: bigshot.id } });
     for (const phase of PHASES) {
       const phaseGames = item.byPhase[phase];
-      const rawProfile = {} as StyleVector;
-      for (const dimension of VECTOR_DIMENSIONS) rawProfile[dimension] = mean(phaseGames.map((game) => game.vectors[phase]![dimension]));
-      const normalizedProfile = normalizeStyleVector(rawProfile, {
+      const phaseCalibration = {
         means: stats[phase].mean,
         stdDevs: stats[phase].stdDev,
         sampleSize: phaseGames.length,
-      });
+      };
+      const rawProfile = {} as StyleVector;
+      for (const dimension of VECTOR_DIMENSIONS) rawProfile[dimension] = mean(phaseGames.map((game) => game.vectors[phase]![dimension]));
+      const normalizedProfile = normalizeStyleVector(rawProfile, phaseCalibration);
       await tx.bigshotPhaseProfile.create({
         data: { bigshotId: bigshot.id, phase, vector: normalizedProfile, sampleSize: phaseGames.length },
       });
-      const samples = phaseGames.slice(0, 5);
+      const samples = phaseGames
+        .map((game) => ({ game, distance: vectorDistance(
+          normalizeStyleVector(game.vectors[phase]!, phaseCalibration), normalizedProfile,
+        ) }))
+        .sort((a, b) => a.distance - b.distance || a.game.original.id.localeCompare(b.game.original.id))
+        .slice(0, 5)
+        .map(({ game }) => game);
       if (samples.length < 2) throw new Error(`${item.config.name}/${phase} lacks two sample games`);
       await tx.bigshotSampleGame.createMany({
         data: samples.map((game) => ({
@@ -271,9 +286,16 @@ export async function persistCorpus(tx: Prisma.TransactionClient, eligible: Elig
           sourceRef: game.sourceRef,
           sourceType: game.sourceType,
           attribution: game.attribution,
-          featureDetails: game.details[phase] as Prisma.InputJsonValue,
+          featureDetails: {
+            ...(game.details[phase] as Record<string, unknown>),
+            rawStyleVector: game.vectors[phase],
+          } as Prisma.InputJsonValue,
         })),
       });
     }
   }
+}
+
+function vectorDistance(a: StyleVector, b: StyleVector): number {
+  return Math.sqrt(VECTOR_DIMENSIONS.reduce((sum, dimension) => sum + (a[dimension] - b[dimension]) ** 2, 0));
 }

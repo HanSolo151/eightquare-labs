@@ -18,6 +18,7 @@
 /data/bigshots/*
 !/data/bigshots/README.md
 /artifacts/profile-matcher-dry-run.json
+/artifacts/bigshot-staging/
 /backups/
 
 # next.js

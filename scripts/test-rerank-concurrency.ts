@@ -3,15 +3,43 @@ import { randomUUID } from "node:crypto";
 import { deliverPlayerStyleMatches } from "../lib/matching/deliverMatches";
 import { prisma } from "../lib/prisma";
 
+const STALE_FIXTURE_AGE_MS = 60 * 60 * 1000;
+
+async function cleanupStaleFixtures(): Promise<void> {
+  const staleBefore = new Date(Date.now() - STALE_FIXTURE_AGE_MS);
+  await prisma.$transaction(async (tx) => {
+    const users = await tx.user.findMany({
+      where: { lichessId: { startsWith: "match-cap-" }, createdAt: { lt: staleBefore } },
+      select: { id: true },
+    });
+    if (users.length) await tx.user.deleteMany({ where: { id: { in: users.map((user) => user.id) } } });
+    await tx.bigshot.deleteMany({
+      where: { name: { startsWith: "Concurrency test " }, createdAt: { lt: staleBefore } },
+    });
+  });
+}
+
 async function main(): Promise<void> {
+  // A prior run may have been force-terminated before `finally` could run.
+  // Sweep only old rows in this test's reserved synthetic namespaces.
+  await cleanupStaleFixtures();
   const suffix = randomUUID();
-  const user = await prisma.user.create({ data: { lichessId: `match-cap-${suffix}`, username: `match-cap-${suffix}` } });
-  const bigshot = await prisma.bigshot.create({ data: { name: `Concurrency test ${suffix}`, gameCount: 250 } });
+  let releasePendingSend: (() => void) | null = null;
+  let interrupted = false;
+  const finishOnSignal = () => {
+    interrupted = true;
+    process.exitCode = 130;
+    releasePendingSend?.();
+  };
+  process.once("SIGINT", finishOnSignal);
+  process.once("SIGTERM", finishOnSignal);
   try {
-    const game = await prisma.game.create({
+    const user = await prisma.user.create({ data: { lichessId: `match-cap-${suffix}`, username: `match-cap-${suffix}` } });
+    const bigshot = await prisma.bigshot.create({ data: { name: `Concurrency test ${suffix}`, gameCount: 250 } });
+    const games = await Promise.all([0, 1, 2].map((index) => prisma.game.create({
       data: {
         userId: user.id,
-        lichessGameId: `match-cap-game-${suffix}`,
+        lichessGameId: `match-cap-game-${suffix}-${index}`,
         playerColor: "white",
         opponentUsername: "test-opponent",
         moves: ["e4", "e5", "Nf3"],
@@ -19,7 +47,7 @@ async function main(): Promise<void> {
         rated: true,
         speed: "rapid",
       },
-    });
+    })));
     await prisma.bigshotPhaseProfile.create({
       data: {
         bigshotId: bigshot.id,
@@ -34,7 +62,7 @@ async function main(): Promise<void> {
     await prisma.gameMoment.createMany({
       data: [0, 1, 2].map((ply) => ({
         userId: user.id,
-        gameId: game.id,
+        gameId: games[ply]!.id,
         ply,
         phase: "opening",
         moveNumber: ply + 1,
@@ -52,6 +80,8 @@ async function main(): Promise<void> {
     let firstSendStarted!: () => void;
     const firstSendStartedPromise = new Promise<void>((resolve) => { firstSendStarted = resolve; });
     const firstSendGate = new Promise<void>((resolve) => { releaseFirstSend = resolve; });
+    releasePendingSend = releaseFirstSend;
+    if (interrupted) releasePendingSend();
     let sendCalls = 0;
     const testSender = async () => {
       sendCalls++;
@@ -62,9 +92,9 @@ async function main(): Promise<void> {
       return true;
     };
 
-    const firstRun = deliverPlayerStyleMatches(new Date(), testSender);
+    const firstRun = deliverPlayerStyleMatches(new Date(), testSender, { userIds: [user.id] });
     await firstSendStartedPromise;
-    const secondRun = await deliverPlayerStyleMatches(new Date(), testSender);
+    const secondRun = await deliverPlayerStyleMatches(new Date(), testSender, { userIds: [user.id] });
     assert.equal(secondRun.sent, 0, "overlapping invocation must observe both reserved slots");
     assert.equal(sendCalls, 1, "second invocation must not begin another email while first run is in flight");
 
@@ -75,8 +105,12 @@ async function main(): Promise<void> {
     assert.equal(sendCalls, 2);
     console.log("Concurrent reranker cap check passed: two invocations sent exactly two emails total.");
   } finally {
-    await prisma.user.delete({ where: { id: user.id } });
-    await prisma.bigshot.delete({ where: { id: bigshot.id } });
+    await prisma.$transaction(async (tx) => {
+      await tx.user.deleteMany({ where: { lichessId: `match-cap-${suffix}` } });
+      await tx.bigshot.deleteMany({ where: { name: `Concurrency test ${suffix}` } });
+    });
+    process.removeListener("SIGINT", finishOnSignal);
+    process.removeListener("SIGTERM", finishOnSignal);
   }
 }
 

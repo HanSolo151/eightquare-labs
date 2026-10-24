@@ -7,6 +7,8 @@ async function main(): Promise<void> {
 const belowWinPrefilter = selectWinningCorpusGames(Array.from({ length: 349 }, () => ({ result: "win" })));
 assert.equal(belowWinPrefilter.skipped, true, "a name with fewer than 350 wins should be skipped before engine work");
 assert.equal(belowWinPrefilter.games.length, 0);
+assert.equal(selectWinningCorpusGames(Array.from({ length: 280 }, () => ({ result: "win" })), 250).games.length, 280,
+  "an explicitly configured per-target threshold can retain a smaller corpus while the phase floor remains separately enforced");
 const exactlyMinWins = selectWinningCorpusGames(Array.from({ length: 350 }, (_, index) => ({ result: "win", index })));
 assert.equal(exactlyMinWins.skipped, false);
 assert.equal(exactlyMinWins.games.length, 350, "350 wins is the attempt threshold");
@@ -24,6 +26,15 @@ const target: BigshotConfig = {
   sourceType: "historical_public_domain",
   sourceRef: "synthetic://fixture",
 };
+const retainedSmallerCorpus: BigshotConfig = { ...target, name: "Retained Smaller Corpus", minWins: 250 };
+assert.doesNotThrow(() => validateBigshotConfig(retainedSmallerCorpus));
+assert.throws(() => validateBigshotConfig({ ...retainedSmallerCorpus, minWins: 249 }), /at least 250/);
+assert.doesNotThrow(() => validateBigshotConfig({
+  ...target,
+  sourceType: "operator_provided",
+  sourceRef: "operator-provided fixture PGN",
+  pgnPath: "data/bigshots/converted/fixture.pgn",
+}));
 const repeatedKnights = Array.from({ length: 12 }, () => ["Nf3", "Nf6", "Ng1", "Ng8"]).flat();
 function makePgnSet(label: string, count: number): SourceGame {
   const pgnGames = Array.from({ length: count }, (_, index) => {
