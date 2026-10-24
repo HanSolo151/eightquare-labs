@@ -9,9 +9,9 @@ const tabs = [
   { href: "/dashboard/openings", label: "Openings" },
   { href: "/dashboard/daily", label: "Daily" },
   { href: "/dashboard/rivalries", label: "Rivalries" },
+  { href: "/dashboard/wins", label: "Wins" },
   { href: "/dashboard/games", label: "Games" },
   { href: "/dashboard/patterns", label: "Patterns" },
-  { href: "/dashboard/preferences", label: "Preferences" },
 ] as const;
 
 export function DashboardNav() {

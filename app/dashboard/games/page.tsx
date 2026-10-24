@@ -96,7 +96,7 @@ export default async function GamesPage({ searchParams }: GamesPageProps) {
                 <div className="flex shrink-0 items-center gap-2 self-start">
                   <span className={`rounded-full border px-2.5 py-1 text-[10px] ${game.evaluated ? "border-emerald-300/20 text-emerald-200" : "border-white/10 text-neutral-500"}`}>{game.evaluated ? "evaluated" : "pending eval"}</span>
                   <span className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] text-neutral-400">{game.flags.length} flag{game.flags.length === 1 ? "" : "s"}</span>
-                  <Link href={`/dashboard/games/${encodeURIComponent(game.id)}`} className="rounded border border-white/10 px-2.5 py-1 text-[10px] text-neutral-300 hover:border-emerald-300/40 hover:text-white">Review →</Link>
+                  <Link href={`/dashboard/games/${encodeURIComponent(game.id)}${occurrencePlysByGame.has(game.id) ? `?ply=${occurrencePlysByGame.get(game.id)![0]}&spar=1` : ""}`} className="rounded border border-white/10 px-2.5 py-1 text-[10px] text-neutral-300 hover:border-emerald-300/40 hover:text-white">{occurrencePlysByGame.has(game.id) ? "Drill position →" : "Review →"}</Link>
                 </div>
               </div>
 

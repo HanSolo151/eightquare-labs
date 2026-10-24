@@ -5,7 +5,6 @@ import { flagMoves } from "@/lib/flags/flagEngine";
 import { evaluateServerGame, type ServerEvalCheckpoint } from "@/lib/eval/evaluateServerGame";
 import { StockfishCli } from "@/lib/eval/stockfishCli";
 import { updateWeaknessProfile } from "@/lib/profile/weaknessProfile";
-import { createGameMoments } from "./createGameMoments";
 import { isVanityEvaluationEligible } from "./vanityEligibility";
 import { prisma } from "@/lib/prisma";
 import type { EvalPoint, FlaggedMove, GameEval, ParsedGame, WeaknessProfile } from "@/types";
@@ -99,34 +98,20 @@ async function claimNextJob(now: Date): Promise<string | null> {
 export interface VanityQueueRunResult {
   claimed: boolean;
   completed: boolean;
-  createdMoments: number;
-  deferredForCorpus?: boolean;
 }
 
 export async function processNextVanityEvaluation(now = new Date()): Promise<VanityQueueRunResult> {
   const jobId = await claimNextJob(now);
-  if (!jobId) return { claimed: false, completed: false, createdMoments: 0 };
+  if (!jobId) return { claimed: false, completed: false };
   const job = await prisma.vanityEvaluationJob.findUnique({
     where: { id: jobId },
     include: { game: { include: { eval: true } }, user: { select: { username: true } } },
   });
-  if (!job) return { claimed: true, completed: false, createdMoments: 0 };
+  if (!job) return { claimed: true, completed: false };
 
   if (!job.game.rated || !isVanityEvaluationEligible({ rated: job.game.rated, result: job.game.result as ParsedGame["result"], speed: job.game.speed })) {
     await prisma.vanityEvaluationJob.update({ where: { id: job.id }, data: { status: "complete", lockedAt: null, checkpoint: Prisma.DbNull, lastError: null } });
-    return { claimed: true, completed: true, createdMoments: 0 };
-  }
-
-  const [calibrationCount, profileCount] = await Promise.all([
-    prisma.bigshotVectorCalibration.count(),
-    prisma.bigshotPhaseProfile.count(),
-  ]);
-  if (calibrationCount === 0 || profileCount === 0) {
-    await prisma.vanityEvaluationJob.update({
-      where: { id: job.id },
-      data: { status: "queued", lockedAt: null, availableAt: new Date(now.getTime() + MATCHING_CONFIG.VANITY_EVAL_JOB_NO_CORPUS_RETRY_HOURS * 60 * 60 * 1000) },
-    });
-    return { claimed: true, completed: false, createdMoments: 0, deferredForCorpus: true };
+    return { claimed: true, completed: true };
   }
 
   let engine: StockfishCli | null = null;
@@ -234,12 +219,11 @@ export async function processNextVanityEvaluation(now = new Date()): Promise<Van
       });
     }
 
-    const createdMoments = await createGameMoments(job.userId, job.game, gameEval);
     await prisma.vanityEvaluationJob.update({
       where: { id: job.id },
       data: { status: "complete", lockedAt: null, checkpoint: Prisma.DbNull, lastError: null },
     });
-    return { claimed: true, completed: true, createdMoments };
+    return { claimed: true, completed: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown evaluation failure";
     const exhausted = job.attempts >= MATCHING_CONFIG.VANITY_EVAL_JOB_MAX_ATTEMPTS;
@@ -257,7 +241,7 @@ export async function processNextVanityEvaluation(now = new Date()): Promise<Van
       },
     });
     console.error("Vanity evaluation job failed", { jobId: job.id, attempts: job.attempts, exhausted, error });
-    return { claimed: true, completed: false, createdMoments: 0 };
+    return { claimed: true, completed: false };
   } finally {
     engine?.close();
   }

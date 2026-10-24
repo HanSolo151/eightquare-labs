@@ -7,7 +7,6 @@ import GameReplay from "@/components/board/GameReplay";
 import { getEffectiveRatingSignal } from "@/lib/opponent/effectiveRating";
 import { getAmbientPaceSignal } from "@/lib/pace/getAmbientPaceSignal";
 import AmbientPaceSignal from "@/components/board/AmbientPaceSignal";
-import { Chess } from "chess.js";
 
 interface GamePageProps {
   params: Promise<{ gameId: string }>;
@@ -15,7 +14,7 @@ interface GamePageProps {
 
 export const instant = false;
 
-export default async function SavedGamePage({ params, searchParams }: GamePageProps & { searchParams: Promise<{ ply?: string }> }) {
+export default async function SavedGamePage({ params, searchParams }: GamePageProps & { searchParams: Promise<{ ply?: string; spar?: string }> }) {
   const [{ gameId }, query, session] = await Promise.all([params, searchParams, auth()]);
   const userId = getSessionUserId(session);
   if (!userId) notFound();
@@ -31,33 +30,6 @@ export default async function SavedGamePage({ params, searchParams }: GamePagePr
     getEffectiveRatingSignal(userId, game.opponentUsername),
     getAmbientPaceSignal(userId, gameId),
   ]);
-  const [matches, evaluationJob] = await Promise.all([
-    prisma.gameMoment.findMany({
-      where: { userId, gameId, status: { in: ["matched", "queued", "emailed"] }, matchedBigshotId: { not: null } },
-      orderBy: { createdAt: "asc" },
-      select: { phase: true, moveNumber: true, soundness: true, matchDistance: true, sampleGameId: true, matchedBigshot: { select: { name: true } } },
-    }),
-    prisma.vanityEvaluationJob.findUnique({ where: { gameId }, select: { status: true } }),
-  ]);
-  const sampleIds = [...new Set(matches.flatMap((match) => match.sampleGameId ? [match.sampleGameId] : []))];
-  const sampleGames = sampleIds.length
-    ? await prisma.bigshotSampleGame.findMany({ where: { id: { in: sampleIds } }, select: { id: true, pgn: true } })
-    : [];
-  const referenceById = new Map(sampleGames.map((sample) => {
-    let label = "representative game";
-    try {
-      const chess = new Chess();
-      chess.loadPgn(sample.pgn);
-      const headers = chess.getHeaders();
-      const players = [headers.White, headers.Black].filter((value) => value && value !== "?").join(" vs ");
-      const event = headers.Event && headers.Event !== "?" ? headers.Event : "reference game";
-      const year = headers.Date && /^\d{4}/.test(headers.Date) ? headers.Date.slice(0, 4) : null;
-      label = [event, year, players || null].filter(Boolean).join(" · ");
-    } catch { /* Use the generic label for an invalid stored sample PGN. */ }
-    return [sample.id, label] as const;
-  }));
-  const orderedMatches = [...matches].sort((a, b) => ["opening", "middlegame", "endgame"].indexOf(a.phase) - ["opening", "middlegame", "endgame"].indexOf(b.phase));
-
   const moves = Array.isArray(game.moves)
     ? game.moves.filter((move): move is string => typeof move === "string")
     : [];
@@ -90,6 +62,7 @@ export default async function SavedGamePage({ params, searchParams }: GamePagePr
         key={`${gameId}:${initialPly}`}
         gameId={gameId}
         initialPly={initialPly}
+        autoStartSpar={query.spar === "1"}
         moves={moves}
         flags={flags}
         playerColor={game.playerColor === "black" ? "black" : "white"}
@@ -97,18 +70,6 @@ export default async function SavedGamePage({ params, searchParams }: GamePagePr
         humanRating={game.playerRating}
         opponentUsername={game.opponentUsername}
         effectiveRatingFires={effectiveRating.fires}
-        styleMatches={orderedMatches.map((match) => ({
-          bigshotName: match.matchedBigshot?.name ?? "Unknown player",
-          phase: match.phase,
-          moveNumber: match.moveNumber,
-          soundness: match.soundness,
-          distance: match.matchDistance,
-          referenceGame: match.sampleGameId ? referenceById.get(match.sampleGameId) ?? "representative game" : "representative game",
-        }))}
-        styleMatchStatus={{
-          evaluationStatus: evaluationJob?.status ?? null,
-          eligible: game.rated && game.result === "win",
-        }}
       />
     </div>
   );

@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { WeaknessPattern } from "@/types";
 
-const MIN_PATTERN_SAMPLES_PER_SIDE = 3;
 const CP_TREND_THRESHOLD = 25;
 
 function isMissingTable(error: unknown): boolean {
@@ -11,11 +10,15 @@ function isMissingTable(error: unknown): boolean {
 export interface PatternProgressDelta {
   patternId: string;
   description: string;
-  trend: "improving" | "steady" | "worsening";
+  phase: "opening" | "middlegame" | "endgame";
+  trend: "improving" | "steady" | "worsening" | "baseline" | "untrained";
   beforeAvgCp: number;
   afterAvgCp: number;
   beforeCount: number;
   afterCount: number;
+  beforeGameCount: number;
+  evidence: { gameId: string; ply: number; san: string; opponentUsername: string; playedAt: string; cpLoss: number }[];
+  latestAfter: { opponentUsername: string; playedAt: string; cpLoss: number } | null;
 }
 
 export interface AmbientPaceAggregate {
@@ -82,7 +85,7 @@ export async function getPatternProgressDeltas(userId: string): Promise<PatternP
   const [occurrences, resolutions] = await Promise.all([
     prisma.flaggedMove.findMany({
       where: { gameId: { in: internalGameIds } },
-      select: { gameId: true, ply: true, cpLoss: true },
+      select: { gameId: true, ply: true, cpLoss: true, san: true, game: { select: { id: true, opponentUsername: true } } },
     }),
     prisma.resolvedSparPosition.findMany({
       where: { userId, gameId: { in: internalGameIds } },
@@ -93,7 +96,7 @@ export async function getPatternProgressDeltas(userId: string): Promise<PatternP
     }),
   ]);
   const gameByInternalId = new Map(games.map((game) => [game.id, game]));
-  const flagByPosition = new Map<string, { cpLoss: number; playedAt: Date }>();
+  const flagByPosition = new Map<string, { cpLoss: number; playedAt: Date; gameId: string; san: string; opponentUsername: string }>();
   for (const flag of occurrences) {
     const game = gameByInternalId.get(flag.gameId);
     if (!game?.lichessCreatedAt) continue;
@@ -102,7 +105,7 @@ export async function getPatternProgressDeltas(userId: string): Promise<PatternP
     const key = `${game.lichessGameId}:${flag.ply}`;
     const previous = flagByPosition.get(key);
     if (!previous || flag.cpLoss > previous.cpLoss) {
-      flagByPosition.set(key, { cpLoss: flag.cpLoss, playedAt: game.lichessCreatedAt });
+      flagByPosition.set(key, { cpLoss: flag.cpLoss, playedAt: game.lichessCreatedAt, gameId: flag.game.id, san: flag.san, opponentUsername: flag.game.opponentUsername });
     }
   }
 
@@ -116,28 +119,41 @@ export async function getPatternProgressDeltas(userId: string): Promise<PatternP
       .map(({ gameId, ply }) => resolutionByPosition.get(`${gameId}:${ply}`))
       .filter((date): date is Date => date !== undefined)
       .sort((a, b) => a.getTime() - b.getTime());
-    const firstResolution = linkedResolutions[0];
-    if (!firstResolution) continue;
+    const firstResolution = linkedResolutions[0] ?? null;
 
     const before: number[] = [];
     const after: number[] = [];
+    const evidence: PatternProgressDelta["evidence"] = [];
+    let latestAfter: PatternProgressDelta["latestAfter"] = null;
     for (const occurrence of pattern.occurrences) {
       const flag = flagByPosition.get(`${occurrence.gameId}:${occurrence.ply}`);
       if (!flag) continue;
-      (flag.playedAt < firstResolution ? before : after).push(flag.cpLoss);
+      if (!firstResolution || flag.playedAt < firstResolution) {
+        before.push(flag.cpLoss);
+        evidence.push({ gameId: flag.gameId, ply: occurrence.ply, san: flag.san, opponentUsername: flag.opponentUsername, playedAt: flag.playedAt.toISOString(), cpLoss: flag.cpLoss });
+      } else {
+        after.push(flag.cpLoss);
+        if (!latestAfter || flag.playedAt.toISOString() > latestAfter.playedAt) {
+          latestAfter = { opponentUsername: flag.opponentUsername, playedAt: flag.playedAt.toISOString(), cpLoss: flag.cpLoss };
+        }
+      }
     }
-    if (before.length < MIN_PATTERN_SAMPLES_PER_SIDE || after.length < MIN_PATTERN_SAMPLES_PER_SIDE) continue;
+    if (before.length === 0) continue;
     const beforeAvgCp = before.reduce((sum, value) => sum + value, 0) / before.length;
-    const afterAvgCp = after.reduce((sum, value) => sum + value, 0) / after.length;
+    const afterAvgCp = after.length ? after.reduce((sum, value) => sum + value, 0) / after.length : 0;
     const change = afterAvgCp - beforeAvgCp;
     deltas.push({
       patternId: pattern.id,
       description: pattern.description,
-      trend: change <= -CP_TREND_THRESHOLD ? "improving" : change >= CP_TREND_THRESHOLD ? "worsening" : "steady",
+      phase: pattern.tags.find((tag): tag is "opening" | "middlegame" | "endgame" => tag === "opening" || tag === "middlegame" || tag === "endgame") ?? "middlegame",
+      trend: !firstResolution ? "untrained" : after.length === 0 ? "baseline" : change <= -CP_TREND_THRESHOLD ? "improving" : change >= CP_TREND_THRESHOLD ? "worsening" : "steady",
       beforeAvgCp: Math.round(beforeAvgCp),
       afterAvgCp: Math.round(afterAvgCp),
       beforeCount: before.length,
       afterCount: after.length,
+      beforeGameCount: new Set(evidence.map((item) => item.gameId)).size,
+      evidence: evidence.sort((a, b) => b.playedAt.localeCompare(a.playedAt)),
+      latestAfter,
     });
   }
   return deltas;

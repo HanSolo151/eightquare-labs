@@ -1,80 +1,37 @@
-# Player-style match: §1–§6 checkpoint
+# Player-style analysis: current status
 
-Next-agent handoff and recommended sequence: [PLAYER_STYLE_MATCH_HANDOFF.md](./PLAYER_STYLE_MATCH_HANDOFF.md).
+Updated: 2026-10-24
 
-## Current state (latest checkpoint)
+## Current build
 
-**Shipping state: shipped as-is with limited validation sample (2 games); revisit once real usage provides more eligible games to review.** The production database contains all 30 configured player profiles at Stockfish depth 10, plus one calibration per phase. All 30 players cleared the unchanged 250-usable-vectors-per-phase floor; the lowest result is Richard Reti at 280/279/254 (opening/middlegame/endgame). The full-corpus dry run found 90 phase profiles and analyzed the 2 eligible user wins currently available. It reports `ready_for_human_review`, but the sample is too small for a strong match-quality verdict. §6 remains open as a known, accepted gap and is not blocking ship. Email remains opt-in; no email was sent during this work. The local production build is green, but this checkout has no Git remote or linked Vercel project, so a hosted application deployment was not triggered or verified here.
+The dashboard has a **Wins** tab. It lists the signed-in user's saved wins; selecting an evaluated win computes the player's phase vectors and nearest bigshot matches in the browser. The client shows opening, middlegame, endgame, an overall nearest-style result, phase descriptions, and estimated move quality by phase. Where clock data and a complete saved evaluation exist, it compares evaluated moves made with low remaining time against moves made with more time.
 
-The configured roster now contains exactly 30 players. It retains the 26 original players with at least 350 wins and replaces Capablanca, Morphy, Stein, and Steinitz with Ding Liren, Richard Reti, Alexei Shirov, and Boris Spassky. Reti has 280 wins, so his target has an explicit 250-win attempt minimum; every player's unchanged publication requirement is at least 250 usable vectors in each phase. The global policy remains wins-only and at most 375 games per player. The four added PGNs are recorded as `operator_provided`, with their local files and operator-provided source reference.
+Only the authenticated user's wins and their saved evaluations are passed to the client. The server supplies the compact 30-player profile vectors and calibration. Style matching runs on demand in the client and does not write a match result to the database. The existing game-evaluation queue still computes and stores Stockfish evaluations and coaching flags for newly imported rated wins; the Wins tab reuses those saved evaluations. Older wins without complete evaluations show a clear unavailable state.
 
-The read-only preflight selected all 30 targets and 11,155 wins, estimating 960,087 Stockfish positions. Depth 16 benchmarked at 263.92 serial hours; depth 10 benchmarked at 1.58 serial hours for the same positions. At the operator's direction, the initial full-roster corpus used depth 10. The Reti depth-16 attempt was stopped before producing a stage file; the full depth-10 run has since completed and been published.
+Time-pressure text is an estimate from remaining clock and engine evaluation change for that move. It is shown only when enough evaluated, clock-tagged moves exist. Results describe the selected win, not durable playing strength. The phase comparison is broad resemblance, not an identical line claim.
 
-The staged runner saved depth-10 per-player results to ignored local files under `artifacts/bigshot-staging/`. Publication verified all 30 source digests and roster metadata and every player cleared all three phase floors, then calculated one full-roster calibration and wrote all profiles in one transaction. The ordinary ingest command is guarded against accidental full-roster execution.
+The email feature has been removed from the source app: delivery code, preference UI/API, unsubscribe and token pages, feedback link API, email cron, email-related configuration, and email database models are gone. `vercel.json` keeps only the game-evaluation cron. Migration `20261024130000_remove_player_match_email` drops the old match/email tables. **The migration is not applied yet.** This workspace has no Git remote or linked Vercel project, so the app has not been deployed; an existing hosted deployment may continue running its old email cron until the updated app is deployed and the migration is applied.
 
-The saved-game page shows phase matches beside the replay, with a representative game label. The displayed result is a broad phase-style resemblance, not an identical line or playing strength. Weekly email remains opt-in and capped at two per rolling seven days. `vanityMatchOptIn` defaults to false, sync and queue processing do not create preferences or enroll users, and email delivery selects only opted-in preferences with an address. Style vectors sample all of the user's own moves per phase, independently of `FlaggedMove` weakness coaching.
-## Vector definitions
+## Corpus
 
-| Dimension | Formula | Data |
-| --- | --- | --- |
-| `materialAggression` | Mean pawn-value material loss between before each own move and after the opponent’s immediate reply; count only negative player-perspective deltas; exclude equal-value recaptures after an opponent capture. | `chess.js` replay of both plies |
-| `kingSafetyDelta` | Mean `pawnShieldScore(after) - pawnShieldScore(before)` on the player's own moves in the phase. Shield is the sum of own pawns on the three files around the king and ahead of it; each pawn contributes `max(0, 1 - ranks-from-start / 6)`. | FEN replay |
-| `pieceActivityDifferential` | Mean, across piece types with moves, of `engineTopMatchCount / moveCount - tradeInitiatedCount / moveCount`, directly from `pieceActivityProfile.ts`. | Existing profile output |
-| `pawnStructureBucket` | At the phase midpoint: open (`2`) for at least 3 files without pawns on one or both sides and at least 2 central tension pairs; semi-open (`1`) for at least 2 such files or 1 tension pair; otherwise closed (`0`). | FEN replay |
-| `evalVolatility` | Population standard deviation of per-ply eval deltas converted to White’s POV. | Persisted `GameEval`; current corpus evals use bundled Stockfish 19 lite-single at depth 10 |
+- Production currently has profiles for the 30 configured players and one calibration per phase.
+- Corpus evaluation depth: Stockfish 19 lite-single, depth 10.
+- Each profile cleared the unchanged 250-usable-vectors-per-phase floor. Richard Reti is closest at 280/279/254 (opening/middlegame/endgame).
+- The corpus remains wins-only, capped at 375 games per player; Reti has the previously approved 250-win ingestion exception.
+- The last real dry run had exactly 30 names / 90 phase profiles and two eligible user wins. Treat this as limited validation; revisit match quality once real usage provides more eligible games.
 
-`kingZoneAttackers` is retained in sample-game `featureDetails`, separate from the five dimensions; it counts legal moves into the king’s adjacent squares, weighted queen 3, rook 2, bishop/knight 1.
+## Implementation references
 
-### Material proxy clarification
+- `app/dashboard/wins/page.tsx` — authenticated, paginated win list and compact profile data.
+- `components/dashboard/WinsAnalysis.tsx` — browser-side vector computation, matching, phase descriptions, and clock/evaluation summaries.
+- `lib/matching/computeGameVector.ts` — shared five-dimensional vector computation.
+- `config/bigshots.json` — active 30-player corpus roster.
+- `prisma/migrations/20261024130000_remove_player_match_email/migration.sql` — pending legacy table cleanup.
 
-The supplied wording for `materialDelta` conflicts: it says positive means material was given up, then says a negative value means the player is down material. Also, material cannot normally be given up on the player’s own move in a FEN before/after comparison; the opponent must capture the offered piece. The implementation uses the coherent sign convention (after minus before, from the player’s perspective) and evaluates through the opponent’s reply. This is isolated in `computeMaterialAggression` for review.
+## Final local checks
 
-## Source and release notes
-
-- `lichess_cc0`: account PGNs; no attribution.
-- `lichess_broadcast_ccbysa`: explicit attribution is persisted per sample and must render in §12. Whether share-alike applies to derived vectors remains open for IP counsel before commercial release.
-- `historical_public_domain`: local or remote move-only PGN source; comments and annotations are stripped before storage.
-- `operator_provided`: local PGN supplied by the operator; the source reference records that provenance without calling the games public domain.
-
-`npm run convert:bigshots` reads one `.pgn` member from each ZIP in `../maia/chess_pgn_zips`, verifies the ZIP CRC, and writes plain PGNs plus a conversion manifest under ignored `data/bigshots/converted/`. The ingester also accepts a local `pgnZipPath` directly. The conversion step does not set source licenses, attribution, or `sourceType`; those must be established per corpus before adding entries to `config/bigshots.json`.
-
-PGN player headers are matched independent of accent marks, punctuation, and surname/given-name order (for example, `Anand, Viswanathan` matches `Viswanathan Anand`).
-
-Each bigshot must reach the configured minimum in all three phases before a profile is published. The matcher dry-run report is at `artifacts/profile-matcher-dry-run.json` and is ignored by Git because it contains account game identifiers and positions.
-
-## Operational checkpoint — 2026-10-23
-
-- **Canonical trigger (Option B product decision):** vanity evaluation and matching are queued atomically with each `runSync` game import, rather than relying on `/api/eval/push` or `GamePanel`. Eligibility is explicit in `config/matching.ts`: rated games whose result is a win, all speeds (`VANITY_ELIGIBLE_SPEEDS: null`). `GamePanel` may still run analysis for its UI, but it is not the vanity feature trigger. `/api/eval/push` no longer invokes matching directly.
-- The durable `VanityEvaluationJob` queue is idempotent by game, claims work with `FOR UPDATE SKIP LOCKED`, retries with bounded exponential backoff, checkpoints evaluation progress, and persists evaluation/flags before creating moments. It reuses `flagMoves` and the shared SAN/evaluation sequence plus Stockfish CLI now used by bigshot ingestion. Existing saved evaluations and flags are reused; only missing evals invoke Stockfish. `/api/cron/vanity-evaluations` is scheduled every five minutes. Migration `20261023150000_vanity_evaluation_queue` was applied to the operator-confirmed sole production Supabase database; `prisma migrate status` reports up to date.
-- **Coverage caveat:** sync guarantees queue creation only for eligible games it actually imports; this is not a backfill of every historical game already in the database. The first sync requests at most 25 games; later syncs paginate incrementally. Initial large account history is therefore not imported in full in one call.
-- **Workload estimate: no usable signal yet.** Repeated read-only 28-day snapshot covered only one active user and 29 synced games (all rapid): 10 rated wins, eight in the old latest-25 rapid window; zero eligible wins lacked saved evals. Observed incremental Stockfish work is **0 games in 28 days (0/week)**. Treat this strictly as “no signal yet,” not a cost or capacity estimate; do not use it for later capacity decisions. Re-measure on a broader user/window sample before corpus ingestion or production capacity planning.
-- **Backfill decision: Option B selected.** V1 is forward-only; no backfill code will be built. Games already stored are not retroactively queued; only eligible games imported in future syncs enter the queue. This does not change the separate need to confirm the target environment before applying the queue/clock-metadata migration.
-- **Migration target: staging requested.** The workspace currently exposes only `.env`; its Supabase pooler hostname is region-generic and does not identify whether the credentials target staging or production. The queue migration has not been deployed. Verify/switch `.env` to the staging project's `DATABASE_URL` and `DIRECT_URL` before running migration status/deploy or any database-backed worker validation; do not use credentials pasted into chat.
-
-- The reranker now serializes selection by user with a PostgreSQL transaction-scoped advisory lock. It counts both persisted sends in the rolling window and currently active queued claims before reserving selected moments, preventing overlapping cron instances from reusing the same allowance. The concurrency integration test is `scripts/test-rerank-concurrency.ts` (`npm run test:matching-concurrency`).
-- The operator applied both pending migrations to the configured Supabase database and confirmed `prisma migrate status` reports the database up to date. The first concurrency-test attempt exposed a Prisma raw-query deserialization issue for PostgreSQL's `void` lock return; the lock query now casts its result to text. The database-backed overlapping-invocation test then passed, sending exactly two emails total across two invocations.
-- **Production backup record (operator-confirmed):** custom-format PostgreSQL `pg_dump`; stored at `C:\Users\Aryan\backup.dump`. The operator verified it using `pg_restore -l` (696 TOC entries). It is not yet copied into the project; `.gitignore` now excludes `/backups/` for the planned project-local copy. A TOC listing validates archive readability, but a full restore test was not reported.
-- **Superseded roster/preflight note:** the earlier 30-player set used pgnmentor archives, of which 26 passed the 350-win minimum. The current exact-30 roster and updated preflight are summarized at the top of this file.
-- **Wins-only caveat:** this intentional policy samples “style when it worked” and may bias profiles toward cleaner wins; losses can be equally characteristic. Revisit if dry-run review shows profiles unusually clean/uniform, especially for known risk-taking players.
-- **Superseded depth-16 estimate:** the read-only PGN preflight estimated 844,032 engine positions for the full 26-name eligible set. The first six-name selection was not ingested; the operator instead approved a validation-only run limited to Tal, Karpov, and Carlsen at depth 10.
-- **Wins-only statistical caveat:** this deliberate corpus sampling choices for “style when it worked” and may suppress characteristic risk-taking/loss patterns. Revisit against user match-quality review if profiles look unusually clean or uniform for tactically riskier players.
-- Production `next build` passed after the changes; matching unit, gate, rerank checks, lint, and TypeScript checks passed.
-- **Production queue smoke validation:** database preflight found 0 queued/processing/failed/complete jobs and 0 due jobs, 1 phase profile but 0 calibrations. The validator safely called the real worker only on the empty queue; it returned without claiming work or evaluating any user's game. Therefore DB connectivity, migration, and empty-queue worker path are verified, but a full queued-job/Stockfish processing run is not (and corpus/calibration is absent).
-- **Superseded historical note (not current behavior):** the former evaluation-push trigger inherited the `/api/games` 25-game rated-rapid window. Option B above replaces it; the vanity feature now queues rated wins across all speeds on sync and does not depend on `GamePanel` analysis.
-- Added `scripts/lib/bigshotIngestion.ts` as a shared seam for PGN parsing, ply-phase mapping, floor checks, calibration statistics, runtime metadata validation, per-target failure isolation, and transactional profile/sample writes. `npm run test:ingest-bigshots-smoke` passed using synthetic PGNs (3-game rejected set and 250-game accepted set), malformed-metadata isolation, hand-checkable mean/stdDev assertions, and a fake transaction client.
-- **Superseded initial ingestion attempt (2026-10-23):** before the vector-sampling correction, `npm run ingest:bigshots -- --validation` used depth 10 for Tal, Karpov, and Carlsen, but `FlaggedMove`-only sampling yielded Tal opening/middlegame/endgame 0/2/19; Karpov 0/0/30; Carlsen 0/3/29. No rows were written; see the successful rerun below.
-- **Vector sampling correction:** corpus and match vectors now select all of the player's own moves in each phase, independently of `FlaggedMove`. The latter remains the existing error-detection mechanism for weakness coaching and is unchanged. `materialAggression`, `kingSafetyDelta`, and king-zone diagnostics use those all-move samples; phase eval volatility continues to use the phase's evaluation deltas. The 250 usable-vector floor and other corpus rules are unchanged.
-- **Successful validation rerun (2026-10-23):** the first corrected evaluation pass met every phase floor, but the database write transaction expired with Prisma P2028; a scoped profile dry run confirmed it committed no profiles. The ingestion transaction now has a bounded 120-second timeout. Re-running only Tal, Karpov, and Carlsen at depth 10 evaluated 375 wins each and persisted three profiles per player plus calibrations. Usable opening/middlegame/endgame vectors: Tal **375/375/363**, Karpov **375/374/372**, Carlsen **375/375/368**.
-- **Full 30-player depth-10 corpus published (2026-10-24):** all staged files matched the current source digests and roster metadata. Every player cleared the 250-per-phase floor; the profiles and full-roster calibration were persisted in one transaction. The first full-roster dry run found 31 names because an orphaned concurrency-test fixture remained from a prior integration run. That exact test user (one synthetic game, three synthetic moments, no email sends) and test bigshot were removed; the dry run was rerun and now reports exactly 30 names / 90 phase profiles, `ready_for_human_review`, and 2 analyzed wins. Report: `artifacts/profile-matcher-dry-run.json`. No email was sent; the §6 match-quality review remains uncleared.
-- **Release checks (2026-10-24):** `npm run build`, `npm run lint`, `npm exec tsc -- --noEmit`, and `npm run test:matching-concurrency` pass. The concurrency test is scoped to its synthetic user, tears down fixture rows transactionally, cleans up stale test-namespace rows older than one hour, and releases its send gate on SIGINT/SIGTERM. A post-run DB check found zero synthetic test users and bigshots. The fake sender does not contact the email provider.
-
-## Product continuation � 2026-10-23
-
-- Saved-game review now shows the closest stored player-style match beside the replay and flagged-move analysis. It describes the result as broad style resemblance, marks an unsound matched moment, and distinguishes pending, complete-without-match, failed, and ineligible games.
-- The panel uses existing `GameMoment` rows and the vanity evaluation queue. It adds no schema or migration. Only eligible rated wins can have this analysis, and matching still requires the current corpus/calibration and flagged positions.
-- The existing email path reranks candidates and caps delivery at two per rolling seven-day window. Email remains opt-in through dashboard preferences. No email was sent as part of this UI work.
-- The matcher dry-run worked example now labels its representative move as illustrative and explicitly states that vectors and diagnostics aggregate all of the player's moves in that phase.
-- This UI makes the feature visible but does not clear the human match-quality checkpoint. The current corpus is the full 30-player depth-10 set; quality conclusions still require human review and more eligible user games.
-
-
-**Post-ship follow-up:** revisit match quality once real usage provides more eligible games to review. Do not mark §6 cleared without that review. Future tuning of dimensions, thresholds, or corpus should be driven by real usage data. Corpus depth is 10 for the first full-roster pass; no depth-16 run is active.
+- `npm exec prisma -- validate` — passed.
+- `npm exec prisma -- generate` — passed.
+- `npm run build` — passed.
+- `npm run lint` — passed.
+- `npm exec tsc -- --noEmit` — passed.

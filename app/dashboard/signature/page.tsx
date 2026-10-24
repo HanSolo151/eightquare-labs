@@ -10,6 +10,7 @@ import BlindSpotHeatmap from "@/components/dashboard/BlindSpotHeatmap";
 import PatternProgress from "@/components/dashboard/PatternProgress";
 import SignatureShareCard from "@/components/dashboard/SignatureShareCard";
 import OpeningFingerprint from "@/components/dashboard/OpeningFingerprint";
+import EarlyRead from "@/components/dashboard/EarlyRead";
 import { getAmbientPaceAggregate, getPatternProgressDeltas, getSelfCpLossTrend } from "@/lib/dashboard/getSignatureSignals";
 
 export const instant = false;
@@ -138,15 +139,11 @@ export default async function SignaturePage() {
           </div>
 
           <div className="grid gap-5 xl:grid-cols-[0.8fr_1.2fr]">
-            <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
-              <SectionHeading eyebrow="Model confidence" title="Repeated patterns" detail="Only recurring signals from evaluated games are shown." />
-              <div className="mt-5 flex items-end justify-between border-t border-white/10 pt-4">
-                <div><p className="text-3xl font-semibold tabular-nums">{data.weaknessSummary.patternCount}</p><p className="mt-1 text-xs text-neutral-500">patterns observed</p></div>
-                <span className={`rounded-full border px-3 py-1 text-xs capitalize ${data.weaknessSummary.confidence === "high" ? "border-emerald-300/30 bg-emerald-300/10 text-emerald-200" : "border-white/10 text-neutral-300"}`}>{data.weaknessSummary.confidence} confidence</span>
-              </div>
-              <p className="mt-4 text-xs leading-5 text-neutral-500">Based on {data.weaknessSummary.gamesEvaluated} evaluated of {data.weaknessSummary.gamesFetched} available games.</p>
-              <Link href="/dashboard/patterns" className="mt-5 inline-flex text-xs text-emerald-300 hover:text-emerald-200">Inspect patterns <span aria-hidden="true" className="ml-2">↗</span></Link>
-            </section>
+            <EarlyRead
+              flags={data.recentFlags.map((flag) => ({ gameId: flag.gameId, phase: flag.phase, cpLoss: flag.cpLoss }))}
+              evaluatedGames={data.evaluatedGames}
+              totalGames={data.totalGames}
+            />
 
             <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
               <div className="flex items-start justify-between gap-4">

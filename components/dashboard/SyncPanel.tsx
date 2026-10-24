@@ -58,7 +58,7 @@ export function SyncPanel({ initialTotalGames, autoSyncOnMount }: SyncPanelProps
   }
 
   return (
-    <section className="mt-8 max-w-xl space-y-3 rounded border border-neutral-700 p-5">
+    <section id="game-sync" className="mt-8 max-w-xl space-y-3 rounded border border-neutral-700 p-5">
       <h2 className="text-sm">Lichess game sync</h2>
       <p className="text-sm text-neutral-300">
         {synced} new games synced · {totalGames} games stored

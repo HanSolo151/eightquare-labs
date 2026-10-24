@@ -24,11 +24,10 @@ export default function GameReplay({
   opponentUsername,
   effectiveRatingFires,
   initialPly = 0,
+  autoStartSpar = false,
   initialFen,
   pgn,
   showSparControls = true,
-  styleMatches,
-  styleMatchStatus,
 }: {
   gameId: string;
   moves: string[];
@@ -39,14 +38,10 @@ export default function GameReplay({
   opponentUsername: string;
   effectiveRatingFires: boolean;
   initialPly?: number;
+  autoStartSpar?: boolean;
   initialFen?: string;
   pgn?: string;
   showSparControls?: boolean;
-  styleMatches?: Array<{ bigshotName: string; phase: string; moveNumber: number; soundness: string; distance: number | null; referenceGame: string }>;
-  styleMatchStatus?: {
-    evaluationStatus: string | null;
-    eligible: boolean;
-  };
 }) {
   const replayMoves = useMemo(() => {
     if (!pgn) return moves;
@@ -124,6 +119,7 @@ export default function GameReplay({
           opponentUsername={opponentUsername}
           effectiveRatingFires={effectiveRatingFires}
           resolution={currentFlag ? { gameId, ply: currentFlag.ply } : null}
+          autoStart={autoStartSpar && ply === initialPly}
           prewarmMaia={showSparControls}
           prewarmMimic={showSparControls}
           showControls={showSparControls}
@@ -170,22 +166,6 @@ export default function GameReplay({
           <p className="mt-2 text-xs leading-5 text-neutral-400">{currentFlag.explanation}</p>
           <p className="mt-3 font-mono text-xs text-neutral-300">{Math.round(currentFlag.cpLoss)} cp loss</p>
         </section> : <section className="rounded-xl border border-white/10 p-4 text-xs text-neutral-500">{ply === 0 ? "Starting position" : "No stored flag for this move."}</section>}
-        {(styleMatches || styleMatchStatus) && <section className="rounded-xl border border-emerald-200/15 bg-emerald-200/[0.035] p-4">
-          <p className="text-[10px] uppercase tracking-widest text-emerald-200/75">Player style</p>
-          {styleMatches?.length ? <>
-            <ul className="mt-2 space-y-2">
-              {styleMatches.map((match) => <li key={match.phase} className="rounded-lg border border-white/5 bg-black/20 p-2.5">
-                <h2 className="text-sm">Your {match.phase} play was closest to {match.bigshotName}</h2>
-                <p className="mt-1 text-xs leading-5 text-neutral-400">Reference: {match.referenceGame}. This is a broad phase-style comparison around move {match.moveNumber}, not a claim of the same line or playing strength.</p>
-              </li>)}
-            </ul>
-            <a href="/dashboard/preferences" className="mt-3 inline-flex text-[11px] text-emerald-200 hover:text-white">Get my top weekly matches by email</a>
-          </> : !styleMatchStatus?.eligible ? <p className="mt-2 text-xs leading-5 text-neutral-500">Style matching currently runs on rated wins.</p>
-            : styleMatchStatus.evaluationStatus === "queued" || styleMatchStatus.evaluationStatus === "processing" ? <p className="mt-2 text-xs leading-5 text-neutral-400">This game is waiting for its style analysis.</p>
-            : styleMatchStatus.evaluationStatus === "complete" ? <p className="mt-2 text-xs leading-5 text-neutral-400">No eligible phase resemblance was found for this game.</p>
-            : styleMatchStatus.evaluationStatus === "failed" ? <p className="mt-2 text-xs leading-5 text-neutral-400">Style analysis could not be completed for this game.</p>
-            : <p className="mt-2 text-xs leading-5 text-neutral-500">Style analysis runs on eligible wins imported during sync.</p>}
-        </section>}
         <p className="text-[10px] leading-5 text-neutral-600">This replay uses your saved game record and analysis. It does not fetch the game from Lichess.</p>
       </div>
     </div>

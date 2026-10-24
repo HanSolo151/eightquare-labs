@@ -33,9 +33,6 @@ model User {
   biasProfile            BiasProfile?
   dailyPuzzleStates      DailyPuzzleState[]
   resolvedSparPositions  ResolvedSparPosition[]
-  gameMoments            GameMoment[]
-  notificationPreference NotificationPreference?
-  emailSends             EmailSendLog[]
   vanityEvaluationJobs   VanityEvaluationJob[]
 }
 
@@ -65,7 +62,6 @@ model Game {
   eval                  GameEval?
   flags                 FlaggedMove[]
   resolvedSparPositions ResolvedSparPosition[]
-  gameMoments           GameMoment[]
   vanityEvaluationJob   VanityEvaluationJob?
 
   createdAt DateTime @default(now())
@@ -202,7 +198,6 @@ model Bigshot {
 
   profiles    BigshotPhaseProfile[]
   sampleGames BigshotSampleGame[]
-  gameMoments GameMoment[]
 }
 
 model BigshotPhaseProfile {
@@ -240,64 +235,6 @@ model BigshotSampleGame {
   bigshot Bigshot @relation(fields: [bigshotId], references: [id], onDelete: Cascade)
 
   @@index([bigshotId, phase])
-}
-
-model GameMoment {
-  id                String    @id @default(cuid())
-  userId            String
-  gameId            String
-  ply               Int
-  phase             String
-  moveNumber        Int
-  san               String
-  fenBeforeMove     String
-  evalBefore        Float?
-  evalAfter         Float?
-  soundness         String    @default("unverified")
-  matchedBigshotId  String?
-  matchDistance     Float?
-  motifMatch        Boolean   @default(false)
-  sampleGameId      String?
-  rerankScore       Float?
-  status            String    @default("pending")
-  feedback          Boolean?
-  deepLinkTokenHash String?   @unique
-  deepLinkExpiresAt DateTime?
-  sendClaimedAt     DateTime?
-  createdAt         DateTime  @default(now())
-
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  game           Game          @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  matchedBigshot Bigshot?      @relation(fields: [matchedBigshotId], references: [id], onDelete: SetNull)
-  emailSendLog   EmailSendLog?
-
-  @@unique([userId, gameId, ply])
-  @@index([userId, status, createdAt])
-  @@index([gameId])
-}
-
-model NotificationPreference {
-  id               String   @id @default(cuid())
-  userId           String   @unique
-  vanityMatchOptIn Boolean  @default(false)
-  emailAddress     String?
-  unsubscribeToken String   @unique @default(cuid())
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model EmailSendLog {
-  id           String   @id @default(cuid())
-  userId       String
-  gameMomentId String   @unique
-  sentAt       DateTime @default(now())
-
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  gameMoment GameMoment @relation(fields: [gameMomentId], references: [id], onDelete: Cascade)
-
-  @@index([userId, sentAt])
 }
 
 model VanityEvaluationJob {

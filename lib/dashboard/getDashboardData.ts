@@ -76,6 +76,7 @@ export async function getDashboardData(userId: string) {
     flagType: flag.flagType,
     severity: flag.severity,
     cpLoss: flag.cpLoss,
+    phase: flag.gamePhase,
     explanation: flag.explanation,
   }));
 

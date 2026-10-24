@@ -1,10 +1,6 @@
 {
   "crons": [
     {
-      "path": "/api/cron/player-style-matches",
-      "schedule": "0 0 * * *"
-    },
-    {
       "path": "/api/cron/vanity-evaluations",
       "schedule": "*/5 * * * *"
     }

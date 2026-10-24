@@ -11,8 +11,6 @@
     "test:ingest-bigshots-smoke": "tsx scripts/test-ingest-bigshots-smoke.ts",
     "test:matching-unit": "tsx scripts/test-matching-unit.ts",
     "test:matching-gates": "tsx scripts/test-matching-gates.ts",
-    "test:matching-rerank": "tsx scripts/test-rerank-selection.ts",
-    "test:matching-concurrency": "tsx scripts/test-rerank-concurrency.ts",
     "start": "next start",
     "lint": "eslint",
     "rotate:oauth-tokens": "tsx scripts/rotateOAuthTokens.ts",
