@@ -11,9 +11,11 @@ export interface SquareStats {
   clockDataCount: number;
   under30Count: number;
   flagTypeCounts: Record<string, number>;
+  flaggedPositions?: { gameId: string; ply: number }[];
 }
 
 export type SquareBias = Record<string, SquareStats>;
+type BiasFlag = Pick<FlaggedMove, "gameId" | "ply" | "cpLoss" | "flagType" | "color">;
 
 export interface BiasProfileState {
   squareBias: SquareBias;
@@ -24,7 +26,7 @@ export interface BiasProfileState {
 }
 
 function emptyStats(): SquareStats {
-  return { moveCount: 0, flaggedCount: 0, totalCpLoss: 0, clockDataCount: 0, under30Count: 0, flagTypeCounts: {} };
+  return { moveCount: 0, flaggedCount: 0, totalCpLoss: 0, clockDataCount: 0, under30Count: 0, flagTypeCounts: {}, flaggedPositions: [] };
 }
 
 /** Folds move features and flags into a square map without profile bookkeeping. */
@@ -32,11 +34,11 @@ export function foldGameIntoSquareBias(
   squareBias: SquareBias,
   moves: string[],
   moveFeatures: MoveFeature[],
-  flags: FlaggedMove[],
+  flags: BiasFlag[],
   playerColor: "white" | "black"
 ): void {
-  const flagsByPly = new Map<number, FlaggedMove[]>();
-  for (const flag of flags) {
+  const flagsByPly = new Map<number, BiasFlag[]>();
+  for (const flag of flags.filter((entry) => entry.color === playerColor)) {
     const atPly = flagsByPly.get(flag.ply) ?? [];
     atPly.push(flag);
     flagsByPly.set(flag.ply, atPly);
@@ -59,6 +61,7 @@ export function foldGameIntoSquareBias(
       stats.flaggedCount++;
       stats.totalCpLoss += Math.max(...flagsAtPly.map((flag) => flag.cpLoss));
       for (const flag of flagsAtPly) stats.flagTypeCounts[flag.flagType] = (stats.flagTypeCounts[flag.flagType] ?? 0) + 1;
+      stats.flaggedPositions?.push({ gameId: flagsAtPly[0]!.gameId, ply });
     }
   }
 }
@@ -69,7 +72,7 @@ export function updateBiasProfile(
   gameId: string,
   moves: string[],
   moveFeatures: MoveFeature[],
-  flags: FlaggedMove[],
+  flags: BiasFlag[],
   playerColor: "white" | "black"
 ): BiasProfileState {
   profile.evaluatedGameIds ??= [];

@@ -66,9 +66,17 @@ export default function WinsAnalysis({
 }) {
   const [selectedId, setSelectedId] = useState(games[0]?.id ?? "");
   const selected = games.find((game) => game.id === selectedId) ?? games[0];
-  const analysis = useMemo(() => selected && calibration
-    ? analyzeWin(selected, profiles, calibration)
-    : null, [selected, profiles, calibration]);
+  const analysisState = useMemo(() => {
+    if (!selected || !calibration) return { analysis: null, failed: false };
+    if (!hasCompleteEvaluation(selected)) return { analysis: null, failed: false };
+    try {
+      return { analysis: analyzeWin(selected, profiles, calibration), failed: false };
+    } catch (error) {
+      console.error("Could not analyze saved win", { gameId: selected.id, error });
+      return { analysis: null, failed: true };
+    }
+  }, [selected, profiles, calibration]);
+  const analysis = analysisState.analysis;
 
   if (!selected) return null;
 
@@ -104,7 +112,9 @@ export default function WinsAnalysis({
       {!calibration || profiles.length !== 90 ? <section className="rounded-xl border border-amber-200/20 p-4 text-sm text-amber-100">The 30-player style library is not available.</section>
         : !analysis ? <section className="space-y-2 rounded-xl border border-white/10 bg-black/25 p-4">
           <h3 className="text-sm font-medium">Move and clock summary</h3>
-          <p className="text-xs leading-5 text-neutral-400">This win has no complete saved move evaluation yet, so a calibrated player comparison and move-quality summary are unavailable. {selected.evaluationStatus === "queued" || selected.evaluationStatus === "processing" ? "Its existing game analysis is still running." : "New rated wins are evaluated after sync; older imported wins may not have a saved evaluation."}</p>
+          {analysisState.failed
+            ? <p className="text-xs leading-5 text-neutral-400">This saved game’s moves could not be replayed for style analysis, so its comparison is unavailable. Other wins remain available to review.</p>
+            : <p className="text-xs leading-5 text-neutral-400">This win has no complete saved move evaluation yet, so a calibrated player comparison and move-quality summary are unavailable. {selected.evaluationStatus === "queued" || selected.evaluationStatus === "processing" ? "Its existing game analysis is still running." : "New rated wins are evaluated after sync; older imported wins may not have a saved evaluation."}</p>}
           {!selected.clocks && <p className="text-xs text-neutral-500">This game has no clock data, so time-pressure observations are unavailable too.</p>}
         </section> : <>
           {analysis.overall && <section className="rounded-xl border border-emerald-200/20 bg-emerald-200/[0.045] p-4 sm:p-5">

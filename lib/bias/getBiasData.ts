@@ -1,4 +1,7 @@
 import { prisma } from "@/lib/prisma";
+import { extractMoveFeatures } from "@/lib/features/extractFeatures";
+import type { FlaggedMove } from "@/types";
+import { foldGameIntoSquareBias, type SquareBias, type SquareStats } from "./updateBiasProfile";
 import {
   allSquares,
   antiDiagonalKey,
@@ -7,7 +10,6 @@ import {
   mainDiagonalLabel,
   parseSquare,
 } from "./squareGeometry";
-import type { SquareBias, SquareStats } from "./updateBiasProfile";
 
 export const MIN_PROFILE_SAMPLES = 20;
 export const MIN_SQUARE_MOVES = 5;
@@ -22,8 +24,10 @@ export interface SquareView {
   flaggedCount: number;
   moveCount: number;
   clockDataCount: number;
+  under30Count: number;
   avgCpLoss: number | null;
   topFlagTypes: string[];
+  flaggedPositions: { gameId: string; ply: number }[];
 }
 
 export interface BiasAxisEntry {
@@ -85,7 +89,7 @@ export function buildBiasData(
     const maxFlagCount = Math.max(0, ...Object.values(squareBias).map((square) => square.flaggedCount));
     const blunderDensity = allSquares().map((square): SquareView => {
       const current = squareBias[square];
-      const stats = current ?? { moveCount: 0, flaggedCount: 0, totalCpLoss: 0, clockDataCount: 0, under30Count: 0, flagTypeCounts: {} };
+      const stats = current ?? { moveCount: 0, flaggedCount: 0, totalCpLoss: 0, clockDataCount: 0, under30Count: 0, flagTypeCounts: {}, flaggedPositions: [] };
       return {
         square,
         // This is a share of recorded flagged moves, not a rate per move.
@@ -93,8 +97,10 @@ export function buildBiasData(
         flaggedCount: stats.flaggedCount,
         moveCount: 0,
         clockDataCount: 0,
+        under30Count: 0,
         avgCpLoss: stats.flaggedCount > 0 ? stats.totalCpLoss / stats.flaggedCount : null,
         topFlagTypes: Object.entries(stats.flagTypeCounts).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([type]) => type),
+        flaggedPositions: current?.flaggedPositions ?? [],
       };
     });
     return {
@@ -115,7 +121,7 @@ export function buildBiasData(
 
   const build = (theme: HeatmapTheme): SquareView[] => allSquares().map((square) => {
     const current = squareBias[square];
-    const s = current ?? { moveCount: 0, flaggedCount: 0, totalCpLoss: 0, clockDataCount: 0, under30Count: 0, flagTypeCounts: {} };
+    const s = current ?? { moveCount: 0, flaggedCount: 0, totalCpLoss: 0, clockDataCount: 0, under30Count: 0, flagTypeCounts: {}, flaggedPositions: [] };
     const smoothedFlagRate = (s.flaggedCount + baselineFlagRate * PRIOR_STRENGTH) / (s.moveCount + PRIOR_STRENGTH);
     const smoothedPressureRate = (s.under30Count + baselineTimePressureRate * PRIOR_STRENGTH) / (s.clockDataCount + PRIOR_STRENGTH);
     const riskValue = baselineFlagRate > 0 ? Math.min(1, smoothedFlagRate / (baselineFlagRate * 2)) : 0;
@@ -136,11 +142,13 @@ export function buildBiasData(
       flaggedCount: s.flaggedCount,
       moveCount: s.moveCount,
       clockDataCount: s.clockDataCount,
+      under30Count: s.under30Count,
       avgCpLoss: s.flaggedCount > 0 ? s.totalCpLoss / s.flaggedCount : null,
       topFlagTypes: Object.entries(s.flagTypeCounts)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 2)
         .map(([type]) => type),
+      flaggedPositions: s.flaggedPositions ?? [],
     };
   });
 
@@ -206,6 +214,59 @@ export function buildBiasData(
 }
 
 export async function getBiasData(userId: string): Promise<BiasData> {
-  const row = await prisma.biasProfile.findUnique({ where: { userId } });
-  return buildBiasData(safeProfile(row?.squareBias), row?.sampleSize ?? 0);
+  // Rebuild from authoritative saved games and flags. Evaluation jobs persist
+  // FlaggedMove rows directly; older/background jobs may not have refreshed
+  // the denormalized BiasProfile, which otherwise leaves this permanently at 0.
+  const games = await prisma.game.findMany({
+    where: { userId, eval: { isNot: null } },
+    select: {
+      id: true,
+      playerColor: true,
+      opponentUsername: true,
+      opponentRating: true,
+      playerRating: true,
+      moves: true,
+      clocks: true,
+      clockInitialSec: true,
+      clockIncrementSec: true,
+      openingName: true,
+      openingEco: true,
+      result: true,
+      rated: true,
+      speed: true,
+      lichessCreatedAt: true,
+      flags: { select: { gameId: true, ply: true, cpLoss: true, flagType: true, color: true } },
+    },
+  });
+  const squareBias: SquareBias = {};
+  let sampleSize = 0;
+  for (const game of games) {
+    const playerColor: "white" | "black" = game.playerColor === "black" ? "black" : "white";
+    const moves = Array.isArray(game.moves) ? game.moves.filter((move): move is string => typeof move === "string") : [];
+    const clocks = Array.isArray(game.clocks) && game.clocks.every((clock) => typeof clock === "number" && Number.isFinite(clock))
+      ? game.clocks as number[] : null;
+    const features = extractMoveFeatures({
+      id: game.id,
+      playerColor,
+      opponentUsername: game.opponentUsername,
+      opponentRating: game.opponentRating,
+      playerRating: game.playerRating,
+      moves,
+      clocks,
+      clockInitialSec: game.clockInitialSec,
+      clockIncrementSec: game.clockIncrementSec,
+      openingName: game.openingName,
+      openingEco: game.openingEco,
+      result: game.result === "win" || game.result === "loss" ? game.result : "draw",
+      rated: game.rated,
+      speed: game.speed,
+      createdAt: game.lichessCreatedAt?.getTime() ?? null,
+    });
+    const playerFlags = game.flags
+      .filter((flag) => flag.color === playerColor)
+      .map((flag) => ({ gameId: flag.gameId, ply: flag.ply, cpLoss: flag.cpLoss, flagType: flag.flagType as FlaggedMove["flagType"], color: playerColor }));
+    foldGameIntoSquareBias(squareBias, moves, features, playerFlags, playerColor);
+    sampleSize += new Set(playerFlags.map((flag) => flag.ply)).size;
+  }
+  return buildBiasData(squareBias, sampleSize);
 }
