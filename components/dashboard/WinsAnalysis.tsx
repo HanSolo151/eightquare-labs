@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { computeGameVectorDetails, normalizeStyleVector } from "@/lib/matching/computeGameVector";
 import { findNearestBigshots } from "@/lib/matching/profileMatcher";
@@ -65,18 +65,50 @@ export default function WinsAnalysis({
   calibration: VectorCalibration | null;
 }) {
   const [selectedId, setSelectedId] = useState(games[0]?.id ?? "");
+  const [analysisByGame, setAnalysisByGame] = useState<Record<string, { analysis: WinResult | null; failed: boolean }>>({});
+  const analyzedIds = useRef(new Set<string>());
   const selected = games.find((game) => game.id === selectedId) ?? games[0];
-  const analysisState = useMemo(() => {
-    if (!selected || !calibration) return { analysis: null, failed: false };
-    if (!hasCompleteEvaluation(selected)) return { analysis: null, failed: false };
-    try {
-      return { analysis: analyzeWin(selected, profiles, calibration), failed: false };
-    } catch (error) {
-      console.error("Could not analyze saved win", { gameId: selected.id, error });
-      return { analysis: null, failed: true };
-    }
-  }, [selected, profiles, calibration]);
-  const analysis = analysisState.analysis;
+  useEffect(() => {
+    if (!calibration) return;
+    let cancelled = false;
+    let idleHandle: number | null = null;
+    let timeoutHandle: number | null = null;
+    const orderedGames = [...games].sort((a, b) =>
+      Number(b.id === selected?.id) - Number(a.id === selected?.id)
+    );
+    const pending = orderedGames.filter((game) => hasCompleteEvaluation(game) && !analyzedIds.current.has(game.id));
+    let index = 0;
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (callback: (deadline: { timeRemaining: () => number }) => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    const schedule = () => {
+      if (cancelled || index >= pending.length) return;
+      if (idleWindow.requestIdleCallback) idleHandle = idleWindow.requestIdleCallback(runOne, { timeout: 500 });
+      else timeoutHandle = window.setTimeout(runOne, 0);
+    };
+    const runOne = () => {
+      if (cancelled || index >= pending.length) return;
+      const game = pending[index++];
+      analyzedIds.current.add(game.id);
+      try {
+        setAnalysisByGame((current) => ({ ...current, [game.id]: { analysis: analyzeWin(game, profiles, calibration), failed: false } }));
+      } catch (error) {
+        console.error("Could not analyze saved win", { gameId: game.id, error });
+        setAnalysisByGame((current) => ({ ...current, [game.id]: { analysis: null, failed: true } }));
+      }
+      schedule();
+    };
+    schedule();
+    return () => {
+      cancelled = true;
+      if (idleHandle !== null) idleWindow.cancelIdleCallback?.(idleHandle);
+      if (timeoutHandle !== null) window.clearTimeout(timeoutHandle);
+    };
+  }, [games, profiles, calibration, selected?.id]);
+  const analysisState = selected ? analysisByGame[selected.id] : undefined;
+  const analysis = analysisState?.analysis;
 
   if (!selected) return null;
 
@@ -110,9 +142,10 @@ export default function WinsAnalysis({
       </header>
 
       {!calibration || profiles.length !== 90 ? <section className="rounded-xl border border-amber-200/20 p-4 text-sm text-amber-100">The 30-player style library is not available.</section>
+        : !analysisState && hasCompleteEvaluation(selected) ? <section role="status" className="rounded-xl border border-white/10 bg-black/25 p-4 text-sm text-neutral-400">Preparing this game’s style comparison…</section>
         : !analysis ? <section className="space-y-2 rounded-xl border border-white/10 bg-black/25 p-4">
           <h3 className="text-sm font-medium">Move and clock summary</h3>
-          {analysisState.failed
+          {analysisState?.failed
             ? <p className="text-xs leading-5 text-neutral-400">This saved game’s moves could not be replayed for style analysis, so its comparison is unavailable. Other wins remain available to review.</p>
             : <p className="text-xs leading-5 text-neutral-400">This win has no complete saved move evaluation yet, so a calibrated player comparison and move-quality summary are unavailable. {selected.evaluationStatus === "queued" || selected.evaluationStatus === "processing" ? "Its existing game analysis is still running." : "New rated wins are evaluated after sync; older imported wins may not have a saved evaluation."}</p>}
           {!selected.clocks && <p className="text-xs text-neutral-500">This game has no clock data, so time-pressure observations are unavailable too.</p>}

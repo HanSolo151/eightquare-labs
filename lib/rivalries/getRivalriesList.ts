@@ -13,7 +13,11 @@ export async function getRivalriesList(userId: string): Promise<RivalryCard[]> {
   const games = await prisma.game.findMany({ where: { userId }, select: { opponentUsername: true, result: true } });
   const byOpponent = new Map<string, { opponentUsername: string; wins: number; losses: number; draws: number }>();
   for (const game of games) {
-    const key = game.opponentUsername.trim().toLowerCase();
+    const opponentUsername = game.opponentUsername.trim();
+    // Lichess omits usernames for anonymous opponents. Those games cannot be
+    // attributed to one person, so grouping them creates a fictitious rival.
+    if (!opponentUsername || opponentUsername.toLowerCase() === "anonymous") continue;
+    const key = opponentUsername.toLowerCase();
     const record = byOpponent.get(key) ?? { opponentUsername: game.opponentUsername, wins: 0, losses: 0, draws: 0 };
     if (game.result === "win") record.wins++;
     else if (game.result === "loss") record.losses++;

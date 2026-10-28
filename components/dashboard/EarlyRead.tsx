@@ -33,7 +33,7 @@ export default function EarlyRead({ flags, evaluatedGames, totalGames }: {
     </div>
 
     {leading ? <>
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+      <div className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-3">
         <article className="rounded-lg border border-white/10 bg-white/[0.025] p-4">
           <p className="text-[10px] uppercase tracking-widest text-neutral-500">Largest average flagged drop</p>
           <p className="mt-2 text-xl font-medium capitalize">{leading.phase}</p>

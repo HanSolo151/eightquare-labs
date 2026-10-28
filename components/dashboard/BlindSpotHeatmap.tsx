@@ -95,12 +95,13 @@ function SquareDetails({ square, flagOnly }: { square: SquareView; flagOnly: boo
 export default function BlindSpotHeatmap({ data }: { data: BiasData }) {
   const [theme, setTheme] = useState<HeatmapTheme>("blunderDensity");
   const [hovered, setHovered] = useState<SquareView | null>(null);
+  const [selectedSquareName, setSelectedSquareName] = useState<string | null>(null);
   const visibleThemes = THEMES.filter((item) => (data.availableThemes ?? THEMES.map((entry) => entry.id)).includes(item.id));
   const activeTheme = visibleThemes.some((item) => item.id === theme) ? theme : visibleThemes[0]?.id ?? "blunderDensity";
   const squares = data.squares[activeTheme];
   const orderedSquares = squaresInBoardOrder(squares);
   const focus = focusForTheme(activeTheme, squares);
-  const selectedSquare = hovered ?? focus?.square ?? squares[0]!;
+  const selectedSquare = hovered ?? squares.find((square) => square.square === selectedSquareName) ?? focus?.square ?? squares[0]!;
   const remaining = Math.max(0, 20 - data.sampleSize);
 
   if (!data.meetsThreshold) {
@@ -116,13 +117,13 @@ export default function BlindSpotHeatmap({ data }: { data: BiasData }) {
 
   return <div>
     {visibleThemes.length > 1 && <div role="group" aria-label="Heatmap view" className="mb-5 inline-flex gap-1 rounded-lg border border-white/10 bg-black/30 p-1 text-xs">
-      {visibleThemes.map((item) => <button key={item.id} type="button" onClick={() => { setTheme(item.id); setHovered(null); }} aria-pressed={activeTheme === item.id}
+      {visibleThemes.map((item) => <button key={item.id} type="button" onClick={() => { setTheme(item.id); setHovered(null); setSelectedSquareName(null); }} aria-pressed={activeTheme === item.id}
         className={`rounded px-3 py-2 transition ${activeTheme === item.id ? "bg-white/10 text-white" : "text-neutral-400 hover:text-white"}`}>{item.label}</button>)}
     </div>}
 
     <div className="grid max-w-5xl items-start gap-6 lg:grid-cols-[minmax(300px,480px)_minmax(240px,1fr)]">
       <div>
-        <div className="grid aspect-square w-full grid-cols-8 overflow-hidden rounded-lg border border-white/15 bg-transparent" role="group" aria-label={`${activeTheme} chessboard heatmap`}>
+        <div className="grid aspect-square w-full grid-cols-8 overflow-hidden rounded-lg border border-white/15 bg-transparent" role="group" aria-label={`${activeTheme} chessboard heatmap`} onMouseLeave={() => setHovered(null)}>
           {orderedSquares.map((square) => {
             const pressureMode = activeTheme === "timePressure";
             const signalCount = pressureMode ? square.under30Count : square.flaggedCount;
@@ -132,13 +133,15 @@ export default function BlindSpotHeatmap({ data }: { data: BiasData }) {
               ? `${square.square}: ${square.under30Count} moves under 30 seconds from ${square.clockDataCount} clocked moves`
               : `${square.square}: ${square.flaggedCount} flagged moves from ${square.moveCount} total moves`;
             const href = gamesHref(square);
-            const className = `flex aspect-square items-center justify-center border border-white/[0.07] font-mono text-[9px] text-white/55 focus:z-10 focus:outline focus:outline-2 focus:outline-white ${href ? "cursor-pointer" : "cursor-default"}`;
+            const isSelected = square.square === selectedSquareName;
+            const className = `flex aspect-square items-center justify-center border border-white/[0.07] font-mono text-[9px] text-white/55 ${isSelected ? "z-10 outline outline-2 outline-white" : ""} focus:z-10 focus:outline focus:outline-2 focus:outline-white ${href ? "cursor-pointer" : "cursor-default"}`;
             const style = { backgroundColor: active ? heatColor(colorValue) : "transparent" };
             const events = {
               onMouseEnter: () => setHovered(square),
               onFocus: () => setHovered(square),
+              onBlur: () => setHovered(null),
             };
-            return <button key={square.square} type="button" {...events} onClick={() => setHovered(square)} style={style} className={className}
+            return <button key={square.square} type="button" {...events} onClick={() => { setSelectedSquareName(square.square); setHovered(null); }} style={style} className={className}
               aria-label={`${description}${href ? "; activate to review source games" : ""}`} title={description}>{square.square}</button>;
           })}
         </div>

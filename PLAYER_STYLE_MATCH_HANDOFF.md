@@ -4,7 +4,7 @@ Updated: 2026-10-24
 
 ## Product behavior
 
-Use `/dashboard/wins` to select a saved win. A small browser-side computation reuses that game's saved moves/evaluation plus the existing 30-player phase vectors. It reports the closest player by phase and an overall nearest style, describes a few measured characteristics, and summarizes estimated evaluation drops by phase and clock-pressure group.
+Use `/dashboard/wins` to select a saved win. A small browser-side computation reuses that game's saved moves/evaluation plus the existing 30-player phase vectors. It reports the closest player by phase and an overall nearest style, describes a few measured characteristics, and summarizes estimated evaluation drops by phase and clock-pressure group. The selected game's comparison is scheduled first after initial paint; other evaluated games on the current page are prepared one at a time during browser idle time.
 
 The client does not run Stockfish or fetch external data. The existing server-side evaluation worker remains responsible for generating saved move evaluations/flags on newly imported rated wins; the style vector and match comparison run in the browser when the user selects a game. Older wins without a complete evaluation are listed but cannot yet get a calibrated style comparison. Clock-pressure observations require clock tags and enough evaluated moves.
 

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { extractMoveFeatures } from "@/lib/features/extractFeatures";
 import type { FlaggedMove } from "@/types";
 import { foldGameIntoSquareBias, type SquareBias, type SquareStats } from "./updateBiasProfile";
@@ -214,9 +215,30 @@ export function buildBiasData(
 }
 
 export async function getBiasData(userId: string): Promise<BiasData> {
-  // Rebuild from authoritative saved games and flags. Evaluation jobs persist
-  // FlaggedMove rows directly; older/background jobs may not have refreshed
-  // the denormalized BiasProfile, which otherwise leaves this permanently at 0.
+  const [cachedProfile, evaluatedGameRows] = await Promise.all([
+    prisma.biasProfile.findUnique({ where: { userId } }).catch((error: unknown) => {
+      if (isMissingTable(error)) return null;
+      throw error;
+    }),
+    prisma.game.findMany({
+      where: { userId, eval: { isNot: null } },
+      select: { id: true },
+      orderBy: { id: "asc" },
+    }),
+  ]);
+  const evaluatedGameIds = evaluatedGameRows.map((game) => game.id);
+  const cachedGameIds = Array.isArray(cachedProfile?.evaluatedGameIds)
+    ? cachedProfile.evaluatedGameIds.filter((id): id is string => typeof id === "string").sort()
+    : [];
+  const cacheIsCurrent = cachedGameIds.length === evaluatedGameIds.length &&
+    cachedGameIds.every((id, index) => id === evaluatedGameIds[index]);
+  if (cachedProfile && cacheIsCurrent) {
+    return buildBiasData(cachedProfile.squareBias as unknown as SquareBias, cachedProfile.sampleSize);
+  }
+
+  // Build from authoritative saved games when the denormalized profile is
+  // missing or its evaluated-game snapshot is stale. Persisting this rebuild
+  // prevents the Signature page from re-extracting every move on each visit.
   const games = await prisma.game.findMany({
     where: { userId, eval: { isNot: null } },
     select: {
@@ -268,5 +290,31 @@ export async function getBiasData(userId: string): Promise<BiasData> {
     foldGameIntoSquareBias(squareBias, moves, features, playerFlags, playerColor);
     sampleSize += new Set(playerFlags.map((flag) => flag.ply)).size;
   }
+  const confidence = sampleSize >= 60 ? "high" : sampleSize >= 20 ? "medium" : "low";
+  const builtAt = new Date();
+  await prisma.biasProfile.upsert({
+    where: { userId },
+    create: {
+      userId,
+      squareBias: squareBias as unknown as Prisma.InputJsonValue,
+      evaluatedGameIds: evaluatedGameIds as unknown as Prisma.InputJsonValue,
+      sampleSize,
+      confidence,
+      builtAt,
+    },
+    update: {
+      squareBias: squareBias as unknown as Prisma.InputJsonValue,
+      evaluatedGameIds: evaluatedGameIds as unknown as Prisma.InputJsonValue,
+      sampleSize,
+      confidence,
+      builtAt,
+    },
+  }).catch((error: unknown) => {
+    if (!isMissingTable(error)) throw error;
+  });
   return buildBiasData(squareBias, sampleSize);
+}
+
+function isMissingTable(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2021";
 }

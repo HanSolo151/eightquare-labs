@@ -1,6 +1,6 @@
 # EightSquare Labs — Project Status and Governing-Agent Handoff
 
-**Snapshot:** 2026-10-21
+**Snapshot:** 2026-10-28
 **Purpose:** Describe what the repository currently implements, how its data moves, and what remains before product polish or additional feature work. This is a source-grounded handoff, not a claim that every path has been verified against the live database or in a browser.
 
 ## 1. Executive overview
@@ -16,7 +16,7 @@ The product currently includes:
 - A database-backed Games archive, saved-game review, Ghost Replay, opening analytics, pattern views, a square heatmap, Daily Puzzle, and Rivalries.
 - Base Maia spar plus an opponent-mimic mode that uses locally built opponent signals when the tier resolver allows it.
 
-The feature set is substantial, but several areas remain “implemented in source, validation outstanding.” All eight local migrations were reported applied to the configured database on 2026-10-22. Browser flows still need a real-account pass, and some analytics are intentionally proxies or partial versions of the larger spec.
+The feature set is substantial, but several areas remain “implemented in source, validation outstanding.” The configured database reported its 14 known migrations up to date, but a direct Supabase catalog query found `DailyPuzzleState` missing while `ResolvedSparPosition` exists. A forward repair migration has been added locally and still needs deployment. Browser flows still need a real-account pass, and some analytics are intentionally proxies or partial versions of the larger spec.
 
 ## 2. Technology and runtime layout
 
@@ -43,8 +43,8 @@ flowchart LR
 ```
 
 1. **Sync:** `POST /api/sync` or the Signature page's SyncPanel calls `lib/sync/runSync.ts`. The server fetches the authenticated user's games from Lichess and inserts them into `Game` rows.
-2. **Evaluation:** the root review page (`/`) fetches recent games through `GET /api/games`. `GamePanel` runs Stockfish evaluation and feature/flag extraction in the browser for games lacking a persisted `GameEval`.
-3. **Persistence:** completed evaluation payloads are sent to `POST /api/eval/push`. The server checks ownership and payload shape, then writes the evaluation and flags and updates aggregated profile rows.
+2. **Evaluation:** new synced rated wins are enqueued by `runSync` into `VanityEvaluationJob`; the five-minute cron processes jobs sequentially, up to eight per invocation or a four-minute work budget, with server-side Stockfish at depth 10. Separately, the root review page (`/`) fetches recent games through `GET /api/games`; `GamePanel` runs depth-16 Stockfish evaluation and feature/flag extraction in the browser for games lacking persisted evaluations.
+3. **Persistence:** the server queue checkpoints every eight plies and transactionally writes completed evaluations, flags, and the weakness profile. Browser evaluations checkpoint every ply in IndexedDB and send completed payloads to `POST /api/eval/push`, which checks ownership and payload shape before updating the database.
 4. **Reading:** `/dashboard/*` archive and analytics views read the signed-in user's persisted database rows. They do not run Stockfish on the server.
 5. **Mimic spar:** opponent-history/profile data may be fetched and folded into browser caches; Maia inference and move selection remain in the browser.
 
@@ -88,8 +88,15 @@ The current migration folders are:
 6. `20261019120000_add_daily_puzzle_state`
 7. `20261020120000_replace_daily_puzzle_with_resolved_spar`
 8. `20261020140000_default_legacy_bias_axes`
+9. `20261022100000_add_player_style_match`
+10. `20261023100000_player_match_email_preference`
+11. `20261023120000_player_match_idempotency`
+12. `20261023150000_vanity_evaluation_queue`
+13. `20261024130000_remove_player_match_email`
+14. `20261026103000_user_game_history_backfill`
+15. `20261028170000_restore_daily_puzzle_state` (local repair; not yet deployed)
 
-**Live database migration status is not confirmed.** This project status previously claimed all eight local migrations were applied, but the configured app database has since returned a missing `DailyPuzzleState` table error, and a fresh `prisma migrate status` check could not complete because the Windows Prisma schema engine failed to start. Treat square-bias, Daily Puzzle, and resolved-spar tables as unavailable until a successful status check confirms otherwise; do not infer deployment from local migration files.
+`prisma migrate status` reported the first 14 migrations up to date. A separate read-only Supabase query then showed `public."DailyPuzzleState"` is absent and `public."ResolvedSparPosition"` exists. Migration history alone therefore does not describe the physical schema accurately in this database. Apply the new repair migration and verify both tables exist afterward; do not mark the repair complete based only on migration status.
 
 ## 6. Core analysis pipeline
 
@@ -107,7 +114,9 @@ The current migration folders are:
 
 ### Browser versus server costs
 
-Stockfish and Maia computation is client-side. The server persists results but does not run a per-user engine fleet. This keeps compute off the application bill, but an analysis that never finishes in a loaded browser tab may remain unevaluated. The dashboard exposes evaluated/unevaluated counts; there is no background server evaluation queue.
+The app has two deliberately different evaluation paths. The durable server queue covers newly synced eligible rated wins, uses depth 10, checkpoints to Postgres every eight plies, reclaims stale 15-minute leases, and retries failures up to five times with exponential backoff. The cron runs every five minutes and now drains jobs sequentially, up to eight per invocation or a four-minute work budget; terminally failed jobs still need operational inspection/requeue. It is not a general-purpose queue for every game.
+
+The live review path evaluates other missing games in the browser at depth 16, two games at a time, with a per-ply IndexedDB checkpoint. It can resume on the same browser after a reload, and a later load retries completed results that failed to persist. Closing the tab stops active browser computation; those games are not portable to another device until their result is uploaded. Maia and opponent feature building also run in the browser. This means the server queue improves coverage for eligible wins but does not remove the client-tab dependency from the live review flow.
 
 ## 7. Product surfaces
 
@@ -117,6 +126,7 @@ Stockfish and Maia computation is client-side. The server persists results but d
 - Fetches recent live Lichess rapid games through `/api/games`.
 - Reuses server-persisted flags/evaluation IDs for the signed-in user's own games and only runs browser evaluation on missing games.
 - Pushes completed evaluation results to `/api/eval/push`; displays save/failure status.
+- Background evaluation runs two games concurrently, checkpoints each completed ply in IndexedDB, and persists completed-game results sequentially with bounded retries. Worker startup/search failures now reject instead of hanging forever; the affected worker is discarded so queued work can start on a replacement.
 - Shows verdict cards, supports dismissals (new dismissals are flag-type-specific while legacy IDs still suppress flags), jumps to a flagged ply, and can lazily load pivot attribution in the list or replay.
 - Includes interactive replay/spar state with Maia and opponent-mimic mode, session IDs to prevent stale inference results, move/clock-aware delay behavior, and guarded attempt logging.
 - Opponent data/profile loading is separate from the primary game fetch and uses client caches; Lichess rate limits mean some profile-building work is sequential.
@@ -158,9 +168,15 @@ Stockfish and Maia computation is client-side. The server persists results but d
 - Weakness pattern detection is intentionally coarse (phase buckets + sustained cp-loss candidates), not a tactical motif classifier.
 - Phase/severity values are counts; the UI states they are not rates.
 
+### `/dashboard/wins`
+
+- Reads saved win evaluations and the prebuilt player-style library from Postgres; it does not run Stockfish.
+- Client-side style comparisons are scheduled after the page paints: the selected game is first, then the remaining evaluated games on the current page are handled one at a time during browser idle time. Selecting a game whose result is not ready shows a preparation state instead of blocking render.
+
 ### `/dashboard/daily`
 
 - Chooses an unresolved own flagged move whose side-to-move matches the user, reconstructs its pre-move position, and presents an interactive puzzle.
+- Starts the five-line Stockfish search as soon as the puzzle board mounts; the board becomes playable after those lines are ready, and the move check reuses that prepared result. The result cache is in-memory and limited to the current browser session.
 - The current client defaults to Stockfish's exact top move, with an opt-in toggle to accept one of its top five moves within 0.25 pawns of the best line. It then persists both the Daily Puzzle state and shared resolved-position marker. Skips remain in `DailyPuzzleState`; three skips defer a position, and a shorter skip cooldown is used before it is eligible again.
 - This is a single best-move exercise, not a multi-line tactics trainer with a full solution tree.
 
@@ -208,8 +224,8 @@ Several dashboard pages call the same server-side data functions directly rather
 - The configured database reported all eight migrations applied on 2026-10-22; re-check before a future release if the deployment target changes.
 - Browser-check sync, evaluation save, archive review, Ghost Replay, spar, Daily Puzzle solve/skip, rivalry drill, and heatmap on a real account.
 - Revisit historical game/profile backfill for square bias. Incremental profile folding does not itself guarantee old already-evaluated games were folded into newly introduced profile columns.
-- There is no server-side eval queue, scheduled sync job, or SparSession persistence/resume. Eval recovery is local to the browser's IndexedDB; it does not run while the browser is closed or on another device.
-- Because Ghost Progression adds on-demand browser-side Stockfish and Maia work, prioritize a resumable evaluation-queue design before increasing client compute or making generated lines a durable product record. No queue is being introduced in this pass.
+- There is no general-purpose server-side eval queue for every imported game, scheduled Lichess sync, or SparSession persistence/resume. The existing server queue only evaluates eligible synced wins; monitor its five-minute batch drain and terminal failures before relying on it for large backfills.
+- Browser evaluation recovery remains local to IndexedDB and does not run while the browser is closed or on another device. Before increasing client compute or making generated lines a durable product record, define which analyses should use the durable server queue, their priority/throughput targets, and how terminal failures are surfaced and retried.
 - `package.json` provides a Playwright `test:e2e` command, but no unit-test command is defined; this handoff does not claim CI coverage.
 
 ### Product/analysis gaps

@@ -11,6 +11,8 @@ interface EngineSlot {
 // The lite engine is memory-light, but two isolated WASM instances provide
 // useful parallelism without spawning one engine per game/search request.
 const ENGINE_POOL_SIZE = 2;
+const ENGINE_START_TIMEOUT_MS = 15_000;
+const ENGINE_SEARCH_TIMEOUT_MS = 120_000;
 const engineSlots: EngineSlot[] = Array.from({ length: ENGINE_POOL_SIZE }, () => ({
   workerPromise: null,
   queue: Promise.resolve(),
@@ -19,18 +21,32 @@ const engineSlots: EngineSlot[] = Array.from({ length: ENGINE_POOL_SIZE }, () =>
 
 function getWorker(slot: EngineSlot): Promise<Worker> {
   if (!slot.workerPromise) {
-    slot.workerPromise = new Promise((resolve, reject) => {
+    const workerPromise = new Promise<Worker>((resolve, reject) => {
       const worker = new Worker("/api/stockfish/stockfish-19-lite-single.js");
-      const onReady = (event: MessageEvent) => {
-        if (event.data === "uciok") {
-          worker.removeEventListener("message", onReady);
-          worker.removeEventListener("error", onError);
-          resolve(worker);
-        }
-      };
-      const onError = (event: ErrorEvent) => {
+      let settled = false;
+      const timeout = window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        worker.terminate();
+        slot.workerPromise = null;
+        reject(new Error("Stockfish worker startup timed out"));
+      }, ENGINE_START_TIMEOUT_MS);
+      const cleanup = () => {
+        window.clearTimeout(timeout);
         worker.removeEventListener("message", onReady);
         worker.removeEventListener("error", onError);
+      };
+      const onReady = (event: MessageEvent) => {
+        if (settled || event.data !== "uciok") return;
+        settled = true;
+        cleanup();
+        resolve(worker);
+      };
+      const onError = (event: ErrorEvent) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
         worker.terminate();
         slot.workerPromise = null;
         reject(new Error(event.message || "Stockfish worker failed to start"));
@@ -39,8 +55,17 @@ function getWorker(slot: EngineSlot): Promise<Worker> {
       worker.addEventListener("error", onError);
       worker.postMessage("uci");
     });
+    slot.workerPromise = workerPromise;
+    void workerPromise.catch(() => {
+      if (slot.workerPromise === workerPromise) slot.workerPromise = null;
+    });
   }
   return slot.workerPromise;
+}
+
+function discardWorker(slot: EngineSlot, worker: Worker): void {
+  slot.workerPromise = null;
+  worker.terminate();
 }
 
 export interface EvalResult {
@@ -101,8 +126,20 @@ function parseMultiPvInfoLine(line: string, lines: Map<number, MultiPvLine>): vo
 }
 
 const MULTIPV_SEARCH_DEPTH = SEARCH_DEPTH;
+const MULTIPV_CACHE_LIMIT = 24;
+const multiPvCache = new Map<string, Promise<MultiPvLine[]>>();
 
 export function evalFenMultiPv(fen: string, numLines = 3): Promise<MultiPvLine[]> {
+  const cacheKey = `${fen}\n${numLines}\n${MULTIPV_SEARCH_DEPTH}`;
+  const cached = multiPvCache.get(cacheKey);
+  if (cached) {
+    // Refresh insertion order for a small LRU and don't expose cached objects
+    // to callers that might mutate them.
+    multiPvCache.delete(cacheKey);
+    multiPvCache.set(cacheKey, cached);
+    return cached.then((lines) => lines.map((line) => ({ ...line })));
+  }
+
   const slot = engineSlots.reduce((leastBusy, candidate) =>
     candidate.pending < leastBusy.pending ? candidate : leastBusy
   );
@@ -110,7 +147,16 @@ export function evalFenMultiPv(fen: string, numLines = 3): Promise<MultiPvLine[]
   const result = slot.queue.then(() => runMultiPvEvaluation(slot, fen, numLines));
   slot.queue = result.then(() => undefined, () => undefined);
   void result.finally(() => { slot.pending--; }).catch(() => undefined);
-  return result;
+  multiPvCache.set(cacheKey, result);
+  while (multiPvCache.size > MULTIPV_CACHE_LIMIT) {
+    const oldestKey = multiPvCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    multiPvCache.delete(oldestKey);
+  }
+  void result.catch(() => {
+    if (multiPvCache.get(cacheKey) === result) multiPvCache.delete(cacheKey);
+  });
+  return result.then((lines) => lines.map((line) => ({ ...line })));
 }
 
 async function runMultiPvEvaluation(slot: EngineSlot, fen: string, numLines: number): Promise<MultiPvLine[]> {
@@ -118,12 +164,24 @@ async function runMultiPvEvaluation(slot: EngineSlot, fen: string, numLines: num
   return new Promise((resolve, reject) => {
     const lines = new Map<number, MultiPvLine>();
     let sawMultiPvLine = false;
+    const timeout = window.setTimeout(() => fail(new Error("Stockfish MultiPV search timed out")), ENGINE_SEARCH_TIMEOUT_MS);
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      worker.removeEventListener("message", onMessage);
+      worker.removeEventListener("error", onError);
+    };
+    const fail = (error: Error) => {
+      cleanup();
+      discardWorker(slot, worker);
+      reject(error);
+    };
+    const onError = (event: ErrorEvent) => fail(new Error(event.message || "Stockfish worker failed during MultiPV search"));
     const onMessage = (e: MessageEvent) => {
       const line: string = e.data;
       if (line.startsWith("info") && /\bmultipv \d+/.test(line)) sawMultiPvLine = true;
       parseMultiPvInfoLine(line, lines);
       if (line.startsWith("bestmove")) {
-        worker.removeEventListener("message", onMessage);
+        cleanup();
         worker.postMessage("setoption name MultiPV value 1");
         if (!sawMultiPvLine) {
           reject(new Error(
@@ -135,6 +193,7 @@ async function runMultiPvEvaluation(slot: EngineSlot, fen: string, numLines: num
       }
     };
     worker.addEventListener("message", onMessage);
+    worker.addEventListener("error", onError);
     worker.postMessage(`setoption name MultiPV value ${numLines}`);
     worker.postMessage(`position fen ${fen}`);
     worker.postMessage(`go depth ${MULTIPV_SEARCH_DEPTH}`);
@@ -154,20 +213,33 @@ export function evalFen(fen: string): Promise<EvalResult> {
 
 async function runEvaluation(slot: EngineSlot, fen: string): Promise<EvalResult> {
   const worker = await getWorker(slot);
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     let best: EvalResult = { cp: null, mate: null, depth: 0, bestMoveUci: null };
+    const timeout = window.setTimeout(() => fail(new Error("Stockfish search timed out")), ENGINE_SEARCH_TIMEOUT_MS);
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      worker.removeEventListener("message", onMessage);
+      worker.removeEventListener("error", onError);
+    };
+    const fail = (error: Error) => {
+      cleanup();
+      discardWorker(slot, worker);
+      reject(error);
+    };
+    const onError = (event: ErrorEvent) => fail(new Error(event.message || "Stockfish worker failed during search"));
     const onMessage = (e: MessageEvent) => {
       const line: string = e.data;
       if (line.startsWith("bestmove")) {
         const bestMoveMatch = line.match(/^bestmove (\S+)/);
         best = { ...best, bestMoveUci: bestMoveMatch ? bestMoveMatch[1] : null };
-        worker.removeEventListener("message", onMessage);
+        cleanup();
         resolve(best);
         return;
       }
       best = parseStockfishInfoLine(line, best);
     };
     worker.addEventListener("message", onMessage);
+    worker.addEventListener("error", onError);
     worker.postMessage(`position fen ${fen}`);
     worker.postMessage(`go depth ${SEARCH_DEPTH}`);
   });

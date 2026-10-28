@@ -32,12 +32,14 @@ export function SyncPanel({ initialTotalGames, autoSyncOnMount }: SyncPanelProps
   useEffect(() => {
     if (autoSyncOnMount && !hasAutoSynced.current) {
       hasAutoSynced.current = true;
-      void syncNow();
+      // A page visit may refresh stale data, but it should not bypass the
+      // server's passive-sync throttle. The button remains an explicit force sync.
+      void syncNow(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function syncNow() {
+  async function syncNow(force = true) {
     setBusy(true);
     setError(null);
     setSynced(0);
@@ -54,7 +56,7 @@ export function SyncPanel({ initialTotalGames, autoSyncOnMount }: SyncPanelProps
         const response = await fetch("/api/sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ force: true, skipIncremental: batch > 1 }),
+          body: JSON.stringify({ force, skipIncremental: batch > 1 }),
         });
         const payload = (await response.json()) as SyncResponse;
         if (!response.ok) throw new Error(payload.error ?? `Sync failed (${response.status})`);
@@ -68,7 +70,7 @@ export function SyncPanel({ initialTotalGames, autoSyncOnMount }: SyncPanelProps
         setHistoryBackfillComplete(complete);
         if (payload.skipped || complete) break;
       }
-      router.refresh();
+      if (syncedThisRun > 0) router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

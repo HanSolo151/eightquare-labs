@@ -3,6 +3,7 @@ import { createInterface } from "node:readline";
 import path from "node:path";
 
 type EvalScore = { cp: number | null; mate: number | null; bestMoveUci: string | null; depth: number };
+const POSITION_EVAL_TIMEOUT_MS = 60_000;
 
 export interface ServerEvalResult {
   cp: number | null;
@@ -12,7 +13,7 @@ export interface ServerEvalResult {
 }
 
 export class StockfishCli {
-  private pending: { resolve: (value: EvalScore) => void; reject: (error: Error) => void; latest: EvalScore } | null = null;
+  private pending: { resolve: (value: EvalScore) => void; reject: (error: Error) => void; latest: EvalScore; timer: ReturnType<typeof setTimeout> } | null = null;
   private readonly process: ChildProcessWithoutNullStreams;
   private readonly lineWaiters = new Set<{ predicate: (line: string) => boolean; resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
 
@@ -46,9 +47,17 @@ export class StockfishCli {
   async evaluate(fen: string, depth: number): Promise<ServerEvalResult> {
     if (this.pending) throw new Error("Stockfish CLI evaluation requests must be serialized");
     const response = new Promise<EvalScore>((resolve, reject) => {
-      this.pending = { resolve, reject, latest: { cp: null, mate: null, bestMoveUci: null, depth: 0 } };
+      const timer = setTimeout(() => {
+        this.rejectAll(new Error(`Stockfish position evaluation exceeded ${POSITION_EVAL_TIMEOUT_MS / 1_000} seconds`));
+        this.process.kill();
+      }, POSITION_EVAL_TIMEOUT_MS);
+      this.pending = { resolve, reject, latest: { cp: null, mate: null, bestMoveUci: null, depth: 0 }, timer };
     });
-    this.process.stdin.write(`position fen ${fen}\ngo depth ${depth}\n`);
+    try {
+      this.process.stdin.write(`position fen ${fen}\ngo depth ${depth}\n`);
+    } catch (error) {
+      this.rejectAll(error instanceof Error ? error : new Error(String(error)));
+    }
     return response;
   }
 
@@ -76,6 +85,7 @@ export class StockfishCli {
 
   private rejectAll(error: Error): void {
     if (this.pending) {
+      clearTimeout(this.pending.timer);
       this.pending.reject(error);
       this.pending = null;
     }
@@ -106,6 +116,7 @@ export class StockfishCli {
     }
     if (line.startsWith("bestmove")) {
       const bestMoveUci = line.split(/\s+/)[1] ?? null;
+      clearTimeout(pending.timer);
       pending.resolve({ ...pending.latest, bestMoveUci });
       this.pending = null;
     }

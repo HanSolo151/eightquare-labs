@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Chess } from "chess.js";
 import type { Key } from "chessground/types";
 import ChessgroundBoard from "@/components/board/ChessgroundBoard";
-import { evalFenMultiPv } from "@/lib/eval/stockfishEngine";
+import { evalFenMultiPv, type MultiPvLine } from "@/lib/eval/stockfishEngine";
 import type { DailyPuzzle as DailyPuzzleData } from "@/lib/puzzle/getDailyPuzzle";
 
 type Status = "idle" | "checking" | "saving" | "correct" | "incorrect" | "error";
@@ -18,6 +18,26 @@ export default function DailyPuzzle({ puzzle }: { puzzle: DailyPuzzleData }) {
   const [solved, setSolved] = useState(false);
   const [busySkipping, setBusySkipping] = useState(false);
   const [acceptNearEqual, setAcceptNearEqual] = useState(false);
+  const [prepared, setPrepared] = useState(false);
+  const [prepareFailed, setPrepareFailed] = useState(false);
+  const [preparedLines, setPreparedLines] = useState<MultiPvLine[] | null>(null);
+  const [prepareAttempt, setPrepareAttempt] = useState(0);
+
+  // Start the depth-16 MultiPV search as soon as this puzzle mounts, so a move
+  // joins the prepared result instead of starting a search after the click.
+  useEffect(() => {
+    let active = true;
+    void evalFenMultiPv(puzzle.fenBefore, 5).then((lines) => {
+      if (active) {
+        setPreparedLines(lines);
+        setPrepared(true);
+      }
+    }).catch((error: unknown) => {
+      console.error("Daily puzzle engine preparation failed:", error);
+      if (active) setPrepareFailed(true);
+    });
+    return () => { active = false; };
+  }, [puzzle.fenBefore, prepareAttempt]);
   const dests = useMemo(() => {
     const chess = new Chess(boardFen);
     const map = new Map<Key, Key[]>();
@@ -29,7 +49,7 @@ export default function DailyPuzzle({ puzzle }: { puzzle: DailyPuzzleData }) {
   }, [boardFen]);
 
   async function onUserMove(from: Key, to: Key) {
-    if (status === "checking" || status === "saving" || busySkipping || solved) return;
+    if (!prepared || status === "checking" || status === "saving" || busySkipping || solved) return;
     const chess = new Chess(puzzle.fenBefore);
     let move;
     try { move = chess.move({ from, to, promotion: "q" }); } catch { return; }
@@ -38,7 +58,7 @@ export default function DailyPuzzle({ puzzle }: { puzzle: DailyPuzzleData }) {
     setBoardFen(chess.fen());
     setStatus("checking");
     try {
-      const lines = await evalFenMultiPv(puzzle.fenBefore, 5);
+      const lines = preparedLines ?? await evalFenMultiPv(puzzle.fenBefore, 5);
       const best = lines.find((line) => line.multipv === 1) ?? lines[0];
       const isTopMove = best?.uci === playedUci;
       const isNearEqual = acceptNearEqual && best?.cp !== null && best?.cp !== undefined && lines.some((line) =>
@@ -82,7 +102,7 @@ export default function DailyPuzzle({ puzzle }: { puzzle: DailyPuzzleData }) {
     }
   }
 
-  const interactive = !solved && status !== "checking" && status !== "saving" && !busySkipping;
+  const interactive = prepared && !solved && status !== "checking" && status !== "saving" && !busySkipping;
   return <div className="rounded-xl border border-white/10 bg-black/35 p-4">
     <p className="text-xs text-neutral-400">Your {puzzle.severity}-severity missed move from a game against {puzzle.opponentUsername}.</p>
     <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-xs text-neutral-400">
@@ -92,6 +112,12 @@ export default function DailyPuzzle({ puzzle }: { puzzle: DailyPuzzleData }) {
     <div className="mx-auto mt-3 max-w-[320px]">
       <ChessgroundBoard fen={boardFen} orientation={puzzle.playerColor} interactive={interactive} turnColor={puzzle.playerColor} dests={dests} onUserMove={(from, to) => void onUserMove(from, to)} />
     </div>
+    {!prepared && <p className="mt-3 min-h-5 text-center text-xs text-neutral-400" role="status">
+      {prepareFailed ? "Stockfish could not prepare this puzzle." : "Preparing Stockfish lines…"}
+    </p>}
+    {prepareFailed && <div className="mt-2 text-center">
+      <button type="button" onClick={() => { setPrepareFailed(false); setPrepareAttempt((attempt) => attempt + 1); }} className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/10">Retry engine</button>
+    </div>}
     <p className="mt-3 min-h-5 text-center text-xs" aria-live="polite">
       {status === "checking" && "Checking your move…"}
       {status === "saving" && "Correct. Saving progress…"}
