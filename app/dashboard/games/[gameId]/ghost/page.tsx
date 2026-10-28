@@ -1,14 +1,20 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getGhostMoment } from "@/lib/ghost/getGhostMoment";
 import GhostReplay from "@/components/board/GhostReplay";
 import { getNearMisses } from "@/lib/ghost/getNearMisses";
+import DashboardPageFallback from "@/components/dashboard/DashboardPageFallback";
 
-export const instant = false;
+type GhostReplayPageProps = { params: Promise<{ gameId: string }>; searchParams: Promise<{ ply?: string }> };
 
-export default async function GhostReplayPage({ params, searchParams }: { params: Promise<{ gameId: string }>; searchParams: Promise<{ ply?: string }> }) {
+export default function GhostReplayPage(props: GhostReplayPageProps) {
+  return <Suspense fallback={<DashboardPageFallback />}><GhostReplayPageContent {...props} /></Suspense>;
+}
+
+async function GhostReplayPageContent({ params, searchParams }: GhostReplayPageProps) {
   const [{ gameId }, query, session] = await Promise.all([params, searchParams, auth()]);
   const userId = getSessionUserId(session);
   if (!userId) notFound();

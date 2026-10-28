@@ -29,8 +29,8 @@ export async function GET(req: NextRequest) {
   if (!username) return NextResponse.json({ error: "username required" }, { status: 400 });
 
   try {
-    // Bumped from 5 — timing/move data is cheap (no engine), needed for a real baseline.
-    const raw = await fetchGames({ username, max: 25, rated: true, perfType: "rapid" });
+    // Fetch a wider recent sample so analysis has more than a few games to learn from.
+    const raw = await fetchGames({ username, max: 50, rated: true, perfType: "rapid" });
     const games = parseGames(raw, username);
     const allFeatures = extractAllMoveFeatures(games);
     const profile = buildPlayerProfile(username, games, allFeatures);

@@ -4,6 +4,7 @@ type UserRow = {
   username: string;
   lastSyncedAt: Date | null;
   lastGameCreatedAt: Date | null;
+  historyBackfillComplete?: boolean;
 };
 
 type GameRow = { id?: string; userId: string; lichessGameId: string; [key: string]: unknown };
@@ -24,6 +25,17 @@ export function __reset() {
 
 export function __gameCount(userId: string) {
   return [...games.values()].filter((game) => game.userId === userId).length;
+}
+
+export function __seedGames(rows: GameRow[]) {
+  for (const row of rows) games.set(gameKey(row), { ...row, id: row.id ?? `internal-${games.size + 1}` });
+}
+
+export function __gameCreatedAtRange(userId: string) {
+  const timestamps = [...games.values()]
+    .filter((game) => game.userId === userId && game.lichessCreatedAt instanceof Date)
+    .map((game) => (game.lichessCreatedAt as Date).getTime());
+  return timestamps.length ? { oldest: Math.min(...timestamps), newest: Math.max(...timestamps) } : null;
 }
 
 export function __vanityJobCount(userId: string) {
@@ -75,6 +87,12 @@ export const prisma = {
       [...games.values()]
         .filter((game) => game.userId === where.userId && where.lichessGameId.in.includes(game.lichessGameId))
         .map((game) => ({ id: game.id!, userId: game.userId })),
+    findFirst: async ({ where }: { where: { userId: string; lichessCreatedAt: { not: null } }; orderBy: { lichessCreatedAt: "asc" }; select: { lichessCreatedAt: true } }) => {
+      const dated = [...games.values()]
+        .filter((game) => game.userId === where.userId && game.lichessCreatedAt instanceof Date)
+        .sort((a, b) => (a.lichessCreatedAt as Date).getTime() - (b.lichessCreatedAt as Date).getTime());
+      return dated[0] ? { lichessCreatedAt: dated[0].lichessCreatedAt as Date } : null;
+    },
   },
   vanityEvaluationJob: {
     createMany: async ({ data, skipDuplicates }: { data: { gameId: string; userId: string }[]; skipDuplicates?: boolean }) => {

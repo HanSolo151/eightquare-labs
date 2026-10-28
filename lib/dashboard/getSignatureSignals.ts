@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import type { WeaknessPattern } from "@/types";
+import type { EvalPoint, WeaknessPattern } from "@/types";
+import { toPlayerPerspective } from "@/lib/eval/toPlayerPerspective";
 
 const CP_TREND_THRESHOLD = 25;
 
@@ -33,6 +34,316 @@ export interface SelfCpLossTrend {
   previousAvgCp: number;
   recentCount: number;
   previousCount: number;
+}
+
+export interface OpeningBreadth {
+  distinctEcoCount: number;
+  gamesWithEco: number;
+  gamesWithoutEco: number;
+}
+
+/** Count distinct recorded ECO codes and separately report games without one. */
+export async function getOpeningBreadth(userId: string): Promise<OpeningBreadth> {
+  const [ecoRows, gamesWithEco, gamesWithoutEco] = await Promise.all([
+    prisma.game.findMany({
+      where: { userId, openingEco: { not: null } },
+      select: { openingEco: true },
+      distinct: ["openingEco"],
+    }),
+    prisma.game.count({ where: { userId, openingEco: { not: null } } }),
+    prisma.game.count({ where: { userId, openingEco: null } }),
+  ]);
+  return { distinctEcoCount: ecoRows.length, gamesWithEco, gamesWithoutEco };
+}
+
+export interface ComebackIndex {
+  comebackWinCount: number;
+  totalWinCount: number;
+  evaluatedWinCount: number;
+  comebackShare: number;
+}
+
+const COMEBACK_INDEX_THRESHOLD_CP = -200;
+const COMEBACK_INDEX_MIN_EVAL_DEPTH = 10;
+
+/** Share of evaluated wins that recovered from a 2-pawn deficit or forced mate. */
+export async function getComebackIndex(userId: string): Promise<ComebackIndex> {
+  const [totalWinCount, evaluatedWins] = await Promise.all([
+    prisma.game.count({ where: { userId, result: "win" } }),
+    prisma.game.findMany({
+      where: { userId, result: "win", eval: { isNot: null } },
+      select: { playerColor: true, eval: { select: { points: true } } },
+    }),
+  ]);
+
+  let evaluatedWinCount = 0;
+  let comebackWinCount = 0;
+  for (const game of evaluatedWins) {
+    if (game.playerColor !== "white" && game.playerColor !== "black") continue;
+    const points = game.eval?.points;
+    if (!Array.isArray(points)) continue;
+    let hasUsableEvaluation = false;
+    let isComeback = false;
+    for (const raw of points) {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+      const point = raw as Partial<EvalPoint>;
+      if (!Number.isInteger(point.ply) || point.ply! < 0 || !Number.isFinite(point.depth) || point.depth! < COMEBACK_INDEX_MIN_EVAL_DEPTH) continue;
+
+      if (typeof point.cpAfter === "number" && Number.isFinite(point.cpAfter)) {
+        hasUsableEvaluation = true;
+        if (toPlayerPerspective(point.cpAfter, point.ply!, game.playerColor) <= COMEBACK_INDEX_THRESHOLD_CP) isComeback = true;
+      } else if (typeof point.mateAfter === "number" && Number.isFinite(point.mateAfter)) {
+        hasUsableEvaluation = true;
+        if (toPlayerPerspective(point.mateAfter, point.ply!, game.playerColor) < 0) isComeback = true;
+      }
+    }
+    if (!hasUsableEvaluation) continue;
+    evaluatedWinCount++;
+    if (isComeback) comebackWinCount++;
+  }
+
+  return {
+    comebackWinCount,
+    totalWinCount,
+    evaluatedWinCount,
+    comebackShare: evaluatedWinCount > 0 ? comebackWinCount / evaluatedWinCount : 0,
+  };
+}
+
+export interface BlunderHourStats {
+  byHour: { hour: number; gameCount: number; flagsPerGame: number }[];
+  worstHour: { hour: number; flagsPerGame: number } | null;
+  bestHour: { hour: number; flagsPerGame: number } | null;
+  overallFlagsPerGame: number;
+}
+
+const MIN_BLUNDER_HOUR_GAMES = 5;
+
+/** Player-colored flagged moves per game grouped by UTC game-start hour. */
+export async function getBlunderHourStats(userId: string): Promise<BlunderHourStats> {
+  const games = await prisma.game.findMany({
+    where: { userId, lichessCreatedAt: { not: null } },
+    select: {
+      playerColor: true,
+      lichessCreatedAt: true,
+      flags: { select: { color: true } },
+    },
+  });
+  const buckets = new Map<number, { gameCount: number; flagCount: number }>();
+  let totalFlags = 0;
+  for (const game of games) {
+    if (!game.lichessCreatedAt) continue;
+    const hour = game.lichessCreatedAt.getUTCHours();
+    const ownFlags = game.flags.filter((flag) => flag.color === game.playerColor).length;
+    const bucket = buckets.get(hour) ?? { gameCount: 0, flagCount: 0 };
+    bucket.gameCount++;
+    bucket.flagCount += ownFlags;
+    totalFlags += ownFlags;
+    buckets.set(hour, bucket);
+  }
+
+  const byHour = [...buckets.entries()]
+    .map(([hour, bucket]) => ({ hour, gameCount: bucket.gameCount, flagsPerGame: bucket.flagCount / bucket.gameCount }))
+    .sort((a, b) => a.hour - b.hour);
+  const eligible = byHour.filter((bucket) => bucket.gameCount >= MIN_BLUNDER_HOUR_GAMES);
+  const worst = [...eligible].sort((a, b) => b.flagsPerGame - a.flagsPerGame)[0] ?? null;
+  const best = [...eligible].sort((a, b) => a.flagsPerGame - b.flagsPerGame)[0] ?? null;
+  return {
+    byHour,
+    worstHour: worst ? { hour: worst.hour, flagsPerGame: worst.flagsPerGame } : null,
+    bestHour: best ? { hour: best.hour, flagsPerGame: best.flagsPerGame } : null,
+    overallFlagsPerGame: games.length ? totalFlags / games.length : 0,
+  };
+}
+
+export interface PersonalRecords {
+  biggestComeback: {
+    gameId: string;
+    ply: number;
+    opponentUsername: string;
+    worstCpForPlayer: number | null;
+    forcedMateAgainstPlayerIn: number | null;
+    playedAt: string | null;
+  } | null;
+  longestWin: { gameId: string; opponentUsername: string; plyCount: number; playedAt: string | null } | null;
+  bestWinVsHigherRated: { gameId: string; opponentUsername: string; ratingGap: number; opponentRating: number; playedAt: string | null } | null;
+}
+
+const MIN_COMEBACK_EVAL_DEPTH = 10;
+const FORCED_MATE_SORT_SCORE = 1_000_000;
+type ComebackCandidate = {
+  rank: number;
+  ply: number;
+  cpForPlayer: number | null;
+  forcedMateAgainstPlayerIn: number | null;
+};
+
+/**
+ * Compute only records supported by saved game data. A comeback requires a
+ * win plus at least one depth-10 evaluation showing a 3-pawn deficit or a
+ * forced mate against the player. Mate scores are ranked separately and are
+ * never displayed as centipawns.
+ */
+export async function getPersonalRecords(userId: string): Promise<PersonalRecords> {
+  const [wonGames, evaluatedWins] = await Promise.all([
+    prisma.game.findMany({
+      where: { userId, result: "win" },
+      select: {
+        id: true,
+        opponentUsername: true,
+        opponentRating: true,
+        playerRating: true,
+        moves: true,
+        lichessCreatedAt: true,
+      },
+    }),
+    prisma.game.findMany({
+      where: { userId, result: "win", eval: { isNot: null } },
+      select: {
+        id: true,
+        playerColor: true,
+        eval: { select: { points: true } },
+      },
+    }),
+  ]);
+
+  let biggestComeback: PersonalRecords["biggestComeback"] = null;
+  let longestWin: PersonalRecords["longestWin"] = null;
+  let bestWinVsHigherRated: PersonalRecords["bestWinVsHigherRated"] = null;
+
+  for (const game of wonGames) {
+    const plyCount = Array.isArray(game.moves)
+      ? game.moves.filter((move): move is string => typeof move === "string").length
+      : 0;
+    const playedAt = game.lichessCreatedAt?.toISOString() ?? null;
+
+    if (plyCount > 0 && (!longestWin || plyCount > longestWin.plyCount)) {
+      longestWin = { gameId: game.id, opponentUsername: game.opponentUsername, plyCount, playedAt };
+    }
+
+    if (game.opponentRating !== null && game.playerRating !== null) {
+      const ratingGap = game.opponentRating - game.playerRating;
+      if (ratingGap > 0 && (!bestWinVsHigherRated || ratingGap > bestWinVsHigherRated.ratingGap)) {
+        bestWinVsHigherRated = {
+          gameId: game.id,
+          opponentUsername: game.opponentUsername,
+          ratingGap,
+          opponentRating: game.opponentRating,
+          playedAt,
+        };
+      }
+    }
+  }
+
+  const wonGameById = new Map(wonGames.map((game) => [game.id, game]));
+  let biggestComebackRank = Number.POSITIVE_INFINITY;
+  for (const game of evaluatedWins) {
+    const gameSummary = wonGameById.get(game.id);
+    if (!gameSummary || (game.playerColor !== "white" && game.playerColor !== "black")) continue;
+    const rawPoints = game.eval?.points;
+    if (!Array.isArray(rawPoints)) continue;
+
+    let gameWorst: ComebackCandidate | null = null;
+
+    for (const raw of rawPoints) {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+      const point = raw as Partial<EvalPoint>;
+      if (!Number.isInteger(point.ply) || point.ply! < 0 || !Number.isFinite(point.depth) || point.depth! < MIN_COMEBACK_EVAL_DEPTH) continue;
+
+      let candidate: ComebackCandidate | null = null;
+      if (typeof point.cpAfter === "number" && Number.isFinite(point.cpAfter)) {
+        const cpForPlayer = toPlayerPerspective(point.cpAfter, point.ply!, game.playerColor);
+        candidate = { rank: cpForPlayer, ply: point.ply!, cpForPlayer, forcedMateAgainstPlayerIn: null };
+      } else if (typeof point.mateAfter === "number" && Number.isFinite(point.mateAfter) && point.mateAfter !== 0) {
+        const mateForPlayer = toPlayerPerspective(point.mateAfter, point.ply!, game.playerColor);
+        const mateDistance = Math.abs(mateForPlayer);
+        candidate = {
+          rank: mateForPlayer < 0
+            ? -FORCED_MATE_SORT_SCORE + mateDistance / (mateDistance + 1)
+            : FORCED_MATE_SORT_SCORE,
+          ply: point.ply!,
+          cpForPlayer: null,
+          forcedMateAgainstPlayerIn: mateForPlayer < 0 ? mateDistance : null,
+        };
+      }
+      if (!candidate) continue;
+
+      const isMoreSevereMate = gameWorst?.forcedMateAgainstPlayerIn !== null &&
+        gameWorst?.forcedMateAgainstPlayerIn !== undefined &&
+        candidate.forcedMateAgainstPlayerIn !== null &&
+        candidate.forcedMateAgainstPlayerIn < gameWorst.forcedMateAgainstPlayerIn;
+      if (!gameWorst || candidate.rank < gameWorst.rank || isMoreSevereMate) gameWorst = candidate;
+    }
+
+    const qualifies = gameWorst && (
+      gameWorst.forcedMateAgainstPlayerIn !== null ||
+      (gameWorst.cpForPlayer !== null && gameWorst.cpForPlayer <= -300)
+    );
+    if (!qualifies || !gameWorst || gameWorst.rank >= biggestComebackRank) continue;
+
+    biggestComebackRank = gameWorst.rank;
+    biggestComeback = {
+      gameId: game.id,
+      ply: gameWorst.ply,
+      opponentUsername: gameSummary.opponentUsername,
+      worstCpForPlayer: gameWorst.cpForPlayer,
+      forcedMateAgainstPlayerIn: gameWorst.forcedMateAgainstPlayerIn,
+      playedAt: gameSummary.lichessCreatedAt?.toISOString() ?? null,
+    };
+  }
+
+  return { biggestComeback, longestWin, bestWinVsHigherRated };
+}
+
+export interface MostExpensiveMove {
+  gameId: string;
+  ply: number;
+  san: string;
+  moveNumber: number;
+  cpLoss: number;
+  opponentUsername: string;
+  playedAt: string | null;
+}
+
+/** Largest recorded loss from one of the account holder's own moves. */
+export async function getMostExpensiveMove(userId: string): Promise<MostExpensiveMove | null> {
+  const [whiteMove, blackMove] = await Promise.all([
+    prisma.flaggedMove.findFirst({
+      where: { color: "white", game: { userId, playerColor: "white" } },
+      orderBy: { cpLoss: "desc" },
+      select: {
+        gameId: true,
+        ply: true,
+        san: true,
+        moveNumber: true,
+        cpLoss: true,
+        game: { select: { opponentUsername: true, lichessCreatedAt: true } },
+      },
+    }),
+    prisma.flaggedMove.findFirst({
+      where: { color: "black", game: { userId, playerColor: "black" } },
+      orderBy: { cpLoss: "desc" },
+      select: {
+        gameId: true,
+        ply: true,
+        san: true,
+        moveNumber: true,
+        cpLoss: true,
+        game: { select: { opponentUsername: true, lichessCreatedAt: true } },
+      },
+    }),
+  ]);
+  const row = !whiteMove ? blackMove : !blackMove ? whiteMove : whiteMove.cpLoss >= blackMove.cpLoss ? whiteMove : blackMove;
+  if (!row) return null;
+  return {
+    gameId: row.gameId,
+    ply: row.ply,
+    san: row.san,
+    moveNumber: row.moveNumber,
+    cpLoss: row.cpLoss,
+    opponentUsername: row.game.opponentUsername,
+    playedAt: row.game.lichessCreatedAt?.toISOString() ?? null,
+  };
 }
 
 /** A descriptive comparison of recent player move flags, not a rating estimate. */

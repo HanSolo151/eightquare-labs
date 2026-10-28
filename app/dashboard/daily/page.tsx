@@ -1,11 +1,15 @@
+import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDailyPuzzle } from "@/lib/puzzle/getDailyPuzzle";
 import DailyPuzzle from "@/components/dashboard/DailyPuzzle";
+import DashboardPageFallback from "@/components/dashboard/DashboardPageFallback";
 
-export const instant = false;
+export default function DailyPage() {
+  return <Suspense fallback={<DashboardPageFallback />}><DailyPageContent /></Suspense>;
+}
 
-export default async function DailyPage() {
+async function DailyPageContent() {
   const userId = getSessionUserId(await auth());
   if (!userId) return <p className="text-sm text-neutral-400">Sign in to see your daily puzzle.</p>;
   const snapshot = await getDailyPuzzle(userId);

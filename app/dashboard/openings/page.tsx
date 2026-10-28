@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getOpeningsData } from "@/lib/openings/getOpeningsData";
-
-export const instant = false;
+import OpeningGambit from "@/components/dashboard/OpeningGambit";
+import DashboardPageFallback from "@/components/dashboard/DashboardPageFallback";
 
 const badgeClass = {
   danger: "border-rose-400/30 bg-rose-400/10 text-rose-200",
@@ -11,7 +12,11 @@ const badgeClass = {
   safe: "border-sky-300/20 bg-sky-300/10 text-sky-100",
 } as const;
 
-export default async function OpeningsPage() {
+export default function OpeningsPage() {
+  return <Suspense fallback={<DashboardPageFallback />}><OpeningsPageContent /></Suspense>;
+}
+
+async function OpeningsPageContent() {
   const userId = getSessionUserId(await auth());
   if (!userId) return <p className="text-sm text-neutral-400">Sign in to see your openings.</p>;
   const openings = await getOpeningsData(userId);
@@ -23,6 +28,7 @@ export default async function OpeningsPage() {
         <h1 className="mt-3 text-2xl font-semibold sm:text-3xl">Opening Danger Score</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">A relative ranking within your openings, combining cp loss per move, loss rate, and flagged move density. It is descriptive, not a prediction.</p>
       </header>
+      <OpeningGambit openings={openings} />
       {openings.length === 0 ? (
         <p className="rounded-lg border border-dashed border-white/10 px-4 py-5 text-xs text-neutral-500">Not enough games per opening yet (minimum 2) to rank anything.</p>
       ) : (

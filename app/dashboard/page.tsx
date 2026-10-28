@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { getSessionUserId } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
@@ -6,10 +7,13 @@ import { getGhostMoment } from "@/lib/ghost/getGhostMoment";
 import { getSparQueue } from "@/lib/dashboard/getSparQueue";
 import { getNearMisses } from "@/lib/ghost/getNearMisses";
 import GhostReplay from "@/components/board/GhostReplay";
+import DashboardPageFallback from "@/components/dashboard/DashboardPageFallback";
 
-export const instant = false;
+export default function DashboardPage() {
+  return <Suspense fallback={<DashboardPageFallback />}><DashboardPageContent /></Suspense>;
+}
 
-export default async function DashboardPage() {
+async function DashboardPageContent() {
   const session = await auth();
   const userId = getSessionUserId(session);
   if (!userId) return <p className="text-sm text-neutral-400">Sign in to continue.</p>;

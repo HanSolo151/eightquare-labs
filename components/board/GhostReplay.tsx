@@ -30,6 +30,7 @@ interface ReplayLine {
   san: string | null;
   fen: string | null;
   detail: string | null;
+  playerEval: PlayerPerspectiveEval | null;
   from?: Key;
   to?: Key;
 }
@@ -295,9 +296,9 @@ export default function GhostReplay({ moment, nearMisses }: { moment: GhostMomen
       const stockfishEval = scoreAt(1);
       const maiaEval = scoreAt(2);
       setLines([
-        { label: "Game move", san: currentSan, fen: playedFen, detail: `Stockfish after move: ${formatPlayerEval(playedEval)}.${currentPly === moment.ply ? ` Saved analysis recorded ${Math.round(moment.cpLoss)} cp loss.` : ""}`, from: playedMove?.from, to: playedMove?.to },
-        { label: "Stockfish top choice", san: sfMove?.san ?? null, fen: sfMove?.fen ?? null, detail: `Stockfish after move: ${formatPlayerEval(stockfishEval)}.`, from: sfMove?.from, to: sfMove?.to },
-        { label: `Maia prediction at ${maiaRating ?? "unknown"} rating`, san: maiaMove?.san ?? null, fen: maiaMove?.fen ?? null, detail: maia ? `Maia predicts this move; Stockfish after the predicted move: ${formatPlayerEval(maiaEval)}.` : issues || "No legal Maia choice available", from: maiaMove?.from, to: maiaMove?.to },
+        { label: "You", san: currentSan, fen: playedFen, playerEval: playedEval, detail: `Stockfish after move: ${formatPlayerEval(playedEval)}.${currentPly === moment.ply ? ` Saved analysis recorded ${Math.round(moment.cpLoss)} cp loss.` : ""}`, from: playedMove?.from, to: playedMove?.to },
+        { label: "Stockfish", san: sfMove?.san ?? null, fen: sfMove?.fen ?? null, playerEval: stockfishEval, detail: `Stockfish after move: ${formatPlayerEval(stockfishEval)}.`, from: sfMove?.from, to: sfMove?.to },
+        { label: `A typical ${maiaRating ?? "unknown"}-rated player`, san: maiaMove?.san ?? null, fen: maiaMove?.fen ?? null, playerEval: maiaEval, detail: maia ? `Base Maia predicts this move; Stockfish after the predicted move: ${formatPlayerEval(maiaEval)}.` : issues || "No legal Maia choice available", from: maiaMove?.from, to: maiaMove?.to },
       ]);
       if (playedEval && stockfishEval) {
         setLines((current) => current?.map((line, index) => index === 0
@@ -344,7 +345,7 @@ export default function GhostReplay({ moment, nearMisses }: { moment: GhostMomen
         ]} />
       <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
         <p className="text-sky-300"><span className="mr-2 inline-block h-2.5 w-2.5 rounded-sm bg-sky-400" />Stockfish: <strong>{lines[1]?.san ?? "unavailable"}</strong></p>
-        <p className="text-pink-300"><span className="mr-2 inline-block h-2.5 w-2.5 rounded-sm bg-pink-400" />Maia: <strong>{lines[2]?.san ?? "unavailable"}</strong> <span className="text-xs text-neutral-500">(behavior prediction)</span></p>
+        <p className="text-amber-200"><span className="mr-2 inline-block h-2.5 w-2.5 rounded-sm bg-amber-300" />Typical {maiaRating ?? "unknown"}-rated player: <strong>{lines[2]?.san ?? "unavailable"}</strong> <span className="text-xs text-neutral-500">(base Maia prediction)</span></p>
       </div>
       <p className="mt-2 text-xs text-neutral-500">{currentSan ? `Game move: ${currentSan}.` : "No game move from this position."} {predictionsAgree ? "Stockfish and Maia agree on this move; both colored arrows mark the shared prediction." : "Blue arrow and ghost piece show Stockfish's top move; pink arrow and ghost piece show Maia's behavior prediction."} A ghost piece marks its hypothetical destination.</p>
       {!isGameFinished && <div className="mt-3 flex justify-end">
@@ -397,7 +398,7 @@ export default function GhostReplay({ moment, nearMisses }: { moment: GhostMomen
       <div className="ghost-share-overlay fixed inset-0 z-[1000] overflow-y-auto bg-black/85 p-3 sm:p-6" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCompareOpen(false); }}>
         <section role="dialog" aria-modal="true" aria-labelledby="ghost-compare-title" className="mx-auto my-8 max-w-6xl rounded-2xl border border-white/10 bg-[#11110f] p-4 shadow-2xl sm:p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
-            <div><h2 id="ghost-compare-title" className="text-sm font-medium text-white">Sliding Doors · What happened vs. Stockfish</h2><p className="mt-1 text-xs text-neutral-500">Compare the played move with the engine line from this position.</p></div>
+            <div><h2 id="ghost-compare-title" className="text-sm font-medium text-white">Sliding Doors · What happened vs. alternatives</h2><p className="mt-1 text-xs text-neutral-500">Compare the resulting positions from your perspective. Maia is a typical player at the shown rating, not your specific opponent.</p></div>
             <span className="flex gap-2 ghost-share-controls"><button type="button" onClick={() => window.print()} className="rounded border border-emerald-300/20 px-3 py-1.5 text-xs text-emerald-100 hover:bg-emerald-300/10">Print / save PDF</button><button type="button" onClick={() => setCompareOpen(false)} className="rounded border border-white/10 px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/5">Close</button></span>
           </div>
           <nav className="mb-4 flex items-center justify-between rounded-lg border border-white/10 bg-black/35 px-3 py-2" aria-label="Game move navigation">
@@ -431,6 +432,7 @@ export default function GhostReplay({ moment, nearMisses }: { moment: GhostMomen
               {index === 2 && <p className="mt-1 text-[10px] text-pink-300/80">Behavior prediction, not an engine evaluation.</p>}
             </div>)}
           </div>
+          <SharedEvalBar lines={lines} />
           </>}
         </section>
       </div>,
@@ -499,6 +501,7 @@ export default function GhostReplay({ moment, nearMisses }: { moment: GhostMomen
             moves={activeProgressionLine.moves.map((move) => move.san)}
             pgn={activeProgressionLine.pgn}
             flags={[]}
+            evalPoints={[]}
             playerColor={movingColor}
             maiaRating={opponentRating}
             humanRating={maiaRating}
@@ -522,4 +525,31 @@ export default function GhostReplay({ moment, nearMisses }: { moment: GhostMomen
     {sparFromProgressionFen && <div className="mt-5"><PositionSpar key={sparFromProgressionFen} fen={sparFromProgressionFen} humanColor={moment.playerColor} maiaRating={moment.opponentRating} humanRating={moment.playerRating} opponentUsername={moment.opponentUsername} effectiveRatingFires={moment.effectiveRatingFires} resolution={null} showPreviewBoard={false} autoStart /></div>}
     {showSpar && <div className="mt-5 max-w-[420px]"><PositionSpar fen={currentFen} humanColor={moment.playerColor} maiaRating={moment.opponentRating} humanRating={moment.playerRating} opponentUsername={moment.opponentUsername} effectiveRatingFires={moment.effectiveRatingFires} resolution={currentPly === moment.ply ? { gameId: moment.gameId, ply: moment.ply } : null} showPreviewBoard={false} /></div>}
   </div>;
+}
+
+function SharedEvalBar({ lines }: { lines: ReplayLine[] }) {
+  const markers = [
+    { label: "You", line: lines[0], color: "#f87171" },
+    { label: "Typical player", line: lines[2], color: "#fbbf24" },
+    { label: "Stockfish", line: lines[1], color: "#4ade80" },
+  ];
+  const position = (score: PlayerPerspectiveEval | null) => {
+    if (!score) return null;
+    const cp = score.cp ?? (score.mate === null ? null : score.mate > 0 ? 1000 : -1000);
+    return cp === null ? null : Math.max(0, Math.min(100, (Math.max(-1000, Math.min(1000, cp)) + 1000) / 2000 * 100));
+  };
+  return <section className="mt-5 rounded-xl border border-white/10 bg-black/25 p-4" aria-label="Resulting position evaluation comparison">
+    <div className="flex items-center justify-between gap-3 text-[10px] uppercase tracking-widest text-neutral-500"><span>Worse for you</span><span>Shared evaluation · from your side</span><span>Better for you</span></div>
+    <div className="relative mt-4 h-8">
+      <div className="absolute inset-x-0 top-3 h-2 rounded-full" style={{ background: "linear-gradient(90deg, #7f1d1d 0%, #292524 50%, #166534 100%)" }} />
+      <div className="absolute bottom-0 left-1/2 top-1 w-px bg-white/25" />
+      {markers.map(({ label, line, color }) => {
+        const left = position(line?.playerEval ?? null);
+        return left === null ? null : <span key={label} className="absolute top-0 z-10 h-8 w-0.5" style={{ left: `${left}%`, backgroundColor: color }} title={`${label}: ${formatPlayerEval(line?.playerEval ?? null)}`} />;
+      })}
+    </div>
+    <div className="mt-2 grid grid-cols-3 gap-2 text-[10px]">
+      {markers.map(({ label, line, color }) => <p key={label} className="truncate" style={{ color }}>{label}: {formatPlayerEval(line?.playerEval ?? null)}</p>)}
+    </div>
+  </section>;
 }

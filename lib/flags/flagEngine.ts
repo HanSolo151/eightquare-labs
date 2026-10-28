@@ -1,5 +1,6 @@
 import type { MoveFeature, PlayerProfile, WeaknessProfile, GameEval, EvalPoint, FlaggedMove } from "@/types";
 import { checkCausality } from "./causality";
+import { MATE_EQUIVALENT_CP } from "@/lib/eval/toPlayerPerspective";
 
 export const TIME_RATIO_COLLAPSE_THRESHOLD = 0.35;
 const TIME_RATIO_PARADOX_SLOW_THRESHOLD = 1.8; // "spent way more time than usual and still got it wrong"
@@ -9,8 +10,6 @@ export const MIN_CP_LOSS = 100;
 // own mate handling (see that file's comment — magnitude needs to match,
 // not the exact number). Large enough to always read as catastrophic
 // relative to any real cp score.
-const MATE_EQUIVALENT_CP = 10000;
-
 // Phase 2b: tilt cascade — a run of 2 to 4 consecutive own moves, each
 // losing at least CASCADE_PER_MOVE_MIN_CP_LOSS, that together add up to a
 // real decline (CASCADE_TOTAL_MIN_CP_LOSS). The per-move bar is

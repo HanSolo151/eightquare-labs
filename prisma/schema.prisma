@@ -25,6 +25,7 @@ model User {
   tokenExpiresAt    DateTime?
   lastSyncedAt      DateTime?
   lastGameCreatedAt DateTime? // watermark for incremental sync
+  historyBackfillComplete Boolean @default(false)
   createdAt         DateTime  @default(now())
 
   games                  Game[]

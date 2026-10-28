@@ -8,9 +8,9 @@ export async function POST(request: Request) {
   const userId = getSessionUserId(session);
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const body = await request.json().catch(() => ({})) as { force?: boolean };
+  const body = await request.json().catch(() => ({})) as { force?: boolean; skipIncremental?: boolean };
   // Keep requests without a body equivalent to the explicit manual sync.
-  const result = await runSync(userId, { force: body.force !== false });
+  const result = await runSync(userId, { force: body.force !== false, skipIncremental: body.skipIncremental === true });
   if (!result.ok) {
     return NextResponse.json(
       { error: result.error },
@@ -23,6 +23,7 @@ export async function POST(request: Request) {
     totalGames: result.totalGames,
     lastSyncedAt: result.lastSyncedAt,
     lastGameCreatedAt: result.lastGameCreatedAt,
+    historyBackfillComplete: result.historyBackfillComplete,
     skipped: result.skipped,
   });
 }

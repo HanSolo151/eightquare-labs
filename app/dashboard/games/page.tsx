@@ -1,9 +1,9 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getGamesData } from "@/lib/dashboard/getGamesData";
-
-export const instant = false;
+import DashboardPageFallback from "@/components/dashboard/DashboardPageFallback";
 
 const severityFill: Record<string, string> = {
   high: "bg-rose-400",
@@ -21,7 +21,11 @@ interface GamesPageProps {
   searchParams: Promise<{ page?: string | string[]; opening?: string | string[]; severity?: string | string[]; phase?: string | string[]; gameIds?: string | string[]; occurrences?: string | string[]; occurrenceCount?: string | string[] }>;
 }
 
-export default async function GamesPage({ searchParams }: GamesPageProps) {
+export default function GamesPage(props: GamesPageProps) {
+  return <Suspense fallback={<DashboardPageFallback />}><GamesPageContent {...props} /></Suspense>;
+}
+
+async function GamesPageContent({ searchParams }: GamesPageProps) {
   const [{ page: rawPage, opening: rawOpening, severity: rawSeverity, phase: rawPhase, gameIds: rawGameIds, occurrences: rawOccurrences, occurrenceCount: rawOccurrenceCount }, session] = await Promise.all([searchParams, auth()]);
   const userId = getSessionUserId(session);
   if (!userId) return <EmptyState title="Session unavailable" detail="Sign in again to view your saved games." />;

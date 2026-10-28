@@ -3,7 +3,7 @@
 // Lichess fetcher dependencies for local in-memory fakes.
 
 import { runSync } from "../../lib/sync/runSync";
-import { __gameCount, __reset, __seedUser, __vanityJobCount } from "./fakes/prisma";
+import { __gameCount, __gameCreatedAtRange, __reset, __seedGames, __seedUser, __vanityJobCount } from "./fakes/prisma";
 import {
   __resetSpy,
   __setNextBatch,
@@ -22,6 +22,22 @@ function check(label: string, condition: boolean, detail?: string) {
     fail++;
     console.log(`  FAIL  ${label}${detail ? `  -- ${detail}` : ""}`);
   }
+}
+
+function ratedWin(id: string, createdAt: number) {
+  return {
+    id,
+    moves: "e4 e5",
+    players: {
+      white: { user: { name: "maverick151" }, rating: 1500 },
+      black: { user: { name: `opponent-${id}` }, rating: 1490 },
+    },
+    rated: true,
+    speed: "rapid",
+    winner: "white",
+    status: "mate",
+    createdAt,
+  };
 }
 
 async function scenarioThrottle() {
@@ -184,12 +200,70 @@ async function scenarioVanityEvaluationEnqueue() {
   check("repeat sync does not duplicate queued jobs", again.ok && __vanityJobCount("u5") === 2);
 }
 
+async function scenarioSequentialHistoryBatches() {
+  console.log("\n[Scenario 6] new-account history backfill persists sequential 100-game batches");
+  __reset();
+  __resetSpy();
+  __seedUser({ id: "u6", username: "maverick151", lastSyncedAt: null, lastGameCreatedAt: null, historyBackfillComplete: false });
+  __setNextBatch(Array.from({ length: 500 }, (_, index) => ratedWin(`history-${index + 1}`, 5000 - index)));
+
+  let result = await runSync("u6", { force: true });
+  check("first batch stores 100 and reports more history", result.ok && result.synced === 100 && !result.historyBackfillComplete, JSON.stringify(result));
+  check("first request is capped at 100", fetchGamesCallLog[0]?.max === 100, JSON.stringify(fetchGamesCallLog[0]));
+  check("batch is persisted before continuing", __gameCount("u6") === 100);
+
+  // Simulate the page closing after batch one; the next page visit resumes
+  // from the oldest stored timestamp and completes the remaining batches.
+  for (let visitBatch = 0; visitBatch < 5 && result.ok && !result.historyBackfillComplete; visitBatch++) {
+    result = await runSync("u6", { force: true, skipIncremental: true });
+  }
+  check("history completes at 500 stored games", result.ok && result.historyBackfillComplete && result.totalGames === 500, JSON.stringify(result));
+  const historyCalls = fetchGamesCallLog.filter((call) => call.since === undefined);
+  check("all five history batches were requested sequentially", historyCalls.length === 5, `got ${historyCalls.length}`);
+  check("follow-up batches avoid redundant incremental requests", fetchGamesCallCount === 5, `got ${fetchGamesCallCount}`);
+  check("stored history spans newest through oldest game", JSON.stringify(__gameCreatedAtRange("u6")) === JSON.stringify({ oldest: 4501, newest: 5000 }), JSON.stringify(__gameCreatedAtRange("u6")));
+  check("history requests remain within 100 games", historyCalls.every((call) => call.max === 100), JSON.stringify(historyCalls.map((call) => call.max)));
+}
+
+async function scenarioExistingAccountBackfill() {
+  console.log("\n[Scenario 7] existing account backfill walks older than its stored watermark");
+  __reset();
+  __resetSpy();
+  __seedUser({
+    id: "u7",
+    username: "maverick151",
+    lastSyncedAt: new Date(),
+    lastGameCreatedAt: new Date(6000),
+    historyBackfillComplete: false,
+  });
+  __seedGames(Array.from({ length: 25 }, (_, index) => ({
+    userId: "u7",
+    lichessGameId: `existing-${index}`,
+    lichessCreatedAt: new Date(6000 - index),
+    moves: ["e4", "e5"],
+    rated: true,
+    result: "win",
+  })));
+  __setNextBatch(Array.from({ length: 600 }, (_, index) => ratedWin(`older-${index + 1}`, 6000 - index)));
+
+  const result = await runSync("u7", { force: true });
+  const firstRequest = fetchGamesCallLog[0];
+  const historyRequest = fetchGamesCallLog[1];
+  check("existing account stores a bounded older batch", result.ok && result.synced === 100 && result.totalGames === 125, JSON.stringify(result));
+  check("incremental request uses saved newest watermark", firstRequest?.since === 6000, JSON.stringify(firstRequest));
+  check("backfill request starts before the oldest stored game", historyRequest?.until === 5975, JSON.stringify(historyRequest));
+  check("backfill remains resumable", result.ok && !result.historyBackfillComplete);
+  check("oldest stored timestamp moved backward", __gameCreatedAtRange("u7")?.oldest === 5876, JSON.stringify(__gameCreatedAtRange("u7")));
+}
+
 (async () => {
   await scenarioThrottle();
   await scenarioForceAndWatermark();
   await scenarioThrottleRespectsForceFalseDefault();
   await scenarioConcurrentFirstSync();
   await scenarioVanityEvaluationEnqueue();
+  await scenarioSequentialHistoryBatches();
+  await scenarioExistingAccountBackfill();
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail > 0 ? 1 : 0);

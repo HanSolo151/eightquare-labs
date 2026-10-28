@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { Fragment } from "react";
+import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getPatternsData, heatmapDrilldownHref, openingDrilldownHref, weaknessPatternGamesHref, weaknessPatternTagHref } from "@/lib/patterns/getPatternsData";
-
-export const instant = false;
+import DashboardPageFallback from "@/components/dashboard/DashboardPageFallback";
 
 const PHASES = ["opening", "middlegame", "endgame"] as const;
 const SEVERITIES = ["high", "medium", "low"] as const;
@@ -15,7 +15,11 @@ const severityStyle: Record<(typeof SEVERITIES)[number], { text: string; cell: s
   low: { text: "text-sky-100", cell: "bg-sky-300" },
 };
 
-export default async function PatternsPage() {
+export default function PatternsPage() {
+  return <Suspense fallback={<DashboardPageFallback />}><PatternsPageContent /></Suspense>;
+}
+
+async function PatternsPageContent() {
   const session = await auth();
   const userId = getSessionUserId(session);
   if (!userId) return <EmptyState />;

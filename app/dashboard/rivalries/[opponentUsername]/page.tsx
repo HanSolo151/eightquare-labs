@@ -1,14 +1,20 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getRivalryDetail } from "@/lib/rivalries/getRivalryDetail";
 import BlindSpotHeatmap from "@/components/dashboard/BlindSpotHeatmap";
 import PositionSpar from "@/components/board/PositionSpar";
+import DashboardPageFallback from "@/components/dashboard/DashboardPageFallback";
 
-export const instant = false;
+type RivalryDetailPageProps = { params: Promise<{ opponentUsername: string }> };
 
-export default async function RivalryDetailPage({ params }: { params: Promise<{ opponentUsername: string }> }) {
+export default function RivalryDetailPage(props: RivalryDetailPageProps) {
+  return <Suspense fallback={<DashboardPageFallback />}><RivalryDetailPageContent {...props} /></Suspense>;
+}
+
+async function RivalryDetailPageContent({ params }: RivalryDetailPageProps) {
   const [{ opponentUsername }, session] = await Promise.all([params, auth()]);
   const userId = getSessionUserId(session);
   if (!userId) notFound();

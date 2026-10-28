@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Chess } from "chess.js";
 import type { Key } from "chessground/types";
@@ -76,6 +76,8 @@ export default function PositionSpar({
   showPreviewBoard = true,
   autoStart = false,
   showControls = true,
+  inlineSpar = false,
+  onOpenChange,
   boardClassName = "mx-auto w-full max-w-[480px] overflow-hidden rounded-lg border border-white/10 bg-[#1b1a18] p-1",
 }: {
   fen: string;
@@ -94,6 +96,8 @@ export default function PositionSpar({
   showPreviewBoard?: boolean;
   autoStart?: boolean;
   showControls?: boolean;
+  inlineSpar?: boolean;
+  onOpenChange?: (open: boolean) => void;
   boardClassName?: string;
 }) {
   const localMaia = useMaiaWorker(!inferOverride);
@@ -142,6 +146,18 @@ export default function PositionSpar({
   }) : null, [effectiveRatingFires, fen, hasOpponent, openingTree, pieceActivityProfile, tierProfiles]);
   const canMimic = hasOpponent && (tier?.tier === 1 || tier?.tier === 2);
   const displayedMode: SparMode = !userChoseMode && canMimic ? "mimic" : canMimic || sparMode === "maia" ? sparMode : "maia";
+  const modeledGameCount = Math.max(tierProfiles?.pieceActivity?.gamesEvaluated ?? 0, tierProfiles?.openingTree?.gamesEvaluated ?? 0);
+  const closeSpar = useCallback(() => {
+    sessionRef.current++;
+    assistSessionRef.current++;
+    chessRef.current = null;
+    setOpen(false);
+    onOpenChange?.(false);
+    setErrorMessage(null);
+    setAssistEnabled(false);
+    setAssistLine(null);
+    assistWasUsedRef.current = false;
+  }, [onOpenChange]);
 
   function legalDests(chess: Chess) {
     const dests = new Map<Key, Key[]>();
@@ -231,7 +247,7 @@ export default function PositionSpar({
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || inlineSpar) return;
     const previousOverflow = document.body.style.overflow;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") closeSpar();
@@ -242,7 +258,7 @@ export default function PositionSpar({
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [open, inlineSpar, closeSpar]);
 
   async function playMaia(chess: Chess, session: number) {
     const isStale = () => sessionRef.current !== session;
@@ -356,6 +372,7 @@ export default function PositionSpar({
     setResolutionMessage(null);
     resolutionAttemptedRef.current = false;
     setOpen(true);
+    onOpenChange?.(true);
     setDests(undefined);
     setStyleNotice(null);
     if (finishIfOver(chess)) return;
@@ -390,17 +407,6 @@ export default function PositionSpar({
     // autoStart is a mount-time command; do not rerun for the function's render-time identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStart]);
-
-  function closeSpar() {
-    sessionRef.current++;
-    assistSessionRef.current++;
-    chessRef.current = null;
-    setOpen(false);
-    setErrorMessage(null);
-    setAssistEnabled(false);
-    setAssistLine(null);
-    assistWasUsedRef.current = false;
-  }
 
   function onUserMove(from: Key, to: Key) {
     const chess = chessRef.current;
@@ -469,7 +475,11 @@ export default function PositionSpar({
       ) : (
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
-            <div><p className="text-sm text-neutral-100">Sparring from this position</p><p className="mt-1 text-xs text-neutral-500">You play {humanColor}; {activeSparMode === "mimic" && opponentUsername ? `Maia mimics ${opponentUsername}` : "Maia uses its baseline style"}.</p></div>
+            <div><p className="text-sm text-neutral-100">Sparring from this position</p><p className="mt-1 text-xs text-neutral-500">You play {humanColor}; {activeSparMode === "mimic" && opponentUsername ? `Maia mimics ${opponentUsername}` : "Maia uses its baseline style"}.</p>
+              {activeSparMode === "mimic" && opponentUsername && tier && tier.tier < 3
+                ? <span className="mt-2 inline-flex rounded-full border border-violet-300/25 bg-violet-300/10 px-2.5 py-1 text-[10px] text-violet-100">Modeling {opponentUsername}{modeledGameCount > 0 ? ` · ${modeledGameCount} games` : " · profile active"}</span>
+                : <span className="mt-2 inline-flex rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] text-neutral-300">Base Maia</span>}
+            </div>
             <button type="button" onClick={closeSpar} className="rounded border border-white/10 px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/5">Close</button>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
@@ -493,7 +503,52 @@ export default function PositionSpar({
         </div>
       )}
       </section>}
-      {open && typeof document !== "undefined" && createPortal(
+      {open && (inlineSpar ? (
+        <section aria-labelledby="position-spar-title" className="w-full rounded-xl border border-emerald-300/20 bg-black/35 p-3 sm:p-4">
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <h2 id="position-spar-title" className="text-base font-medium text-white">Spar from this position</h2>
+              <p className="mt-1 text-xs text-neutral-400">You play {humanColor}; {activeSparMode === "mimic" && opponentUsername ? `Maia mimics ${opponentUsername}` : "Maia uses its baseline style"}.</p>
+              {activeSparMode === "mimic" && opponentUsername && tier && tier.tier < 3
+                ? <span className="mt-2 inline-flex rounded-full border border-violet-300/25 bg-violet-300/10 px-2.5 py-1 text-[10px] text-violet-100">Modeling {opponentUsername}{modeledGameCount > 0 ? ` · ${modeledGameCount} games` : " · profile active"}</span>
+                : <span className="mt-2 inline-flex rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] text-neutral-300">Base Maia</span>}
+            </div>
+            <button type="button" onClick={closeSpar} className="shrink-0 rounded border border-white/10 px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/5">Back to game review</button>
+          </div>
+          <div className={boardClassName}>
+            <ChessgroundBoard {...boardProps}
+              ghostLayers={assistEnabled && assistLine?.fen ? [{ fen: assistLine.fen, tint: "#38bdf8", opacity: 0.58, label: "Stockfish best move" }] : undefined}
+              ghostArrows={assistEnabled && assistLine?.from && assistLine.to ? [{ from: assistLine.from, to: assistLine.to, tint: "#38bdf8", label: "Stockfish best move" }] : undefined} />
+          </div>
+          <div className="mt-3 space-y-2 text-xs">
+            <label className="flex items-center gap-2 text-neutral-300">
+              <input type="checkbox" checked={assistEnabled} onChange={(event) => {
+                const enabled = event.target.checked;
+                assistSessionRef.current++;
+                setAssistEnabled(enabled);
+                setAssistLine(null);
+                if (enabled && status === "your-turn" && chessRef.current) {
+                  void runAssist(chessRef.current.fen(), sessionRef.current, assistSessionRef.current);
+                }
+              }} />
+              Show Stockfish&apos;s best move for you
+            </label>
+            {assistEnabled && <p className="text-neutral-400">Engine assist: the blue arrow and ghost piece show Stockfish&apos;s top move for your turn. Once a hint appears, a win or draw here won&apos;t count as resolving the position.</p>}
+            {assistEnabled && assistLine && <p className="text-sky-300" aria-live="polite">Stockfish&apos;s top move for you: <strong>{assistLine.san ?? "unavailable"}</strong>{assistLine.mate !== null ? ` (mate in ${Math.abs(assistLine.mate)} ${assistLine.mate > 0 ? "for you" : "against you"})` : assistLine.cp !== null ? ` (${assistLine.cp > 0 ? "+" : ""}${(assistLine.cp / 100).toFixed(2)} pawns for you)` : ""}.</p>}
+            <p aria-live="polite" className="text-neutral-300">
+              {status === "loading-style" && "Loading opponent style locally. First-time profiling may take a while…"}
+              {status === "your-turn" && "Your move"}
+              {status === "maia-thinking" && "Maia is thinking…"}
+              {status === "error" && (errorMessage ?? "Maia could not move.")}
+              {status === "game-over" && "Game over"}
+            </p>
+            {status === "error" && <button type="button" onClick={() => chessRef.current && void playMaia(chessRef.current, sessionRef.current)} className="rounded border border-white/10 px-3 py-1.5 text-neutral-300 hover:text-white">Retry Maia</button>}
+            {status === "game-over" && <button type="button" onClick={startSpar} className="rounded border border-white/10 px-3 py-1.5 text-neutral-300 hover:text-white">Restart from position</button>}
+            {resolution && resolutionMessage && <div className="flex flex-wrap items-center gap-3 text-[11px] text-neutral-400" aria-live="polite"><span>{resolutionMessage}</span>{resolutionMessage.startsWith("Could not save") && <button type="button" onClick={() => void saveResolution(chessRef.current?.isDraw() ? "draw" : "win")} className="underline hover:text-white">Retry save</button>}</div>}
+            {styleNotice && <p className="text-[11px] leading-5 text-amber-200/80">{styleNotice}</p>}
+          </div>
+        </section>
+      ) : open && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[1000] overflow-y-auto bg-black/85 p-3 sm:p-6" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeSpar(); }}>
           <div className="mx-auto flex min-h-full max-w-3xl items-center justify-center">
             <section role="dialog" aria-modal="true" aria-labelledby="position-spar-title" className="w-full rounded-2xl border border-white/10 bg-[#11110f] p-4 shadow-2xl sm:p-6">
@@ -548,7 +603,7 @@ export default function PositionSpar({
           </div>
         </div>,
         document.body,
-      )}
+      ))}
     </>
   );
 }

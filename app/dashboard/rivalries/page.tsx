@@ -1,11 +1,15 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getRivalriesList } from "@/lib/rivalries/getRivalriesList";
+import DashboardPageFallback from "@/components/dashboard/DashboardPageFallback";
 
-export const instant = false;
+export default function RivalriesPage() {
+  return <Suspense fallback={<DashboardPageFallback />}><RivalriesPageContent /></Suspense>;
+}
 
-export default async function RivalriesPage() {
+async function RivalriesPageContent() {
   const userId = getSessionUserId(await auth());
   if (!userId) return <p className="text-sm text-neutral-400">Sign in to see your rivalries.</p>;
   const rivalries = await getRivalriesList(userId);

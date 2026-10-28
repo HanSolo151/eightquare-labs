@@ -1,4 +1,5 @@
 import type { GameEval, CausalityVerdict } from "@/types";
+import { MATE_EQUIVALENT_CP, toPlayerPerspective } from "@/lib/eval/toPlayerPerspective";
 
 const PARITY_THRESHOLD_CP = 50; // back within half a pawn counts as "recovered" — tunable, not validated
 
@@ -11,8 +12,6 @@ const PARITY_THRESHOLD_CP = 50; // back within half a pawn counts as "recovered"
 // defeat the point of surfacing them. Must stay large enough to always read
 // as "worse than any real cp score" — doesn't need to match flagEngine's
 // mate-equivalent constant exactly, just the same order of magnitude.
-const MATE_EQUIVALENT_CP = 10000;
-
 export function checkCausality(
   gameEval: GameEval,
   candidatePly: number,
@@ -68,9 +67,4 @@ export function checkCausality(
     recoveredAtPly,
     plyChecked: gameEval.points.length - 1,
   };
-}
-
-function toPlayerPerspective(cp: number, ply: number, playerColor: "white" | "black"): number {
-  const moverColor = ply % 2 === 0 ? "white" : "black";
-  return moverColor === playerColor ? cp : -cp;
 }

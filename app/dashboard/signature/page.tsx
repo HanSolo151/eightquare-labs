@@ -1,5 +1,6 @@
 /** Signature overview: account metrics, tempo, openings, patterns, and recent flags. */
 import Link from "next/link";
+import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { getSessionUserId, getSessionPlan } from "@/lib/auth/session";
 import { getDashboardData } from "@/lib/dashboard/getDashboardData";
@@ -11,9 +12,14 @@ import PatternProgress from "@/components/dashboard/PatternProgress";
 import SignatureShareCard from "@/components/dashboard/SignatureShareCard";
 import OpeningFingerprint from "@/components/dashboard/OpeningFingerprint";
 import EarlyRead from "@/components/dashboard/EarlyRead";
-import { getAmbientPaceAggregate, getPatternProgressDeltas, getSelfCpLossTrend } from "@/lib/dashboard/getSignatureSignals";
-
-export const instant = false;
+import NemesisSquare from "@/components/dashboard/NemesisSquare";
+import MostExpensiveMove from "@/components/dashboard/MostExpensiveMove";
+import PersonalRecords from "@/components/dashboard/PersonalRecords";
+import ComebackIndex from "@/components/dashboard/ComebackIndex";
+import BlunderHour from "@/components/dashboard/BlunderHour";
+import OpeningBreadth from "@/components/dashboard/OpeningBreadth";
+import DashboardPageFallback from "@/components/dashboard/DashboardPageFallback";
+import { getAmbientPaceAggregate, getBlunderHourStats, getComebackIndex, getMostExpensiveMove, getOpeningBreadth, getPatternProgressDeltas, getPersonalRecords, getSelfCpLossTrend } from "@/lib/dashboard/getSignatureSignals";
 
 const PHASES = ["opening", "middlegame", "endgame"] as const;
 const severityClass: Record<string, string> = {
@@ -31,10 +37,14 @@ function formatDate(date: Date | null) {
   return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
-export default async function SignaturePage() {
+export default function SignaturePage() {
+  return <Suspense fallback={<DashboardPageFallback />}><SignaturePageContent /></Suspense>;
+}
+
+async function SignaturePageContent() {
   const session = await auth();
   const userId = getSessionUserId(session);
-  const [data, totalGames, openingGames, biasData, patternProgress, ambientPace, cpLossTrend] = await Promise.all([
+  const [data, totalGames, openingGames, biasData, patternProgress, ambientPace, cpLossTrend, mostExpensiveMove, personalRecords, comebackIndex, blunderHour, openingBreadth] = await Promise.all([
     userId ? getDashboardData(userId) : Promise.resolve(null),
     userId ? prisma.game.count({ where: { userId } }) : Promise.resolve(0),
     userId ? prisma.game.count({ where: { userId, openingName: { not: null } } }) : Promise.resolve(0),
@@ -42,7 +52,15 @@ export default async function SignaturePage() {
     userId ? getPatternProgressDeltas(userId) : Promise.resolve([]),
     userId ? getAmbientPaceAggregate(userId) : Promise.resolve(null),
     userId ? getSelfCpLossTrend(userId) : Promise.resolve(null),
+    userId ? getMostExpensiveMove(userId) : Promise.resolve(null),
+    userId ? getPersonalRecords(userId) : Promise.resolve({ biggestComeback: null, longestWin: null, bestWinVsHigherRated: null }),
+    userId ? getComebackIndex(userId) : Promise.resolve({ comebackWinCount: 0, totalWinCount: 0, evaluatedWinCount: 0, comebackShare: 0 }),
+    userId ? getBlunderHourStats(userId) : Promise.resolve({ byHour: [], worstHour: null, bestHour: null, overallFlagsPerGame: 0 }),
+    userId ? getOpeningBreadth(userId) : Promise.resolve({ distinctEcoCount: 0, gamesWithEco: 0, gamesWithoutEco: 0 }),
   ]);
+  const hasNemesisSignal = Boolean(
+    biasData?.meetsThreshold && biasData.squares.blunderDensity.some((square) => square.flaggedCount >= 3)
+  );
 
   return (
     <div className="space-y-8 pb-12">
@@ -82,6 +100,16 @@ export default async function SignaturePage() {
             <h2 className="mb-4 text-lg font-medium">Blind spot heatmap</h2>
             <BlindSpotHeatmap data={biasData} />
           </section>}
+          {(hasNemesisSignal || mostExpensiveMove) && <div className={`grid gap-5 ${hasNemesisSignal && mostExpensiveMove ? "xl:grid-cols-2" : ""}`}>
+            {hasNemesisSignal && biasData && <NemesisSquare data={biasData} />}
+            <MostExpensiveMove move={mostExpensiveMove} />
+          </div>}
+          <PersonalRecords records={personalRecords} />
+          <div className="grid gap-5 xl:grid-cols-2">
+            <ComebackIndex data={comebackIndex} />
+            <BlunderHour data={blunderHour} />
+          </div>
+          <OpeningBreadth data={openingBreadth} />
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Metric label="Games in archive" value={data.totalGames.toLocaleString()} note="Synced to your account" />
             <Metric label="Evaluated" value={data.evaluatedGames.toLocaleString()} note={`${data.unevaluatedGames} waiting for analysis`} />

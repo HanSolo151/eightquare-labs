@@ -10,6 +10,7 @@ export type SyncResult =
       totalGames: number;
       lastSyncedAt: Date;
       lastGameCreatedAt: Date | null;
+      historyBackfillComplete: boolean;
       skipped: boolean;
     }
   | { ok: false; error: string };
@@ -17,14 +18,42 @@ export type SyncResult =
 // Passive page loads are throttled so repeated dashboard visits don't
 // repeatedly call Lichess. Explicit sync requests can bypass this interval.
 const MIN_SYNC_INTERVAL_MS = 60 * 1000;
+const SYNC_PAGE_SIZE = 200;
+const HISTORY_BACKFILL_BATCH_SIZE = 100;
+const USER_HISTORY_TARGET = 500;
+
+async function fetchGamePages(opts: {
+  username: string;
+  maxGames: number | null;
+  since?: number;
+  until?: number;
+}) {
+  const games: Awaited<ReturnType<typeof fetchGames>> = [];
+  let until = opts.until;
+  while (opts.maxGames === null || games.length < opts.maxGames) {
+    const remaining = opts.maxGames === null ? SYNC_PAGE_SIZE : opts.maxGames - games.length;
+    const pageSize = Math.min(SYNC_PAGE_SIZE, remaining);
+    if (pageSize <= 0) break;
+    const page = await fetchGames({ username: opts.username, max: pageSize, since: opts.since, until });
+    games.push(...page);
+    if (page.length < pageSize) break;
+
+    const timestamps = page.map((game) => game.createdAt).filter((value): value is number => Number.isFinite(value));
+    if (timestamps.length !== page.length) throw new Error("Cannot safely paginate Lichess games without a createdAt timestamp on every game");
+    const oldestTimestamp = Math.min(...timestamps);
+    if ((opts.since !== undefined && oldestTimestamp <= opts.since) || (until !== undefined && oldestTimestamp >= until)) break;
+    until = oldestTimestamp - 1;
+  }
+  return games;
+}
 
 /**
  * Incremental Lichess -> Game table sync for one user.
- * Shared by POST /api/sync and the dashboard server component.
+ * Called by POST /api/sync; the client chains short requests during backfill.
  */
 export async function runSync(
   userId: string,
-  opts: { force?: boolean } = {}
+  opts: { force?: boolean; skipIncremental?: boolean } = {}
 ): Promise<SyncResult> {
   try {
     const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -40,29 +69,43 @@ export async function runSync(
           totalGames,
           lastSyncedAt: user.lastSyncedAt,
           lastGameCreatedAt: user.lastGameCreatedAt,
+          historyBackfillComplete: user.historyBackfillComplete,
           skipped: true,
         };
       }
     }
 
     const since = user.lastGameCreatedAt?.getTime();
-    const pageSize = since ? 200 : 25;
     const raw: Awaited<ReturnType<typeof fetchGames>> = [];
-    let until: number | undefined;
+    const existingGameCount = await prisma.game.count({ where: { userId: user.id } });
+    let backfillComplete = user.historyBackfillComplete;
 
-    // Lichess returns newest games first. A fixed 200-game incremental
-    // request must not advance the watermark past older games in that same
-    // window. Walk backward with `until` until the page is short, then only
-    // advance the watermark to the newest timestamp seen across all pages.
-    while (true) {
-      const page = await fetchGames({ username: user.username, max: pageSize, since, until });
-      raw.push(...page);
-      if (!since || page.length < pageSize) break;
-      const timestamps = page.map((game) => game.createdAt).filter((value): value is number => Number.isFinite(value));
-      if (timestamps.length !== page.length) throw new Error("Cannot safely paginate Lichess games without a createdAt timestamp on every game");
-      const oldestTimestamp = Math.min(...timestamps);
-      if (oldestTimestamp <= since || (until !== undefined && oldestTimestamp >= until)) break;
-      until = oldestTimestamp;
+    // Catch up on new games first. Historical imports are limited to one
+    // 100-game batch per request so the UI can show progress between batches.
+    if (since !== undefined && !opts.skipIncremental) {
+      raw.push(...await fetchGamePages({ username: user.username, maxGames: null, since }));
+    }
+
+    if (!backfillComplete) {
+      const remainingHistory = Math.max(0, USER_HISTORY_TARGET - existingGameCount - raw.length);
+      if (remainingHistory === 0) {
+        backfillComplete = true;
+      } else {
+        const batchSize = Math.min(HISTORY_BACKFILL_BATCH_SIZE, remainingHistory);
+        const oldestStoredGame = existingGameCount > 0 ? await prisma.game.findFirst({
+          where: { userId: user.id, lichessCreatedAt: { not: null } },
+          orderBy: { lichessCreatedAt: "asc" },
+          select: { lichessCreatedAt: true },
+        }) : null;
+        const until = oldestStoredGame?.lichessCreatedAt?.getTime();
+        const history = await fetchGamePages({
+          username: user.username,
+          maxGames: batchSize,
+          until: until === undefined ? undefined : until - 1,
+        });
+        raw.push(...history);
+        backfillComplete = history.length < batchSize || existingGameCount + raw.length >= USER_HISTORY_TARGET;
+      }
     }
     const games = parseGames(raw, user.username);
 
@@ -118,10 +161,17 @@ export async function runSync(
       data: {
         lastSyncedAt,
         lastGameCreatedAt: newestTimestamp ? new Date(newestTimestamp) : undefined,
+        historyBackfillComplete: backfillComplete,
       },
       select: { lastGameCreatedAt: true },
     });
     const totalGames = await prisma.game.count({ where: { userId: user.id } });
+
+    if (insertedCount === 0 && !backfillComplete) {
+      // Avoid retrying the same unparseable/duplicate page forever.
+      backfillComplete = true;
+      await prisma.user.update({ where: { id: user.id }, data: { historyBackfillComplete: true } });
+    }
 
     return {
       ok: true,
@@ -129,6 +179,7 @@ export async function runSync(
       totalGames,
       lastSyncedAt,
       lastGameCreatedAt: updatedUser.lastGameCreatedAt,
+      historyBackfillComplete: backfillComplete,
       skipped: false,
     };
   } catch (err) {

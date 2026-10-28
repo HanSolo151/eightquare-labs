@@ -11,6 +11,7 @@
     "test:ingest-bigshots-smoke": "tsx scripts/test-ingest-bigshots-smoke.ts",
     "test:matching-unit": "tsx scripts/test-matching-unit.ts",
     "test:matching-gates": "tsx scripts/test-matching-gates.ts",
+    "test:sync-verify": "tsx --tsconfig scripts/sync-verify/tsconfig.json scripts/sync-verify/test.ts",
     "start": "next start",
     "lint": "eslint",
     "rotate:oauth-tokens": "tsx scripts/rotateOAuthTokens.ts",

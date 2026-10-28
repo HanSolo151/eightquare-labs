@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getSessionUserId } from "@/lib/auth/session";
@@ -6,8 +7,8 @@ import { prisma } from "@/lib/prisma";
 import { isStyleVector, PHASES, type MatchPhase, type PhaseVectorCalibration, type StyleVector, type VectorCalibration } from "@/lib/matching/vectorSchema";
 import WinsAnalysis, { type WinAnalysisGame } from "@/components/dashboard/WinsAnalysis";
 import type { EvalPoint } from "@/types";
+import DashboardPageFallback from "@/components/dashboard/DashboardPageFallback";
 
-export const instant = false;
 const PAGE_SIZE = 10;
 
 function jsonNumberArray(value: unknown): number[] | null {
@@ -28,7 +29,11 @@ function readEvalPoints(value: unknown): EvalPoint[] {
   });
 }
 
-export default async function WinsPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+export default function WinsPage(props: { searchParams: Promise<{ page?: string }> }) {
+  return <Suspense fallback={<DashboardPageFallback />}><WinsPageContent {...props} /></Suspense>;
+}
+
+async function WinsPageContent({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const [session, query] = await Promise.all([auth(), searchParams]);
   const userId = getSessionUserId(session);
   if (!userId) redirect("/login");

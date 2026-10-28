@@ -1,13 +1,19 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getOpeningDrilldown } from "@/lib/openings/getOpeningDrilldown";
 import { OpeningDrilldownClient } from "@/components/dashboard/OpeningDrilldownClient";
+import DashboardPageFallback from "@/components/dashboard/DashboardPageFallback";
 
-export const instant = false;
+type OpeningDrilldownPageProps = { params: Promise<{ eco: string }> };
 
-export default async function OpeningDrilldownPage({ params }: { params: Promise<{ eco: string }> }) {
+export default function OpeningDrilldownPage(props: OpeningDrilldownPageProps) {
+  return <Suspense fallback={<DashboardPageFallback />}><OpeningDrilldownPageContent {...props} /></Suspense>;
+}
+
+async function OpeningDrilldownPageContent({ params }: OpeningDrilldownPageProps) {
   const [{ eco }, session] = await Promise.all([params, auth()]);
   const userId = getSessionUserId(session);
   if (!userId) notFound();
