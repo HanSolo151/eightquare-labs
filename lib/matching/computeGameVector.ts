@@ -4,6 +4,7 @@ import { emptyPieceActivityProfile, updatePieceActivityProfile } from "@/lib/pro
 import type { EvalPoint, GameEval, ParsedGame, PieceType } from "@/types";
 import { MATCHING_CONFIG } from "@/config/matching";
 import { PHASES, VECTOR_DIMENSIONS, type MatchPhase, type StyleVector, type VectorCalibration } from "./vectorSchema";
+import { detectMaterialSacrifices } from "@/lib/style/sacrificeDetector";
 
 const PIECE_VALUE: Record<PieceType, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const KING_ZONE_WEIGHT: Record<PieceType, number> = { p: 0, n: 1, b: 1, r: 2, q: 3, k: 0 };
@@ -17,6 +18,7 @@ type PhaseMetrics = Record<MatchPhase, StyleVector | null>;
 type PhaseDiagnostics = Record<MatchPhase, {
   kingZoneAttackers: number | null;
   materialAcceptedLosses: number[];
+  materialSacrifices: { evaluatedEvents: number; compensated: number; blunders: number; uncertain: number; compensationRate: number | null };
   kingShieldDeltas: number[];
   pawnStructure: { openOrHalfOpenFiles: number; centralPawnTension: number; bucket: number } | null;
   evalDeltaSamples: number[];
@@ -79,6 +81,7 @@ export function computeGameVectorDetails(
     }),
   ])) as Record<MatchPhase, StyleMoment[]>;
   const pointsByPly = new Map(evaluation.points.map((point) => [point.ply, point]));
+  const sacrificeEvents = detectMaterialSacrifices(game, evaluation);
   const vectors = {} as PhaseMetrics;
   const diagnostics = {} as PhaseDiagnostics;
 
@@ -88,7 +91,9 @@ export function computeGameVectorDetails(
     if (moments.length === 0 || phasePlies.length === 0) {
       vectors[phase] = null;
       diagnostics[phase] = {
-        kingZoneAttackers: null, materialAcceptedLosses: [], kingShieldDeltas: [],
+        kingZoneAttackers: null, materialAcceptedLosses: [],
+        materialSacrifices: { evaluatedEvents: 0, compensated: 0, blunders: 0, uncertain: 0, compensationRate: null },
+        kingShieldDeltas: [],
         pawnStructure: null, evalDeltaSamples: [],
       };
       continue;
@@ -107,6 +112,11 @@ export function computeGameVectorDetails(
     const pawnStructure = pawnStructureMetricsAt(new Chess(fenBefore[midpointPly]));
     const evalDeltas = computeEvalDeltas(phasePlies, pointsByPly);
     const evalVolatility = standardDeviation(evalDeltas);
+    const phaseSacrifices = sacrificeEvents.filter((event) => phaseForPly(event.ply) === phase);
+    const compensated = phaseSacrifices.filter((event) => event.outcome === "compensated").length;
+    const blunders = phaseSacrifices.filter((event) => event.outcome === "blunder").length;
+    const uncertain = phaseSacrifices.filter((event) => event.outcome === "uncertain").length;
+    const decisiveSacrificeCount = compensated + blunders;
 
     const raw: StyleVector = {
       materialAggression: mean(materialAggression),
@@ -122,6 +132,13 @@ export function computeGameVectorDetails(
     diagnostics[phase] = {
       kingZoneAttackers: mean(kingZoneCounts),
       materialAcceptedLosses: materialAggression,
+      materialSacrifices: {
+        evaluatedEvents: phaseSacrifices.length,
+        compensated,
+        blunders,
+        uncertain,
+        compensationRate: decisiveSacrificeCount > 0 ? compensated / decisiveSacrificeCount : null,
+      },
       kingShieldDeltas: shieldDeltas,
       pawnStructure,
       evalDeltaSamples: evalDeltas,

@@ -470,12 +470,12 @@ export async function getPatternProgressDeltas(userId: string): Promise<PatternP
   return deltas;
 }
 
-/** Retrospective count of this month's per-game pace-collapse signals. */
+/** Retrospective count of this month's multi-move evaluation-loss runs. */
 export async function getAmbientPaceAggregate(userId: string, now = new Date()): Promise<AmbientPaceAggregate | null> {
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const rows = await prisma.flaggedMove.findMany({
     where: {
-      flagType: "tilt_cascade",
+      flagType: { in: ["tilt_cascade", "evaluation_cascade"] },
       game: { userId, lichessCreatedAt: { gte: monthStart } },
     },
     select: { gameId: true, gamePhase: true, game: { select: { openingName: true } } },

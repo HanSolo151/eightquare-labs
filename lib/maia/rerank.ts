@@ -15,8 +15,9 @@
 //   file is now the ONLY place legality is enforced — baseTopMove and
 //   topMove below are both guaranteed legal. If you call the worker
 //   directly elsewhere, its output is still NOT legality-checked.
-// - Opening-book boosting reads a real per-opponent OpeningTree, gated on
-//   at least MIN_OCCURRENCES observations for the candidate move.
+// - Opponent-level style rates are weak priors and are shrunk toward neutral.
+// - Opening choices use a Maia-prior/empirical-frequency blend. Piece usage
+//   shares are intentionally excluded: they do not predict a specific move.
 
 import { Chess } from "chess.js";
 import { loadMoveVocab } from "./moveVocab";
@@ -24,7 +25,7 @@ import { mirrorUci } from "./boardToTensor";
 import { openingBookPosition, MIN_OCCURRENCES, OPENING_BOOST_CAP } from "../profile/openingTree";
 import { evalFen } from "../eval/stockfishEngine";
 import type { OpponentFeatures } from "../lichess/opponentFeatures";
-import type { OpeningTree, PieceActivityProfile, PieceType } from "@/types";
+import type { OpeningTree } from "@/types";
 
 export interface RerankedMove {
   uci: string;
@@ -51,28 +52,20 @@ export interface RerankResult {
 
 const SAFETY_CP_LOSS_THRESHOLD = 150;
 
-function moverCpFromResult(result: { cp: number | null; mate: number | null }): number {
-  if (result.cp !== null) return -result.cp;
-  if (result.mate !== null) return result.mate > 0 ? -10000 : 10000;
-  return 0;
+function moverCpFromResult(result: { cp: number | null; mate: number | null }): number | null {
+  if (result.cp !== null && Number.isFinite(result.cp)) return -result.cp;
+  if (result.mate !== null && Number.isFinite(result.mate)) return result.mate > 0 ? -10000 : 10000;
+  return null;
 }
 
 // Arbitrary judgment-call constants, same spirit as Step 4's flag thresholds
 // and Step 8's aggression-index weights — not validated against anything,
 // flagged for later tuning once Step 10's replay loop makes behavior visible.
-const QUEEN_TRADE_BOOST_STRENGTH = 1.5; // multiplier scale on (tradeRate - baseline), now piece/phase-scoped
-const TRADE_RATE_BASELINE = 0.5;        // "coin flip" baseline for whether this piece trades off in this phase
-const AGGRESSION_BOOST_STRENGTH = 1.5;
-const MIN_BOOST_FACTOR = 0.1;           // clamp so boosts can't zero out or invert a move's rank
-
-// Piece-activity preference boost; unlike capture/check boosts, this can
-// also favor quiet moves associated with a particular piece type.
-const PIECE_BOOST_STRENGTH = 1.5;
-const POPULATION_PIECE_SHARE_BASELINE: Record<"opening" | "middlegame" | "endgame", Record<PieceType, number>> = {
-  opening: { p: 0.45, n: 0.18, b: 0.13, r: 0.03, q: 0.04, k: 0.17 },
-  middlegame: { p: 0.3, n: 0.15, b: 0.13, r: 0.15, q: 0.12, k: 0.15 },
-  endgame: { p: 0.25, n: 0.08, b: 0.08, r: 0.2, q: 0.09, k: 0.3 },
-};
+const QUEEN_TRADE_BOOST_STRENGTH = 0.5;
+const AGGRESSION_BOOST_STRENGTH = 0.5;
+const MIN_BOOST_FACTOR = 0.25;
+const PROFILE_PRIOR_GAMES = 20;
+const OPENING_PRIOR_STRENGTH = 5;
 const ENDGAME_MATERIAL_FRACTION = 0.5;
 const FULL_MATERIAL = 78;
 const OPENING_END_MOVE = 12;
@@ -91,32 +84,13 @@ export function gamePhaseFromFen(chess: Chess): "opening" | "middlegame" | "endg
   return "middlegame";
 }
 
-function softmax(logits: Float32Array): Float64Array {
-  let maxVal = -Infinity;
-  for (let i = 0; i < logits.length; i++) {
-    if (!Number.isFinite(logits[i])) throw new Error(`Maia returned a non-finite logit at index ${i}`);
-    if (logits[i] > maxVal) maxVal = logits[i];
-  }
-  let sum = 0;
-  const out = new Float64Array(logits.length);
-  for (let i = 0; i < logits.length; i++) {
-    const e = Math.exp(logits[i] - maxVal);
-    out[i] = e;
-    sum += e;
-  }
-  for (let i = 0; i < logits.length; i++) out[i] /= sum;
-  return out;
-}
-
 export async function rerankMoves(params: {
   fen: string;
   logitsMaia: Float32Array;
   opponentFeatures: OpponentFeatures;
-  pieceActivityProfile?: PieceActivityProfile | null;
   openingTree?: OpeningTree | null;
 }): Promise<RerankResult> {
-  const { fen, logitsMaia, pieceActivityProfile, openingTree } = params;
-  void params.opponentFeatures;
+  const { fen, logitsMaia, opponentFeatures, openingTree } = params;
 
   const vocab = await loadMoveVocab(); // throws if not exactly 1880 entries, per moveVocab.ts
   if (logitsMaia.length !== vocab.length) {
@@ -129,14 +103,11 @@ export async function rerankMoves(params: {
   const chess = new Chess(fen);
   const mirrorMoves = chess.turn() === "b";
   const legalMoves = chess.moves({ verbose: true });
-  const currentPhase = gamePhaseFromFen(chess);
   const openingPosition = openingBookPosition(openingTree, fen);
-  let playerPhaseTotalMoves = 0;
-  if (pieceActivityProfile) {
-    for (const pieceType of ["p", "n", "b", "r", "q", "k"] as const) {
-      playerPhaseTotalMoves += pieceActivityProfile.byPieceType[pieceType][currentPhase].moveCount;
-    }
-  }
+  // Shrink sparse profiles toward a neutral population prior instead of
+  // allowing a handful of games to swing the move distribution sharply.
+  const profileReliability = Math.max(0, opponentFeatures.gamesAnalyzed) /
+    (Math.max(0, opponentFeatures.gamesAnalyzed) + PROFILE_PRIOR_GAMES);
 
   if (legalMoves.length === 0) {
     // Game over (checkmate/stalemate) at this FEN — nothing to rerank.
@@ -159,21 +130,26 @@ export async function rerankMoves(params: {
     legalByUci.set(mirrorMoves ? mirrorUci(uci) : uci, m);
   }
 
-  const probs = softmax(logitsMaia);
-
-  // Sum raw softmax probability mass over legal moves only, so we can
-  // renormalize Maia's output to a proper distribution over LEGAL moves —
-  // this also throws out (and documents, via baseTopMove's legality guarantee)
-  // any probability mass Maia put on illegal moves.
-  let legalProbSum = 0;
+  let maxLegalLogit = -Infinity;
   for (let i = 0; i < vocab.length; i++) {
-    if (legalByUci.has(vocab[i])) legalProbSum += probs[i];
+    if (!Number.isFinite(logitsMaia[i])) throw new Error(`Maia returned a non-finite logit at index ${i}`);
+    if (legalByUci.has(vocab[i]) && logitsMaia[i] > maxLegalLogit) maxLegalLogit = logitsMaia[i];
   }
-  if (legalProbSum === 0) {
-    // Degenerate case: Maia's distribution put ~zero mass on every legal
-    // move (shouldn't happen in practice, but don't divide by zero).
-    legalProbSum = 1e-12;
+  if (!Number.isFinite(maxLegalLogit)) throw new Error("Maia move vocabulary has no legal move for this position");
+
+  const legalExpByUci = new Map<string, number>();
+  let legalExpSum = 0;
+  for (let i = 0; i < vocab.length; i++) {
+    if (!legalByUci.has(vocab[i])) continue;
+    const weight = Math.exp(logitsMaia[i] - maxLegalLogit);
+    legalExpByUci.set(vocab[i], weight);
+    legalExpSum += weight;
   }
+  if (!(legalExpSum > 0) || !Number.isFinite(legalExpSum)) throw new Error("Maia legal-move logits could not be normalized");
+
+  // This is Maia's conditional distribution over legal moves. Illegal logits
+  // are excluded before normalization and cannot cause legal weights to
+  // underflow to zero.
 
   const results: RerankedMove[] = [];
   let anyOpeningBoostApplied = false;
@@ -185,7 +161,7 @@ export async function rerankMoves(params: {
 
     const uci = m.from + m.to + (m.promotion ?? "");
 
-    const baseProbability = probs[i] / legalProbSum;
+    const baseProbability = (legalExpByUci.get(modelUci) ?? 0) / legalExpSum;
 
     const isCapture = !!m.captured;
     const isQueenCapture = m.captured === "q";
@@ -193,43 +169,33 @@ export async function rerankMoves(params: {
 
     let boost = 1;
 
-    // Trade and aggression signals now come from the opponent's per-piece,
-    // per-phase PieceActivityProfile. Low-confidence profiles contribute no
-    // boost for this signal.
-    const pieceBucketForTrade =
-      pieceActivityProfile && pieceActivityProfile.confidence !== "low"
-        ? pieceActivityProfile.byPieceType[m.piece as PieceType][currentPhase]
-        : null;
-    const tradeRate =
-      pieceBucketForTrade && pieceBucketForTrade.moveCount > 0
-        ? pieceBucketForTrade.tradeInitiatedCount / pieceBucketForTrade.moveCount
-        : null;
-
-    if (tradeRate !== null && isQueenCapture) {
-      boost *= 1 + (tradeRate - TRADE_RATE_BASELINE) * QUEEN_TRADE_BOOST_STRENGTH;
+    // Opponent-level rates are weak priors, not move-conditioned evidence;
+    // shrink and cap them. Piece-usage shares are omitted because global
+    // piece frequency does not establish a preference between legal moves.
+    if (opponentFeatures.gamesAnalyzed >= 5 && (isCapture || isCheck)) {
+      const aggression = Math.max(0, Math.min(1, opponentFeatures.aggressionIndex));
+      boost *= 1 + (aggression - 0.35) * AGGRESSION_BOOST_STRENGTH * profileReliability;
     }
-    if (tradeRate !== null && (isCapture || isCheck)) {
-      boost *= 1 + (tradeRate - TRADE_RATE_BASELINE) * AGGRESSION_BOOST_STRENGTH;
-    }
-
-    if (pieceActivityProfile && playerPhaseTotalMoves >= 5) {
-      const pieceType = m.piece as PieceType;
-      const bucket = pieceActivityProfile.byPieceType[pieceType][currentPhase];
-      const playerShare = bucket.moveCount / playerPhaseTotalMoves;
-      const populationShare = POPULATION_PIECE_SHARE_BASELINE[currentPhase][pieceType];
-      boost *= 1 + (playerShare - populationShare) * PIECE_BOOST_STRENGTH;
+    if (opponentFeatures.gamesAnalyzed >= 5 && isQueenCapture) {
+      const queenTradeRate = Math.max(0, Math.min(1, opponentFeatures.queenTradeRate));
+      boost *= 1 + (queenTradeRate - 0.5) * QUEEN_TRADE_BOOST_STRENGTH * profileReliability;
     }
 
     let openingMatchCount: number | null = null;
     let openingTotalCount: number | null = null;
-    if (openingPosition) {
+    if (openingPosition && openingPosition.total >= MIN_OCCURRENCES) {
       const matchCount = openingPosition.byUci[uci] ?? 0;
+      // Empirical-Bayes blend: observed choices contribute counts while
+      // Maia's legal-move distribution supplies five prior observations.
+      // Every legal candidate is updated, so unobserved alternatives are
+      // treated as evidence too rather than left untouched.
+      const posteriorProbability = (matchCount + OPENING_PRIOR_STRENGTH * baseProbability) /
+        (openingPosition.total + OPENING_PRIOR_STRENGTH);
+      boost *= Math.min(OPENING_BOOST_CAP, posteriorProbability / Math.max(baseProbability, 1e-12));
+      anyOpeningBoostApplied = true;
       if (matchCount >= MIN_OCCURRENCES) {
-        const share = matchCount / openingPosition.total;
-        boost *= Math.min(OPENING_BOOST_CAP, 1 + share * (OPENING_BOOST_CAP - 1));
         openingMatchCount = matchCount;
         openingTotalCount = openingPosition.total;
-        anyOpeningBoostApplied = true;
       }
     }
 
@@ -263,8 +229,7 @@ export async function rerankMoves(params: {
   if (
     topCandidate &&
     baseTopMove &&
-    topCandidate.uci !== baseTopMove.uci &&
-    (topCandidate.isCapture || topCandidate.isCheck)
+    topCandidate.uci !== baseTopMove.uci
   ) {
     safetyChecked = true;
     try {
@@ -278,7 +243,8 @@ export async function rerankMoves(params: {
       ]);
       const boostedMoverCp = moverCpFromResult(boostedEval);
       const baseMoverCp = moverCpFromResult(baseEval);
-      if (boostedMoverCp < baseMoverCp - SAFETY_CP_LOSS_THRESHOLD) {
+      if (boostedMoverCp === null || baseMoverCp === null ||
+          boostedMoverCp < baseMoverCp - SAFETY_CP_LOSS_THRESHOLD) {
         safetyDowngraded = true;
         topCandidate = baseTopMove;
       }

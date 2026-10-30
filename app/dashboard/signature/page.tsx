@@ -196,7 +196,7 @@ async function SignaturePageContent() {
           <PatternProgress items={patternProgress} />
 
           {ambientPace && <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
-            <SectionHeading eyebrow="Ambient pace · this month (UTC)" title="A recurring pace-collapse pattern" detail="Retrospective signal from evaluated games, grouped by opening and phase. It is not a live-game warning." />
+            <SectionHeading eyebrow="Evaluation runs · this month (UTC)" title="Recurring multi-move evaluation losses" detail="Retrospective signal from evaluated games, grouped by opening and phase. It does not infer tilt or decision-making from the clock." />
             <p className="mt-4 text-sm text-neutral-200">Seen in <strong className="font-semibold text-emerald-200">{ambientPace.gameCount} games</strong>, most often in {ambientPace.openingName} during the {ambientPace.phase}.</p>
           </section>}
         </>

@@ -21,6 +21,7 @@
 
 import { rerankMoves } from "../lib/maia/rerank";
 import { loadMoveVocab } from "../lib/maia/moveVocab";
+import { emptyOpeningTree, openingFenKey } from "../lib/profile/openingTree";
 import type { OpponentFeatures } from "../lib/lichess/opponentFeatures";
 
 // loadMoveVocab() does a `fetch("/data/move_vocab.json")`, which assumes a
@@ -192,6 +193,16 @@ async function main() {
     const e4 = result.moves.find((m) => m.uci === "e2e4");
     console.log(`PASS (informational) — e2e4 present, adjustedProbability=${e4?.adjustedProbability.toFixed(4)}`);
     printRanking("Illegal-move exclusion test", result.moves, 3);
+
+    const vocab = await loadMoveVocab();
+    const underflowLogits = new Float32Array(vocab.length).fill(-1_000);
+    underflowLogits[vocab.indexOf("a1a8")] = 1_000;
+    const stable = await rerankMoves({ fen, logitsMaia: underflowLogits, opponentFeatures: opponent });
+    const stableSum = stable.moves.reduce((sum, move) => sum + move.baseProbability, 0);
+    const stablePass = stable.moves.length === 20 && Math.abs(stableSum - 1) < 1e-6 &&
+      stable.moves.every((move) => move.baseProbability > 0);
+    console.log(`${stablePass ? "PASS" : "FAIL"} — legal-only normalization survives a dominant illegal logit without zeroing legal probabilities`);
+    if (!stablePass) process.exitCode = 1;
   }
 
   console.log("\n=== Test 4: Checkmate position — zero legal moves, no crash ===");
@@ -221,20 +232,30 @@ async function main() {
     }
   }
 
-  console.log("\n=== Test 6: openingBoostApplied is always false (documented stub, not silently faked) ===");
+  console.log("\n=== Test 6: training opening choices receive a smoothed Maia-prior update ===");
   {
     const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     const logits = await fakeLogits([]);
-    const opponent = fakeOpponent({
-      mostCommonOpenings: [{ name: "Italian Game", eco: "C50", count: 10 }],
-    });
-    const result = await rerankMoves({ fen, logitsMaia: logits, opponentFeatures: opponent });
-    const pass = result.openingBoostApplied === false;
-    console.log(`${pass ? "PASS" : "FAIL"} — openingBoostApplied === false even with opening data present on OpponentFeatures`);
+    const openingTree = emptyOpeningTree("opening-test");
+    openingTree.positions[openingFenKey(fen)] = { e2e4: 5, d2d4: 1 };
+    const result = await rerankMoves({ fen, logitsMaia: logits, opponentFeatures: fakeOpponent({}), openingTree });
+    const e4 = result.moves.find((move) => move.uci === "e2e4");
+    const pass = result.openingBoostApplied && !!e4 && e4.adjustedProbability > e4.baseProbability &&
+      Math.abs(result.moves.reduce((sum, move) => sum + move.adjustedProbability, 0) - 1) < 1e-6;
+    console.log(`${pass ? "PASS" : "FAIL"} — observed opening moves get a bounded posterior update and probabilities remain normalized`);
     if (!pass) process.exitCode = 1;
   }
 
-  console.log("\n=== Test 7: Black-to-move logits map back from Maia's canonical orientation ===");
+  console.log("\n=== Test 7: en-passant state separates otherwise identical board keys ===");
+  {
+    const withEnPassant = openingFenKey("8/8/8/3pP3/8/8/8/8 w - d6 0 1");
+    const withoutEnPassant = openingFenKey("8/8/8/3pP3/8/8/8/8 w - - 0 1");
+    const pass = withEnPassant !== withoutEnPassant;
+    console.log(`${pass ? "PASS" : "FAIL"} — en-passant availability is represented in the opening-position key`);
+    if (!pass) process.exitCode = 1;
+  }
+
+  console.log("\n=== Test 8: Black-to-move logits map back from Maia's canonical orientation ===");
   {
     const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1";
     // Maia sees this as the mirrored starting position and predicts e2e4;

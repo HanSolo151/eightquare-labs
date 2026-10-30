@@ -3,7 +3,7 @@ export type OpponentTier = 1 | 2 | 3;
 export interface TierInputs {
   effectiveRatingFires: boolean;
   openingTreeHits: number;
-  pieceActivityConfidence: "low" | "medium" | "high" | null;
+  opponentGamesAnalyzed: number;
 }
 
 export interface TierResult {
@@ -13,16 +13,16 @@ export interface TierResult {
 
 const MIN_OPENING_OCCURRENCES = 3;
 
-export function resolveOpponentTier({ effectiveRatingFires, openingTreeHits, pieceActivityConfidence }: TierInputs): TierResult {
+export function resolveOpponentTier({ effectiveRatingFires, openingTreeHits, opponentGamesAnalyzed }: TierInputs): TierResult {
   const openingFires = openingTreeHits >= MIN_OPENING_OCCURRENCES;
-  const pieceFires = pieceActivityConfidence === "medium" || pieceActivityConfidence === "high";
+  const behaviorFires = opponentGamesAnalyzed >= 5;
   const fired: string[] = [];
   if (effectiveRatingFires) fired.push("effective rating");
   if (openingFires) fired.push("opening tree");
-  if (pieceFires) fired.push("piece activity");
+  if (behaviorFires) fired.push("move tendencies");
 
-  if (effectiveRatingFires && (openingFires || pieceFires)) return { tier: 1, firedSignals: fired };
-  const otherDataExists = openingTreeHits > 0 || pieceActivityConfidence !== null;
+  if (effectiveRatingFires && (openingFires || behaviorFires)) return { tier: 1, firedSignals: fired };
+  const otherDataExists = openingTreeHits > 0 || opponentGamesAnalyzed > 0;
   if (effectiveRatingFires && otherDataExists) return { tier: 2, firedSignals: fired };
   return { tier: 3, firedSignals: fired };
 }

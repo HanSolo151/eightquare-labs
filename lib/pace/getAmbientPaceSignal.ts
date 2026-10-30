@@ -21,7 +21,7 @@ export async function getAmbientPaceSignal(
       openingName: true,
       lichessCreatedAt: true,
       flags: {
-        where: { flagType: "tilt_cascade" },
+        where: { flagType: { in: ["tilt_cascade", "evaluation_cascade"] } },
         orderBy: { cpLoss: "desc" },
         take: 1,
         select: { ply: true, gamePhase: true, cascadeMeta: true },
@@ -46,7 +46,7 @@ export async function getAmbientPaceSignal(
       userId,
       openingName: game.openingName,
       lichessCreatedAt: { lt: game.lichessCreatedAt },
-      flags: { some: { flagType: "tilt_cascade", gamePhase: cascade.gamePhase } },
+      flags: { some: { flagType: { in: ["tilt_cascade", "evaluation_cascade"] }, gamePhase: cascade.gamePhase } },
     },
     distinct: ["id"],
     select: { id: true },

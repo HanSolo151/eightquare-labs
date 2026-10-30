@@ -1,0 +1,5 @@
+maia2
+numpy
+onnx
+onnxruntime
+python-chess

@@ -1,12 +1,8 @@
-import { buildOpponentPieceActivityProfile } from "./opponentPieceActivity";
 import { buildOpponentOpeningTree } from "./opponentOpeningTree";
-import { buildOpponentTimePressureProfile } from "./opponentTimePressure";
-import type { OpeningTree, OpponentTimePressureProfile, PieceActivityProfile } from "@/types";
+import type { OpeningTree } from "@/types";
 
 export interface OpponentMimicProfiles {
-  pieceActivity: PieceActivityProfile | null;
   openingTree: OpeningTree | null;
-  timePressure: OpponentTimePressureProfile | null;
   notice: string | null;
 }
 
@@ -21,36 +17,20 @@ export function loadOpponentMimicProfiles(username: string): Promise<OpponentMim
   if (existing) return existing;
 
   const loading = (async (): Promise<OpponentMimicProfiles> => {
-    let pieceActivity: PieceActivityProfile | null = null;
     let openingTree: OpeningTree | null = null;
-    let timePressure: OpponentTimePressureProfile | null = null;
     const unavailable: string[] = [];
 
-    // These builders may fetch the same recent games. Keep them sequential
-    // to respect Lichess rate limits; their persistent caches absorb repeats.
-    try {
-      pieceActivity = await buildOpponentPieceActivityProfile(username);
-    } catch (err) {
-      console.error("Could not build opponent piece-activity profile:", err);
-      unavailable.push("piece-activity");
-    }
+    // Keep public history requests sequential to respect Lichess rate limits.
+    // Do not build the piece-activity/Stockfish profile here: current move
+    // ranking does not use piece-use frequencies as evidence of preferences.
     try {
       openingTree = await buildOpponentOpeningTree(username);
     } catch (err) {
       console.error("Could not build opponent opening tree:", err);
       unavailable.push("opening");
     }
-    try {
-      timePressure = await buildOpponentTimePressureProfile(username);
-    } catch (err) {
-      console.error("Could not build opponent time-pressure profile:", err);
-      unavailable.push("time-pressure");
-    }
-
     return {
-      pieceActivity,
       openingTree,
-      timePressure,
       notice: unavailable.length
         ? `${unavailable.join(", ")} profile${unavailable.length === 1 ? " is" : "s are"} unavailable; Maia will use the other available mimic signals.`
         : null,

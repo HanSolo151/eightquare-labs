@@ -2,214 +2,234 @@
 
 import { useState } from "react";
 import { Chess } from "chess.js";
-import { fetchGames } from "@/lib/lichess/fetchGames";
-import { parseGames } from "@/lib/lichess/parseGame";
-import { extractOpponentFeatures, type OpponentFeatures } from "@/lib/lichess/opponentFeatures";
+import { emptyOpeningTree, updateOpeningTree } from "@/lib/profile/openingTree";
+import { buildOpponentFeaturesFromGames } from "@/lib/lichess/opponentFeatures";
 import { useMaiaWorker } from "@/lib/maia/useMaiaWorker";
 import { rerankMoves } from "@/lib/maia/rerank";
-import { buildOpponentPieceActivityProfile } from "@/lib/profile/opponentPieceActivity";
-import { buildOpponentOpeningTree } from "@/lib/profile/opponentOpeningTree";
-import type { PieceType } from "@/types";
+import type { OpeningTree, ParsedGame } from "@/types";
 
-const NEUTRAL_FEATURES: OpponentFeatures = {
-  username: "",
-  gamesAnalyzed: 0,
-  mostCommonOpenings: [],
-  queenTradeRate: 0.5,
-  aggressionIndex: 0.35,
-  avgRating: null,
-  fetchedAt: Date.now(),
-};
-
-function pieceTypeFromUci(fen: string, uci: string): PieceType | null {
-  const chess = new Chess(fen);
-  const piece = chess.get(uci.slice(0, 2) as Parameters<Chess["get"]>[0]);
-  return piece?.type ?? null;
-}
-
-function pieceTypeFromSan(san: string): PieceType {
-  switch (san[0]) {
-    case "O": return "k";
-    case "N": return "n";
-    case "B": return "b";
-    case "R": return "r";
-    case "Q": return "q";
-    case "K": return "k";
-    default: return "p";
-  }
-}
-
-const HELD_OUT_COUNT = 25;
-const BUILD_SET_COUNT = 40;
+const SELECTED_OPPONENTS = 2;
+const MAX_POSITIONS_PER_OPPONENT = 100;
 type Phase = "opening" | "middlegame" | "endgame";
+type MetricBucket = { baseHits: number; mimicHits: number; gained: number; lost: number; positions: number };
+type StyleDimension = "capture" | "check" | "queenCapture";
+type StyleTotals = Record<StyleDimension, number>;
+type StyleBucket = { positions: number; observed: StyleTotals; baseExpected: StyleTotals; adjustedExpected: StyleTotals };
+type Candidate = { username: string; trainGames: ParsedGame[]; heldOutGames: ParsedGame[]; opening: OpeningTree; opponentFeatures: ReturnType<typeof buildOpponentFeaturesFromGames>; aggressionIndex: number; queenTradeRate: number; forcingMoveRate: number; sacrifices: { evaluatedEvents: number; compensated: number; blunders: number; uncertain: number } };
+type OpponentResult = { username: string; buildGames: number; heldOutGames: number; aggressionIndex: number; queenTradeRate: number; forcingMoveRate: number; sacrifices: Candidate["sacrifices"]; byPhase: Record<Phase, MetricBucket>; styleByPhase: Record<Phase, StyleBucket> };
 const PHASES: Phase[] = ["opening", "middlegame", "endgame"];
-const DEFAULT_OPPONENTS = [
-  "makarvlch",
-  "PARSA-2-0-1-0",
-  "racketsaber",
-  "Levofloxacine",
-  "Dani001187",
-  "vadimpindos14",
-  "dageamMister",
-  "oprokhorov",
-  "BugritGambit",
-  "Ezio545",
-  "GamarraGhost",
-  "chessugu1981",
-  "Danger888",
-  "ded2n2",
-  "meyviriofrio",
-  "Gambler123I",
-  "jayCarlsen",
-  "akenpalihawadana",
-  "Zideha",
-  "antbev",
-  "Msayed0",
-  "mahardikaaa",
-  "D4813l",
-  "baris828",
-].join("\n");
-const PIECE_VALUES: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+const STYLE_DIMENSIONS: StyleDimension[] = ["capture", "check", "queenCapture"];
+const PIECE_VALUES: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+function emptyBucket(): MetricBucket {
+  return { baseHits: 0, mimicHits: 0, gained: 0, lost: 0, positions: 0 };
+}
+
+function emptyPhases(): Record<Phase, MetricBucket> {
+  return { opening: emptyBucket(), middlegame: emptyBucket(), endgame: emptyBucket() };
+}
+
+function emptyStyleTotals(): StyleTotals {
+  return { capture: 0, check: 0, queenCapture: 0 };
+}
+
+function emptyStyleBucket(): StyleBucket {
+  return { positions: 0, observed: emptyStyleTotals(), baseExpected: emptyStyleTotals(), adjustedExpected: emptyStyleTotals() };
+}
+
+function styleError(observed: StyleTotals, expected: StyleTotals, positions: number): number {
+  if (positions === 0) return 0;
+  return STYLE_DIMENSIONS.reduce((sum, dimension) =>
+    sum + Math.abs(observed[dimension] / positions - expected[dimension] / positions), 0,
+  ) / STYLE_DIMENSIONS.length;
+}
 
 function gamePhaseAt(chess: Chess): Phase {
   let material = 0;
-  for (const row of chess.board()) {
-    for (const square of row) {
-      if (square) material += PIECE_VALUES[square.type] ?? 0;
-    }
+  for (const row of chess.board()) for (const square of row) {
+    if (square) material += PIECE_VALUES[square.type] ?? 0;
   }
   if (material / 78 <= 0.5) return "endgame";
   const fullmove = Number.parseInt(chess.fen().split(" ")[5] ?? "1", 10) || 1;
   return fullmove <= 12 ? "opening" : "middlegame";
 }
 
+function buildOpeningProfile(username: string, games: ParsedGame[]): OpeningTree {
+  const opening = emptyOpeningTree(username);
+  for (const game of games) {
+    updateOpeningTree(opening, game.id, game.moves, game.playerColor);
+  }
+  return opening;
+}
+
 export default function MaiaMimicryEfficacyPage() {
   const [log, setLog] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
-  const [usernamesInput, setUsernamesInput] = useState(DEFAULT_OPPONENTS);
   const { infer } = useMaiaWorker();
   const append = (line: string) => setLog((previous) => [...previous, line]);
 
-  async function runOne(opponentUsername: string): Promise<Record<Phase, { baselineMatches: number; rerankedMatches: number; total: number }>> {
-    const byPhase: Record<Phase, { baselineMatches: number; rerankedMatches: number; total: number }> = {
-      opening: { baselineMatches: 0, rerankedMatches: 0, total: 0 },
-      middlegame: { baselineMatches: 0, rerankedMatches: 0, total: 0 },
-      endgame: { baselineMatches: 0, rerankedMatches: 0, total: 0 },
-    };
-    append(`Held-out mimicry test for ${opponentUsername}`);
-    const raw = await fetchGames({
-      username: opponentUsername,
-      max: BUILD_SET_COUNT + HELD_OUT_COUNT,
-      rated: true,
-      perfType: "rapid",
-    });
-    const allGames = parseGames(raw, opponentUsername);
-    if (allGames.length < BUILD_SET_COUNT + 5) {
-      append(`Not enough games (${allGames.length}) for a clean build/held-out split.`);
-      return byPhase;
-    }
+  if (process.env.NODE_ENV === "production") {
+    return <p style={{ padding: 24, fontFamily: "monospace" }}>This evaluation tool is available only in local development.</p>;
+  }
 
-    const buildGames = allGames.slice(0, BUILD_SET_COUNT);
-    const heldOutGames = allGames.slice(BUILD_SET_COUNT, BUILD_SET_COUNT + HELD_OUT_COUNT);
-    append(`Build set: ${buildGames.length} games — held-out: ${heldOutGames.length} games`);
-    append("Building OpponentFeatures from build set only...");
-
-    const opponentFeatures = await extractOpponentFeatures(opponentUsername, BUILD_SET_COUNT);
-    append("Building piece-activity profile from build set...");
-    const pieceActivityProfile = await buildOpponentPieceActivityProfile(opponentUsername, undefined, buildGames);
-    append("Building opening tree from build set...");
-    const openingTree = await buildOpponentOpeningTree(opponentUsername, undefined, buildGames);
-
-    for (const game of heldOutGames) {
+  async function evaluateCandidate(candidate: Candidate): Promise<OpponentResult | null> {
+    const { username, trainGames, heldOutGames, opening, opponentFeatures } = candidate;
+    append(`\nEvaluating ${username} on at most ${MAX_POSITIONS_PER_OPPONENT} later-game moves...`);
+    const byPhase = emptyPhases();
+    const styleByPhase = { opening: emptyStyleBucket(), middlegame: emptyStyleBucket(), endgame: emptyStyleBucket() };
+    for (let gameIndex = 0; gameIndex < heldOutGames.length && totalScoredPositions(byPhase) < MAX_POSITIONS_PER_OPPONENT; gameIndex++) {
+      const game = heldOutGames[gameIndex];
       const chess = new Chess();
-      const opponentColor = game.playerColor;
-      for (let ply = 0; ply < game.moves.length; ply++) {
-        const san = game.moves[ply];
-        const moverColor = ply % 2 === 0 ? "white" : "black";
-        const fenBeforeMove = chess.fen();
-        let moveResult;
-        try { moveResult = chess.move(san); } catch { break; }
-        if (!moveResult) break;
-        if (moverColor !== opponentColor) continue;
+      for (let ply = 0; ply < game.moves.length && totalScoredPositions(byPhase) < MAX_POSITIONS_PER_OPPONENT; ply++) {
+        const color = ply % 2 === 0 ? "white" : "black";
+        const fen = chess.fen();
+        const phase = gamePhaseAt(chess); // classify the position before the move
+        let actual;
+        try { actual = chess.move(game.moves[ply]); } catch { break; }
+        if (!actual) break;
+        if (color !== game.playerColor) continue;
 
-        const phase = gamePhaseAt(chess);
         const bucket = byPhase[phase];
-        bucket.total++;
-        const actualPieceType = pieceTypeFromSan(san);
+        const actualUci = actual.from + actual.to + (actual.promotion ?? "");
         try {
-          const { logitsMaia } = await infer(fenBeforeMove, game.playerRating, game.opponentRating);
-          const baseline = await rerankMoves({ fen: fenBeforeMove, logitsMaia, opponentFeatures: NEUTRAL_FEATURES });
-          const reranked = await rerankMoves({ fen: fenBeforeMove, logitsMaia, opponentFeatures, pieceActivityProfile, openingTree });
-          const baselineUci = baseline.baseTopMove?.uci ?? null;
-          const rerankedUci = reranked.topMove?.uci ?? reranked.baseTopMove?.uci ?? null;
-          if (baselineUci && pieceTypeFromUci(fenBeforeMove, baselineUci) === actualPieceType) bucket.baselineMatches++;
-          if (rerankedUci && pieceTypeFromUci(fenBeforeMove, rerankedUci) === actualPieceType) bucket.rerankedMatches++;
-        } catch (err) {
-          append(`  (skipping ply ${ply} of ${game.id}: ${err instanceof Error ? err.message : String(err)})`);
-          bucket.total--;
+          const { logitsMaia } = await infer(fen, game.playerRating, game.opponentRating);
+          // One inference and one rerank yield both comparators:
+          // baseTopMove is Maia alone; topMove includes experimental adjustments.
+          const result = await rerankMoves({
+            fen,
+            logitsMaia,
+            opponentFeatures,
+            openingTree: opening,
+          });
+          const baseline = result.baseTopMove?.uci ?? null;
+          const mimic = result.topMove?.uci ?? null;
+          bucket.positions++;
+          if (baseline === actualUci) bucket.baseHits++;
+          if (mimic === actualUci) bucket.mimicHits++;
+          if (baseline !== actualUci && mimic === actualUci) bucket.gained++;
+          if (baseline === actualUci && mimic !== actualUci) bucket.lost++;
+
+          // Compare the opponent's actual action-feature rates with the
+          // model's expected rates on the exact same held-out positions.
+          // This is a paired, teacher-forced distribution diagnostic, not a
+          // claim that a self-play simulation has recreated the opponent.
+          const style = styleByPhase[phase];
+          style.positions++;
+          style.observed.capture += actual.captured ? 1 : 0;
+          style.observed.check += actual.san.includes("+") || actual.san.includes("#") ? 1 : 0;
+          style.observed.queenCapture += actual.captured === "q" ? 1 : 0;
+          for (const move of result.moves) {
+            style.baseExpected.capture += move.baseProbability * Number(move.isCapture);
+            style.baseExpected.check += move.baseProbability * Number(move.isCheck);
+            style.baseExpected.queenCapture += move.baseProbability * Number(move.isQueenCapture);
+            style.adjustedExpected.capture += move.adjustedProbability * Number(move.isCapture);
+            style.adjustedExpected.check += move.adjustedProbability * Number(move.isCheck);
+            style.adjustedExpected.queenCapture += move.adjustedProbability * Number(move.isQueenCapture);
+          }
+        } catch (error) {
+          append(`  Skipped ${game.id} ply ${ply}: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
-      const grandTotal = PHASES.reduce((sum, phase) => sum + byPhase[phase].total, 0);
-      append(`  ${game.id} done — ${grandTotal} positions so far`);
+      const scored = totalScoredPositions(byPhase);
+      append(`${username}: held-out game ${gameIndex + 1}/${heldOutGames.length}; scored positions=${scored}.`);
     }
 
-    append(`\n=== ${opponentUsername}: per-phase breakdown ===`);
-    let overallBaseline = 0;
-    let overallReranked = 0;
-    let overallTotal = 0;
-    for (const phase of PHASES) {
-      const bucket = byPhase[phase];
-      overallBaseline += bucket.baselineMatches;
-      overallReranked += bucket.rerankedMatches;
-      overallTotal += bucket.total;
-      if (bucket.total === 0) {
-        append(`${phase}: 0 positions — skipped`);
-        continue;
-      }
-      const baselineRate = bucket.baselineMatches / bucket.total;
-      const rerankedRate = bucket.rerankedMatches / bucket.total;
-      append(`${phase}: n=${bucket.total}  baseline=${(baselineRate * 100).toFixed(1)}%  reranked=${(rerankedRate * 100).toFixed(1)}%  efficacy=${((rerankedRate - baselineRate) * 100).toFixed(1)}pp`);
+    const total = totalScoredPositions(byPhase);
+    if (total === 0) {
+      append(`SKIP ${username}: no held-out positions were scored.\n`);
+      return null;
     }
-    const overallBaseRate = overallTotal > 0 ? overallBaseline / overallTotal : 0;
-    const overallRerankedRate = overallTotal > 0 ? overallReranked / overallTotal : 0;
-    append(`${opponentUsername} overall: n=${overallTotal}  baseline=${(overallBaseRate * 100).toFixed(1)}%  reranked=${(overallRerankedRate * 100).toFixed(1)}%  efficacy=${((overallRerankedRate - overallBaseRate) * 100).toFixed(1)}pp\n`);
-    return byPhase;
+    const base = PHASES.reduce((sum, phase) => sum + byPhase[phase].baseHits, 0) / total;
+    const mimic = PHASES.reduce((sum, phase) => sum + byPhase[phase].mimicHits, 0) / total;
+    append(`${username}: training aggression index ${(candidate.aggressionIndex * 100).toFixed(1)}%; queen-trade rate ${(candidate.queenTradeRate * 100).toFixed(1)}%; capture/check proxy ${(candidate.forcingMoveRate * 100).toFixed(1)}%; exact top-1 Maia ${(base * 100).toFixed(2)}%; adjusted ${(mimic * 100).toFixed(2)}%; lift ${((mimic - base) * 100).toFixed(2)} percentage points; n=${total}.`);
+    return { username, buildGames: trainGames.length, heldOutGames: heldOutGames.length, aggressionIndex: candidate.aggressionIndex, queenTradeRate: candidate.queenTradeRate, forcingMoveRate: candidate.forcingMoveRate, sacrifices: candidate.sacrifices, byPhase, styleByPhase };
+  }
+
+  function totalScoredPositions(buckets: Record<Phase, MetricBucket>): number {
+    return PHASES.reduce((sum, phase) => sum + buckets[phase].positions, 0);
   }
 
   async function runAll() {
-    const usernames = usernamesInput.split(/[\n,]+/).map((username) => username.trim()).filter(Boolean);
-    if (usernames.length === 0) return;
     setRunning(true);
     setLog([]);
-    append(`Running ${usernames.length} username(s) sequentially: ${usernames.join(", ")}\n`);
-    const aggregate: Record<Phase, { baselineMatches: number; rerankedMatches: number; total: number }> = {
-      opening: { baselineMatches: 0, rerankedMatches: 0, total: 0 },
-      middlegame: { baselineMatches: 0, rerankedMatches: 0, total: 0 },
-      endgame: { baselineMatches: 0, rerankedMatches: 0, total: 0 },
-    };
+    append("Reading your saved, fully evaluated games. The first 80% selects the lowest and highest opponent-aggression profiles; up to 100 later decisions per opponent are held out for the Maia comparison. No Lichess fetches or database writes are performed.\n");
+    const results: OpponentResult[] = [];
     try {
-      for (const username of usernames) {
-        try {
-          const result = await runOne(username);
-          for (const phase of PHASES) {
-            aggregate[phase].baselineMatches += result[phase].baselineMatches;
-            aggregate[phase].rerankedMatches += result[phase].rerankedMatches;
-            aggregate[phase].total += result[phase].total;
-          }
-        } catch (err) {
-          append(`!! ${username} FAILED entirely: ${err instanceof Error ? err.message : String(err)} — continuing with next username\n`);
+      const response = await fetch("/api/debug/mimic-candidates");
+      const payload = await response.json() as { error?: string; candidateCount?: number; selected?: Array<Omit<Candidate, "opening" | "opponentFeatures">> };
+      if (!response.ok || !Array.isArray(payload.selected)) {
+        throw new Error(payload.error ?? `Candidate profile request failed (${response.status}).`);
+      }
+      const selected: Candidate[] = payload.selected.map((candidate) => ({
+        ...candidate,
+        opening: buildOpeningProfile(candidate.username, candidate.trainGames),
+        opponentFeatures: buildOpponentFeaturesFromGames(candidate.username, candidate.trainGames),
+      }));
+      append(`Found ${payload.candidateCount ?? 0} opponents with enough fully evaluated games. Training-set extremes by current aggression index: ${selected.map((candidate) => `${candidate.username} ${(candidate.aggressionIndex * 100).toFixed(1)}%`).join(" vs ")}.`);
+      for (const candidate of selected) {
+        const decisiveSacrifices = candidate.sacrifices.compensated + candidate.sacrifices.blunders;
+        append(`${candidate.username}: training eval-backed material losses=${candidate.sacrifices.evaluatedEvents}; compensated=${candidate.sacrifices.compensated}; material blunders=${candidate.sacrifices.blunders}; uncertain=${candidate.sacrifices.uncertain}; decisive compensation rate=${decisiveSacrifices ? `${(100 * candidate.sacrifices.compensated / decisiveSacrifices).toFixed(1)}%` : "no decisive events"}.`);
+      }
+      for (const candidate of selected) {
+        const result = await evaluateCandidate(candidate);
+        if (result) results.push(result);
+      }
+
+      const aggregate = emptyBucket();
+      const styleAggregate = emptyStyleBucket();
+      for (const result of results) for (const phase of PHASES) {
+        const bucket = result.byPhase[phase];
+        aggregate.positions += bucket.positions;
+        aggregate.baseHits += bucket.baseHits;
+        aggregate.mimicHits += bucket.mimicHits;
+        aggregate.gained += bucket.gained;
+        aggregate.lost += bucket.lost;
+        const style = result.styleByPhase[phase];
+        styleAggregate.positions += style.positions;
+        for (const dimension of STYLE_DIMENSIONS) {
+          styleAggregate.observed[dimension] += style.observed[dimension];
+          styleAggregate.baseExpected[dimension] += style.baseExpected[dimension];
+          styleAggregate.adjustedExpected[dimension] += style.adjustedExpected[dimension];
         }
       }
-      append(`\n=== Aggregate across all ${usernames.length} usernames, by phase ===`);
-      for (const phase of PHASES) {
-        const bucket = aggregate[phase];
-        if (bucket.total === 0) {
-          append(`${phase}: 0 positions — skipped`);
-          continue;
+      const macroLifts = results.map((result) => {
+        const buckets = PHASES.map((phase) => result.byPhase[phase]);
+        const positions = buckets.reduce((sum, bucket) => sum + bucket.positions, 0);
+        const base = buckets.reduce((sum, bucket) => sum + bucket.baseHits, 0) / positions;
+        const mimic = buckets.reduce((sum, bucket) => sum + bucket.mimicHits, 0) / positions;
+        return mimic - base;
+      });
+      const macroLift = macroLifts.length ? macroLifts.reduce((sum, value) => sum + value, 0) / macroLifts.length : 0;
+      const weightedLift = aggregate.positions > 0 ? (aggregate.mimicHits - aggregate.baseHits) / aggregate.positions : 0;
+      append(`\n=== Exact top-1 results ===`);
+      append(`Completed extreme opponents: ${results.length}/${SELECTED_OPPONENTS}; positions: ${aggregate.positions}; baseline hits: ${aggregate.baseHits}; adjusted hits: ${aggregate.mimicHits}; gained/lost: +${aggregate.gained}/-${aggregate.lost}.`);
+      append(`Position-weighted lift: ${(weightedLift * 100).toFixed(2)}pp. Opponent-macro lift: ${(macroLift * 100).toFixed(2)}pp.`);
+      const baseStyleError = styleError(styleAggregate.observed, styleAggregate.baseExpected, styleAggregate.positions);
+      const adjustedStyleError = styleError(styleAggregate.observed, styleAggregate.adjustedExpected, styleAggregate.positions);
+      append(`\n=== Held-out action-style calibration (lower is closer) ===`);
+      append(`Mean absolute rate error across capture, check, and queen-capture choices: Maia ${(baseStyleError * 100).toFixed(2)}pp; opponent-adjusted ${(adjustedStyleError * 100).toFixed(2)}pp; delta ${((baseStyleError - adjustedStyleError) * 100).toFixed(2)}pp.`);
+      for (const dimension of STYLE_DIMENSIONS) {
+        const observed = styleAggregate.positions ? styleAggregate.observed[dimension] / styleAggregate.positions : 0;
+        const baseExpected = styleAggregate.positions ? styleAggregate.baseExpected[dimension] / styleAggregate.positions : 0;
+        const adjustedExpected = styleAggregate.positions ? styleAggregate.adjustedExpected[dimension] / styleAggregate.positions : 0;
+        append(`  ${dimension}: observed ${(observed * 100).toFixed(1)}%; Maia expects ${(baseExpected * 100).toFixed(1)}%; adjusted expects ${(adjustedExpected * 100).toFixed(1)}%.`);
+      }
+      append(results.length === SELECTED_OPPONENTS
+        ? macroLift >= 0.05
+          ? "Result clears the requested 5pp point-estimate bar. Review per-opponent results before enabling the Mimic label."
+          : "Result is below the requested 5pp point-estimate bar. Keep Base Maia as the default; the adjusted policy is not validated for a Mimic claim."
+        : "INCONCLUSIVE: both selected opponents did not produce enough scored positions. Do not use this as a ship decision.");
+      append("This is a small holdout point estimate, not proof of statistical significance. Style rates are measured on each real held-out position (teacher-forced), not from self-play games; capture/check features do not measure sacrifice skill or full playing style. Training-only opponent rates and opening frequencies drive the experimental adjustments; piece-usage shares are deliberately excluded.");
+      append("\n=== Per-opponent, per-phase exact top-1 accuracy ===");
+      for (const result of results) {
+        append(`\n${result.username} (${result.buildGames} train games / ${result.heldOutGames} holdout games)`);
+        for (const phase of PHASES) {
+          const bucket = result.byPhase[phase];
+          if (!bucket.positions) {
+            append(`  ${phase}: no positions`);
+            continue;
+          }
+          append(`  ${phase}: n=${bucket.positions}; Maia=${(100 * bucket.baseHits / bucket.positions).toFixed(1)}%; mimic=${(100 * bucket.mimicHits / bucket.positions).toFixed(1)}%; net ${bucket.gained - bucket.lost >= 0 ? "+" : ""}${bucket.gained - bucket.lost}`);
         }
-        const baselineRate = bucket.baselineMatches / bucket.total;
-        const rerankedRate = bucket.rerankedMatches / bucket.total;
-        append(`${phase}: n=${bucket.total}  baseline=${(baselineRate * 100).toFixed(1)}%  reranked=${(rerankedRate * 100).toFixed(1)}%  efficacy=${((rerankedRate - baselineRate) * 100).toFixed(1)}pp`);
       }
     } finally {
       setRunning(false);
@@ -218,20 +238,9 @@ export default function MaiaMimicryEfficacyPage() {
 
   return (
     <div style={{ padding: 24, fontFamily: "monospace" }}>
-      <h2>Maia mimicry efficacy (dev only)</h2>
-      <div style={{ marginBottom: 8 }}>
-        <div>Opponents (one per line or comma-separated):</div>
-        <textarea
-          rows={8}
-          style={{ width: 400, fontFamily: "monospace" }}
-          value={usernamesInput}
-          onChange={(event) => setUsernamesInput(event.target.value)}
-          disabled={running}
-        />
-      </div>
-      <button disabled={running} onClick={() => void runAll()}>
-        {running ? "Running…" : "Run all"}
-      </button>
+      <h2>Maia opponent-adjustment fidelity (local development only)</h2>
+      <p>Local, authenticated read-only probe. It selects the opponents with the highest and lowest training-only aggression index from your fully evaluated saved games, then compares Maia and opponent-adjusted predictions on up to 100 chronological holdout decisions each. It also reports Stockfish-backed material-loss outcomes from training games. This is not a full self-play style test or proof of style fidelity; the checked-in ONNX model does not accept player prototypes or embeddings.</p>
+      <button disabled={running} onClick={() => void runAll()}>{running ? "Running…" : "Run two-opponent probe"}</button>
       <pre style={{ marginTop: 16, whiteSpace: "pre-wrap" }}>{log.join("\n")}</pre>
     </div>
   );

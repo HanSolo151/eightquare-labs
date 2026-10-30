@@ -24,9 +24,11 @@ function formatSentence(flag: FlaggedMove): string {
 }
 
 const FLAG_TYPE_LABEL: Record<FlaggedMove["flagType"], string> = {
+  decision_error: "Unrecovered evaluation loss",
+  evaluation_cascade: "Multi-move evaluation loss",
   collapse: "Fast-move collapse",
   pattern_repeat: "Recurring weakness",
-  tilt_cascade: "Tilt cascade",
+  tilt_cascade: "Multi-move evaluation loss",
   time_paradox: "Slow-move blunder",
 };
 
@@ -66,8 +68,8 @@ export default function VerdictCard({
       {opponentLabel && <div style={{ fontSize: 12, opacity: 0.8 }}>{opponentLabel}</div>}
       <div style={{ fontSize: 13, margin: "6px 0" }}>{formatSentence(flag)}</div>
       <div style={{ fontSize: 12, opacity: 0.8 }}>
-        Eval loss: {(flag.cpLoss / 100).toFixed(1)} pawns · played in {flag.timeSpentSec.toFixed(1)}s
-        ({Math.round(flag.timeRatio * 100)}% of usual)
+        {flag.evalConfidence === "mate_only" ? "Forced-mate evaluation change" : `Eval loss: ${(flag.cpLoss / 100).toFixed(1)} pawns`}
+        {flag.timeSpentSec > 0 && <> · played in {flag.timeSpentSec.toFixed(1)}s</>}
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

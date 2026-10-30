@@ -13,6 +13,7 @@ interface ReplayFlag {
   severity: string;
   flagType: string;
   cpLoss: number;
+  evalConfidence: "full" | "mate_only" | "degraded";
   explanation: string;
   timeSpentSec: number;
   phaseAvgSec: number;
@@ -175,9 +176,9 @@ export default function GameReplay({
         {currentFlag ? <section className="rounded-xl border border-amber-200/15 bg-amber-200/[0.04] p-4">
           <p className="text-[10px] uppercase tracking-widest text-amber-100/70">Flagged move · {currentFlag.severity}</p>
           <h2 className="mt-2 text-lg font-semibold">Move {Math.floor(currentFlag.ply / 2) + 1}: {currentFlag.san}</h2>
-          <p className="mt-1 text-xs capitalize text-amber-100">{currentFlag.severity} · −{(currentFlag.cpLoss / 100).toFixed(1)} eval swing</p>
+          <p className="mt-1 text-xs capitalize text-amber-100">{currentFlag.severity} · {currentFlag.evalConfidence === "mate_only" ? "forced-mate evaluation change" : `−${(currentFlag.cpLoss / 100).toFixed(1)} eval swing`}</p>
           <p className="mt-2 text-xs leading-5 text-neutral-400">{currentFlag.explanation}</p>
-          {Number.isFinite(currentFlag.timeSpentSec) && Number.isFinite(currentFlag.phaseAvgSec) && <p className="mt-3 text-xs leading-5 text-neutral-300">You played this in <strong>{currentFlag.timeSpentSec.toFixed(1)}s</strong>. Your {currentFlag.gamePhase} average is <strong>{currentFlag.phaseAvgSec.toFixed(1)}s</strong>.</p>}
+          {currentFlag.timeSpentSec > 0 && currentFlag.phaseAvgSec > 0 && <p className="mt-3 text-xs leading-5 text-neutral-300">You played this in <strong>{currentFlag.timeSpentSec.toFixed(1)}s</strong>. Your {currentFlag.gamePhase} average is <strong>{currentFlag.phaseAvgSec.toFixed(1)}s</strong>.</p>}
           {currentFlag.patternDescription && <p className="mt-2 text-xs leading-5 text-neutral-300">This matches a recurring weakness: <strong>{currentFlag.patternDescription}</strong>.</p>}
           {!sparActive && <Link href={`/dashboard/games/${encodeURIComponent(gameId)}/ghost?ply=${currentFlag.ply}`} className="mt-4 inline-flex rounded-lg border border-amber-300/30 bg-amber-300/10 px-4 py-2.5 text-xs font-medium text-amber-100 hover:bg-amber-300/15">Replay from here →</Link>}
         </section> : <section className="rounded-xl border border-white/10 p-4 text-xs text-neutral-500">{ply === 0 ? "Starting position" : "No stored flag for this move."}</section>}

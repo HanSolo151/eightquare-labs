@@ -5,7 +5,7 @@
 3. [x] Ghost Replay — single-moment three-way comparison (your move / Stockfish / Maia) with spar from the flagged position. Browser validation remains.
    - Not built: scrub bar and synchronized multi-ply continuation evaluation graph from the full spec.
 3a. [x] `/dashboard` is now the Spar hero. The player dossier has moved to `/dashboard/signature` and includes the heatmap.
-4. [ ] Opponent-Specific Replay (Maia4All tiered model) — partial model support exists in spar; validate tier behavior and coverage.
+4. [ ] Opponent-Specific Replay (Maia4All tiered model) — player-ID fine-tuning, prototype matching, and optional ONNX inference are wired; train and validate on representative Lichess data before enabling production artifacts.
 5. [x] Daily Puzzle from flagged moves — persisted solve/skip state and interactive board are implemented; apply the migration and validate the browser flow.
 6. [x] Rivalry Tracker — self-scoped list/detail, matchup openings, flagged-square distribution, and worst flagged-position spar. Browser validation remains.
 7. [x] Ambient Pace Signal — retrospective recurring cascade signal on saved game review. Browser validation remains.

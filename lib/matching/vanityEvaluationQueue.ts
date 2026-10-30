@@ -7,9 +7,10 @@ import { StockfishCli } from "@/lib/eval/stockfishCli";
 import { updateWeaknessProfile } from "@/lib/profile/weaknessProfile";
 import { isVanityEvaluationEligible } from "./vanityEligibility";
 import { prisma } from "@/lib/prisma";
-import type { EvalPoint, FlaggedMove, GameEval, ParsedGame, WeaknessProfile } from "@/types";
+import type { EvalPoint, GameEval, ParsedGame, WeaknessProfile } from "@/types";
 
 const EVAL_DEPTH = MATCHING_CONFIG.INGEST_EVAL_DEPTH;
+const EVAL_ENGINE_VERSION = `stockfish-19-lite-single-depth${EVAL_DEPTH}-v1`;
 const LEASE_MS = MATCHING_CONFIG.VANITY_EVAL_JOB_LEASE_MINUTES * 60 * 1000;
 
 function stringArray(value: unknown): string[] {
@@ -118,7 +119,6 @@ export async function processNextVanityEvaluation(now = new Date()): Promise<Van
   try {
     const game = toParsedGame(job.game);
     let gameEval: GameEval;
-    let flags: FlaggedMove[];
     if (job.game.eval) {
       gameEval = {
         gameId: job.game.id,
@@ -126,8 +126,6 @@ export async function processNextVanityEvaluation(now = new Date()): Promise<Van
         evaluatedAt: job.game.eval.evaluatedAt.getTime(),
         engineVersion: job.game.eval.engineVersion,
       };
-      const storedFlags = await prisma.flaggedMove.findMany({ where: { gameId: job.game.id } });
-      flags = storedFlags as unknown as FlaggedMove[];
     } else {
       const checkpoint = readCheckpoint(job.checkpoint);
       engine = await StockfishCli.create();
@@ -144,80 +142,87 @@ export async function processNextVanityEvaluation(now = new Date()): Promise<Van
             });
           }
         },
+        EVAL_ENGINE_VERSION,
       );
-      const userGamesRows = await prisma.game.findMany({
-        where: { userId: job.userId },
-        select: {
-          id: true, playerColor: true, opponentUsername: true, opponentRating: true, playerRating: true, moves: true,
-          clocks: true, clockInitialSec: true, clockIncrementSec: true, openingName: true, openingEco: true, result: true,
-          rated: true, speed: true, lichessCreatedAt: true,
-        },
-      });
-      const userGames = userGamesRows.map(toParsedGame);
-      const features = extractAllMoveFeatures(userGames);
-      const playerProfile = buildPlayerProfile(job.user.username, userGames, features);
-      const weaknessRow = await prisma.weaknessProfileRow.findUnique({ where: { userId: job.userId } });
-      const weaknessProfile = weaknessProfileFromRow(weaknessRow, job.user.username);
-      const gameFeatures = features.filter((feature) => feature.gameId === game.id);
-      flags = flagMoves(gameFeatures, playerProfile, weaknessProfile, gameEval, game.playerColor);
-      updateWeaknessProfile(weaknessProfile, game.id, gameEval, gameFeatures, game.playerColor);
+    }
 
-      await prisma.$transaction(async (tx) => {
+    // Recompute flags even when the game already has a saved evaluation. This
+    // lets queued jobs apply the current flag rules without paying for another
+    // Stockfish pass, and prevents old stored flags from becoming permanent.
+    const userGamesRows = await prisma.game.findMany({
+      where: { userId: job.userId },
+      select: {
+        id: true, playerColor: true, opponentUsername: true, opponentRating: true, playerRating: true, moves: true,
+        clocks: true, clockInitialSec: true, clockIncrementSec: true, openingName: true, openingEco: true, result: true,
+        rated: true, speed: true, lichessCreatedAt: true,
+      },
+    });
+    const userGames = userGamesRows.map(toParsedGame);
+    const features = extractAllMoveFeatures(userGames);
+    const playerProfile = buildPlayerProfile(job.user.username, userGames, features);
+    const weaknessRow = await prisma.weaknessProfileRow.findUnique({ where: { userId: job.userId } });
+    const weaknessProfile = weaknessProfileFromRow(weaknessRow, job.user.username);
+    const gameFeatures = features.filter((feature) => feature.gameId === game.id);
+    const flags = flagMoves(gameFeatures, playerProfile, weaknessProfile, gameEval, game.playerColor);
+    updateWeaknessProfile(weaknessProfile, game.id, gameEval, gameFeatures, game.playerColor);
+
+    await prisma.$transaction(async (tx) => {
+      if (!job.game.eval) {
         await tx.gameEval.upsert({
           where: { gameId: game.id },
           create: { gameId: game.id, points: gameEval.points as unknown as Prisma.InputJsonValue, engineVersion: gameEval.engineVersion },
           update: { points: gameEval.points as unknown as Prisma.InputJsonValue, engineVersion: gameEval.engineVersion },
         });
-        await tx.flaggedMove.deleteMany({ where: { gameId: game.id } });
-        if (flags.length > 0) {
-          await tx.flaggedMove.createMany({
-            data: flags.map((flag) => ({
-              gameId: game.id,
-              ply: flag.ply,
-              moveNumber: flag.moveNumber,
-              san: flag.san,
-              color: flag.color,
-              flagType: flag.flagType,
-              timeSpentSec: flag.timeSpentSec,
-              phaseAvgSec: flag.phaseAvgSec,
-              timeRatio: flag.timeRatio,
-              ratio: flag.ratio,
-              clockRemainingSec: flag.clockRemainingSec,
-              gamePhase: flag.gamePhase,
-              cpLoss: flag.cpLoss,
-              causality: flag.causality as unknown as Prisma.InputJsonValue,
-              matchedWeaknessId: flag.matchedWeaknessId,
-              styleDeviationScore: flag.styleDeviationScore,
-              absoluteAnomalyScore: flag.absoluteAnomalyScore,
-              severity: flag.severity,
-              severityBreakdown: flag.severityBreakdown as unknown as Prisma.InputJsonValue,
-              pivotMove: flag.pivotMove ? flag.pivotMove as unknown as Prisma.InputJsonValue : undefined,
-              cascadeMeta: flag.cascadeMeta ? flag.cascadeMeta as unknown as Prisma.InputJsonValue : undefined,
-              evalConfidence: flag.evalConfidence,
-              explanation: flag.explanation,
-            })),
-          });
-        }
-        await tx.weaknessProfileRow.upsert({
-          where: { userId: job.userId },
-          create: {
-            userId: job.userId,
-            patterns: weaknessProfile.patterns as unknown as Prisma.InputJsonValue,
-            evaluatedGameIds: weaknessProfile.evaluatedGameIds as unknown as Prisma.InputJsonValue,
-            gamesEvaluated: weaknessProfile.gamesEvaluated,
-            gamesFetched: weaknessProfile.gamesFetched,
-            confidence: weaknessProfile.confidence,
-          },
-          update: {
-            patterns: weaknessProfile.patterns as unknown as Prisma.InputJsonValue,
-            evaluatedGameIds: weaknessProfile.evaluatedGameIds as unknown as Prisma.InputJsonValue,
-            gamesEvaluated: weaknessProfile.gamesEvaluated,
-            gamesFetched: weaknessProfile.gamesFetched,
-            confidence: weaknessProfile.confidence,
-          },
+      }
+      await tx.flaggedMove.deleteMany({ where: { gameId: game.id } });
+      if (flags.length > 0) {
+        await tx.flaggedMove.createMany({
+          data: flags.map((flag) => ({
+            gameId: game.id,
+            ply: flag.ply,
+            moveNumber: flag.moveNumber,
+            san: flag.san,
+            color: flag.color,
+            flagType: flag.flagType,
+            timeSpentSec: flag.timeSpentSec,
+            phaseAvgSec: flag.phaseAvgSec,
+            timeRatio: flag.timeRatio,
+            ratio: flag.ratio,
+            clockRemainingSec: flag.clockRemainingSec,
+            gamePhase: flag.gamePhase,
+            cpLoss: flag.cpLoss,
+            causality: flag.causality as unknown as Prisma.InputJsonValue,
+            matchedWeaknessId: flag.matchedWeaknessId,
+            styleDeviationScore: flag.styleDeviationScore,
+            absoluteAnomalyScore: flag.absoluteAnomalyScore,
+            severity: flag.severity,
+            severityBreakdown: flag.severityBreakdown as unknown as Prisma.InputJsonValue,
+            pivotMove: flag.pivotMove ? flag.pivotMove as unknown as Prisma.InputJsonValue : undefined,
+            cascadeMeta: flag.cascadeMeta ? flag.cascadeMeta as unknown as Prisma.InputJsonValue : undefined,
+            evalConfidence: flag.evalConfidence,
+            explanation: flag.explanation,
+          })),
         });
+      }
+      await tx.weaknessProfileRow.upsert({
+        where: { userId: job.userId },
+        create: {
+          userId: job.userId,
+          patterns: weaknessProfile.patterns as unknown as Prisma.InputJsonValue,
+          evaluatedGameIds: weaknessProfile.evaluatedGameIds as unknown as Prisma.InputJsonValue,
+          gamesEvaluated: weaknessProfile.gamesEvaluated,
+          gamesFetched: weaknessProfile.gamesFetched,
+          confidence: weaknessProfile.confidence,
+        },
+        update: {
+          patterns: weaknessProfile.patterns as unknown as Prisma.InputJsonValue,
+          evaluatedGameIds: weaknessProfile.evaluatedGameIds as unknown as Prisma.InputJsonValue,
+          gamesEvaluated: weaknessProfile.gamesEvaluated,
+          gamesFetched: weaknessProfile.gamesFetched,
+          confidence: weaknessProfile.confidence,
+        },
       });
-    }
+    });
 
     await prisma.vanityEvaluationJob.update({
       where: { id: job.id },

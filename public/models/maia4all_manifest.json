@@ -1,0 +1,1338 @@
+{
+  "version": 1,
+  "players": [
+    {
+      "id": 0,
+      "name": "aliafrooz",
+      "username": "aliafrooz",
+      "rating": 926,
+      "rating_bin": "lt1000",
+      "games": 100,
+      "training_positions": 2644,
+      "validation_positions": 567
+    },
+    {
+      "id": 1,
+      "name": "Anush_Borse",
+      "username": "Anush_Borse",
+      "rating": 988,
+      "rating_bin": "lt1000",
+      "games": 100,
+      "training_positions": 2181,
+      "validation_positions": 527
+    },
+    {
+      "id": 2,
+      "name": "hempatel3215",
+      "username": "hempatel3215",
+      "rating": 676,
+      "rating_bin": "lt1000",
+      "games": 100,
+      "training_positions": 1954,
+      "validation_positions": 527
+    },
+    {
+      "id": 3,
+      "name": "Jasmine-Jane",
+      "username": "Jasmine-Jane",
+      "rating": 945,
+      "rating_bin": "lt1000",
+      "games": 100,
+      "training_positions": 2418,
+      "validation_positions": 536
+    },
+    {
+      "id": 4,
+      "name": "josueg12chess",
+      "username": "josueg12chess",
+      "rating": 860,
+      "rating_bin": "lt1000",
+      "games": 100,
+      "training_positions": 2177,
+      "validation_positions": 446
+    },
+    {
+      "id": 5,
+      "name": "kamallllll",
+      "username": "kamallllll",
+      "rating": 953,
+      "rating_bin": "lt1000",
+      "games": 100,
+      "training_positions": 2103,
+      "validation_positions": 615
+    },
+    {
+      "id": 6,
+      "name": "Madi_bugg",
+      "username": "Madi_bugg",
+      "rating": 942,
+      "rating_bin": "lt1000",
+      "games": 100,
+      "training_positions": 1988,
+      "validation_positions": 486
+    },
+    {
+      "id": 7,
+      "name": "mhdaaqil",
+      "username": "mhdaaqil",
+      "rating": 881,
+      "rating_bin": "lt1000",
+      "games": 100,
+      "training_positions": 1843,
+      "validation_positions": 411
+    },
+    {
+      "id": 8,
+      "name": "MolyGreaseNinja",
+      "username": "MolyGreaseNinja",
+      "rating": 999,
+      "rating_bin": "lt1000",
+      "games": 100,
+      "training_positions": 2233,
+      "validation_positions": 434
+    },
+    {
+      "id": 9,
+      "name": "pawnstorm22",
+      "username": "pawnstorm22",
+      "rating": 954,
+      "rating_bin": "lt1000",
+      "games": 100,
+      "training_positions": 1758,
+      "validation_positions": 502
+    },
+    {
+      "id": 10,
+      "name": "punjablion",
+      "username": "punjablion",
+      "rating": 925,
+      "rating_bin": "lt1000",
+      "games": 100,
+      "training_positions": 2264,
+      "validation_positions": 519
+    },
+    {
+      "id": 11,
+      "name": "remoon74",
+      "username": "remoon74",
+      "rating": 757,
+      "rating_bin": "lt1000",
+      "games": 100,
+      "training_positions": 2672,
+      "validation_positions": 484
+    },
+    {
+      "id": 12,
+      "name": "samguerra",
+      "username": "samguerra",
+      "rating": 981,
+      "rating_bin": "lt1000",
+      "games": 100,
+      "training_positions": 2210,
+      "validation_positions": 566
+    },
+    {
+      "id": 13,
+      "name": "Shiningknight8",
+      "username": "Shiningknight8",
+      "rating": 988,
+      "rating_bin": "lt1000",
+      "games": 100,
+      "training_positions": 2147,
+      "validation_positions": 633
+    },
+    {
+      "id": 14,
+      "name": "Tomorrow_Never_Knows",
+      "username": "Tomorrow_Never_Knows",
+      "rating": 619,
+      "rating_bin": "lt1000",
+      "games": 100,
+      "training_positions": 1542,
+      "validation_positions": 386
+    },
+    {
+      "id": 15,
+      "name": "Alkaly1982",
+      "username": "Alkaly1982",
+      "rating": 1193,
+      "rating_bin": "1000-1199",
+      "games": 100,
+      "training_positions": 2209,
+      "validation_positions": 665
+    },
+    {
+      "id": 16,
+      "name": "ArshavirAghaei1396",
+      "username": "ArshavirAghaei1396",
+      "rating": 1104,
+      "rating_bin": "1000-1199",
+      "games": 100,
+      "training_positions": 2324,
+      "validation_positions": 655
+    },
+    {
+      "id": 17,
+      "name": "DharmenderArora_77",
+      "username": "DharmenderArora_77",
+      "rating": 1125,
+      "rating_bin": "1000-1199",
+      "games": 100,
+      "training_positions": 2612,
+      "validation_positions": 653
+    },
+    {
+      "id": 18,
+      "name": "Emmitt1",
+      "username": "Emmitt1",
+      "rating": 1051,
+      "rating_bin": "1000-1199",
+      "games": 100,
+      "training_positions": 2703,
+      "validation_positions": 549
+    },
+    {
+      "id": 19,
+      "name": "Gagik20130614",
+      "username": "Gagik20130614",
+      "rating": 1176,
+      "rating_bin": "1000-1199",
+      "games": 100,
+      "training_positions": 2164,
+      "validation_positions": 510
+    },
+    {
+      "id": 20,
+      "name": "GeneralBlather",
+      "username": "GeneralBlather",
+      "rating": 1113,
+      "rating_bin": "1000-1199",
+      "games": 100,
+      "training_positions": 2442,
+      "validation_positions": 654
+    },
+    {
+      "id": 21,
+      "name": "Lucyfer874",
+      "username": "Lucyfer874",
+      "rating": 1093,
+      "rating_bin": "1000-1199",
+      "games": 100,
+      "training_positions": 1595,
+      "validation_positions": 362
+    },
+    {
+      "id": 22,
+      "name": "mahmoud5468",
+      "username": "mahmoud5468",
+      "rating": 1093,
+      "rating_bin": "1000-1199",
+      "games": 100,
+      "training_positions": 1997,
+      "validation_positions": 571
+    },
+    {
+      "id": 23,
+      "name": "OmerBasar",
+      "username": "OmerBasar",
+      "rating": 1090,
+      "rating_bin": "1000-1199",
+      "games": 100,
+      "training_positions": 2385,
+      "validation_positions": 921
+    },
+    {
+      "id": 24,
+      "name": "resloz",
+      "username": "resloz",
+      "rating": 1105,
+      "rating_bin": "1000-1199",
+      "games": 100,
+      "training_positions": 2753,
+      "validation_positions": 698
+    },
+    {
+      "id": 25,
+      "name": "Santanahxcx",
+      "username": "Santanahxcx",
+      "rating": 1109,
+      "rating_bin": "1000-1199",
+      "games": 100,
+      "training_positions": 2258,
+      "validation_positions": 553
+    },
+    {
+      "id": 26,
+      "name": "Toinouh",
+      "username": "Toinouh",
+      "rating": 1041,
+      "rating_bin": "1000-1199",
+      "games": 100,
+      "training_positions": 2474,
+      "validation_positions": 569
+    },
+    {
+      "id": 27,
+      "name": "Tuul4",
+      "username": "Tuul4",
+      "rating": 1035,
+      "rating_bin": "1000-1199",
+      "games": 100,
+      "training_positions": 2415,
+      "validation_positions": 573
+    },
+    {
+      "id": 28,
+      "name": "Voxcaeli",
+      "username": "Voxcaeli",
+      "rating": 1088,
+      "rating_bin": "1000-1199",
+      "games": 100,
+      "training_positions": 2360,
+      "validation_positions": 558
+    },
+    {
+      "id": 29,
+      "name": "Yaroub123456789",
+      "username": "Yaroub123456789",
+      "rating": 1154,
+      "rating_bin": "1000-1199",
+      "games": 100,
+      "training_positions": 2298,
+      "validation_positions": 658
+    },
+    {
+      "id": 30,
+      "name": "albinlearning",
+      "username": "albinlearning",
+      "rating": 1309,
+      "rating_bin": "1200-1399",
+      "games": 100,
+      "training_positions": 2625,
+      "validation_positions": 604
+    },
+    {
+      "id": 31,
+      "name": "beatatitiledoplayer",
+      "username": "beatatitiledoplayer",
+      "rating": 1213,
+      "rating_bin": "1200-1399",
+      "games": 100,
+      "training_positions": 2388,
+      "validation_positions": 512
+    },
+    {
+      "id": 32,
+      "name": "Danyero",
+      "username": "Danyero",
+      "rating": 1372,
+      "rating_bin": "1200-1399",
+      "games": 100,
+      "training_positions": 3020,
+      "validation_positions": 731
+    },
+    {
+      "id": 33,
+      "name": "Felipe80rodrigues",
+      "username": "Felipe80rodrigues",
+      "rating": 1376,
+      "rating_bin": "1200-1399",
+      "games": 100,
+      "training_positions": 2626,
+      "validation_positions": 718
+    },
+    {
+      "id": 34,
+      "name": "Ichselber",
+      "username": "Ichselber",
+      "rating": 1386,
+      "rating_bin": "1200-1399",
+      "games": 100,
+      "training_positions": 2760,
+      "validation_positions": 587
+    },
+    {
+      "id": 35,
+      "name": "ItalianGambit",
+      "username": "ItalianGambit",
+      "rating": 1271,
+      "rating_bin": "1200-1399",
+      "games": 100,
+      "training_positions": 2496,
+      "validation_positions": 563
+    },
+    {
+      "id": 36,
+      "name": "Luan_e",
+      "username": "Luan_e",
+      "rating": 1306,
+      "rating_bin": "1200-1399",
+      "games": 100,
+      "training_positions": 2694,
+      "validation_positions": 626
+    },
+    {
+      "id": 37,
+      "name": "natalMO",
+      "username": "natalMO",
+      "rating": 1283,
+      "rating_bin": "1200-1399",
+      "games": 100,
+      "training_positions": 2737,
+      "validation_positions": 741
+    },
+    {
+      "id": 38,
+      "name": "opyegor",
+      "username": "opyegor",
+      "rating": 1311,
+      "rating_bin": "1200-1399",
+      "games": 100,
+      "training_positions": 2861,
+      "validation_positions": 710
+    },
+    {
+      "id": 39,
+      "name": "prostoAndrew",
+      "username": "prostoAndrew",
+      "rating": 1243,
+      "rating_bin": "1200-1399",
+      "games": 100,
+      "training_positions": 2617,
+      "validation_positions": 767
+    },
+    {
+      "id": 40,
+      "name": "Sadinb",
+      "username": "Sadinb",
+      "rating": 1269,
+      "rating_bin": "1200-1399",
+      "games": 100,
+      "training_positions": 3104,
+      "validation_positions": 572
+    },
+    {
+      "id": 41,
+      "name": "sainis",
+      "username": "sainis",
+      "rating": 1257,
+      "rating_bin": "1200-1399",
+      "games": 100,
+      "training_positions": 3039,
+      "validation_positions": 763
+    },
+    {
+      "id": 42,
+      "name": "sarao1415",
+      "username": "sarao1415",
+      "rating": 1208,
+      "rating_bin": "1200-1399",
+      "games": 100,
+      "training_positions": 2071,
+      "validation_positions": 508
+    },
+    {
+      "id": 43,
+      "name": "Shashank-karkare",
+      "username": "Shashank-karkare",
+      "rating": 1311,
+      "rating_bin": "1200-1399",
+      "games": 100,
+      "training_positions": 3056,
+      "validation_positions": 791
+    },
+    {
+      "id": 44,
+      "name": "ted206",
+      "username": "ted206",
+      "rating": 1213,
+      "rating_bin": "1200-1399",
+      "games": 100,
+      "training_positions": 2433,
+      "validation_positions": 564
+    },
+    {
+      "id": 45,
+      "name": "AleksandrVasilyev",
+      "username": "AleksandrVasilyev",
+      "rating": 1561,
+      "rating_bin": "1400-1599",
+      "games": 100,
+      "training_positions": 2979,
+      "validation_positions": 789
+    },
+    {
+      "id": 46,
+      "name": "Aura_smart_homes",
+      "username": "Aura_smart_homes",
+      "rating": 1419,
+      "rating_bin": "1400-1599",
+      "games": 100,
+      "training_positions": 2710,
+      "validation_positions": 761
+    },
+    {
+      "id": 47,
+      "name": "giogiogiogiogio",
+      "username": "giogiogiogiogio",
+      "rating": 1443,
+      "rating_bin": "1400-1599",
+      "games": 100,
+      "training_positions": 2860,
+      "validation_positions": 764
+    },
+    {
+      "id": 48,
+      "name": "IamAaravthegoat",
+      "username": "IamAaravthegoat",
+      "rating": 1506,
+      "rating_bin": "1400-1599",
+      "games": 100,
+      "training_positions": 3021,
+      "validation_positions": 577
+    },
+    {
+      "id": 49,
+      "name": "joesnooze",
+      "username": "joesnooze",
+      "rating": 1452,
+      "rating_bin": "1400-1599",
+      "games": 100,
+      "training_positions": 2666,
+      "validation_positions": 585
+    },
+    {
+      "id": 50,
+      "name": "Jrussell8",
+      "username": "Jrussell8",
+      "rating": 1584,
+      "rating_bin": "1400-1599",
+      "games": 100,
+      "training_positions": 2799,
+      "validation_positions": 793
+    },
+    {
+      "id": 51,
+      "name": "Juan2012l",
+      "username": "Juan2012l",
+      "rating": 1411,
+      "rating_bin": "1400-1599",
+      "games": 100,
+      "training_positions": 2421,
+      "validation_positions": 673
+    },
+    {
+      "id": 52,
+      "name": "Karzan12",
+      "username": "Karzan12",
+      "rating": 1427,
+      "rating_bin": "1400-1599",
+      "games": 100,
+      "training_positions": 2568,
+      "validation_positions": 650
+    },
+    {
+      "id": 53,
+      "name": "Matvei4",
+      "username": "Matvei4",
+      "rating": 1554,
+      "rating_bin": "1400-1599",
+      "games": 100,
+      "training_positions": 2481,
+      "validation_positions": 600
+    },
+    {
+      "id": 54,
+      "name": "mehrzad_Ghanbari",
+      "username": "mehrzad_Ghanbari",
+      "rating": 1530,
+      "rating_bin": "1400-1599",
+      "games": 100,
+      "training_positions": 2989,
+      "validation_positions": 749
+    },
+    {
+      "id": 55,
+      "name": "SaidevsGambit",
+      "username": "SaidevsGambit",
+      "rating": 1404,
+      "rating_bin": "1400-1599",
+      "games": 100,
+      "training_positions": 2462,
+      "validation_positions": 442
+    },
+    {
+      "id": 56,
+      "name": "SapereAude74",
+      "username": "SapereAude74",
+      "rating": 1402,
+      "rating_bin": "1400-1599",
+      "games": 100,
+      "training_positions": 2374,
+      "validation_positions": 642
+    },
+    {
+      "id": 57,
+      "name": "stw_097",
+      "username": "stw_097",
+      "rating": 1532,
+      "rating_bin": "1400-1599",
+      "games": 100,
+      "training_positions": 2322,
+      "validation_positions": 550
+    },
+    {
+      "id": 58,
+      "name": "sushanpanguluri",
+      "username": "sushanpanguluri",
+      "rating": 1472,
+      "rating_bin": "1400-1599",
+      "games": 100,
+      "training_positions": 2570,
+      "validation_positions": 615
+    },
+    {
+      "id": 59,
+      "name": "yusufekici0734",
+      "username": "yusufekici0734",
+      "rating": 1562,
+      "rating_bin": "1400-1599",
+      "games": 100,
+      "training_positions": 3137,
+      "validation_positions": 862
+    },
+    {
+      "id": 60,
+      "name": "D_Daniel",
+      "username": "D_Daniel",
+      "rating": 1789,
+      "rating_bin": "1600-1799",
+      "games": 100,
+      "training_positions": 3025,
+      "validation_positions": 692
+    },
+    {
+      "id": 61,
+      "name": "eagle727",
+      "username": "eagle727",
+      "rating": 1659,
+      "rating_bin": "1600-1799",
+      "games": 100,
+      "training_positions": 3088,
+      "validation_positions": 816
+    },
+    {
+      "id": 62,
+      "name": "fibonacci1123",
+      "username": "fibonacci1123",
+      "rating": 1761,
+      "rating_bin": "1600-1799",
+      "games": 100,
+      "training_positions": 2929,
+      "validation_positions": 732
+    },
+    {
+      "id": 63,
+      "name": "Heisenberg123459",
+      "username": "Heisenberg123459",
+      "rating": 1682,
+      "rating_bin": "1600-1799",
+      "games": 100,
+      "training_positions": 3086,
+      "validation_positions": 754
+    },
+    {
+      "id": 64,
+      "name": "helo1111111",
+      "username": "helo1111111",
+      "rating": 1641,
+      "rating_bin": "1600-1799",
+      "games": 100,
+      "training_positions": 2997,
+      "validation_positions": 729
+    },
+    {
+      "id": 65,
+      "name": "JMTUC",
+      "username": "JMTUC",
+      "rating": 1680,
+      "rating_bin": "1600-1799",
+      "games": 100,
+      "training_positions": 2550,
+      "validation_positions": 669
+    },
+    {
+      "id": 66,
+      "name": "Liar2015",
+      "username": "Liar2015",
+      "rating": 1747,
+      "rating_bin": "1600-1799",
+      "games": 100,
+      "training_positions": 2484,
+      "validation_positions": 682
+    },
+    {
+      "id": 67,
+      "name": "nekollaps",
+      "username": "nekollaps",
+      "rating": 1692,
+      "rating_bin": "1600-1799",
+      "games": 100,
+      "training_positions": 2826,
+      "validation_positions": 753
+    },
+    {
+      "id": 68,
+      "name": "Pogi08",
+      "username": "Pogi08",
+      "rating": 1615,
+      "rating_bin": "1600-1799",
+      "games": 100,
+      "training_positions": 2762,
+      "validation_positions": 567
+    },
+    {
+      "id": 69,
+      "name": "PratEEk64",
+      "username": "PratEEk64",
+      "rating": 1694,
+      "rating_bin": "1600-1799",
+      "games": 100,
+      "training_positions": 2855,
+      "validation_positions": 584
+    },
+    {
+      "id": 70,
+      "name": "rbb64",
+      "username": "rbb64",
+      "rating": 1659,
+      "rating_bin": "1600-1799",
+      "games": 100,
+      "training_positions": 3047,
+      "validation_positions": 794
+    },
+    {
+      "id": 71,
+      "name": "Schachbrettblume",
+      "username": "Schachbrettblume",
+      "rating": 1699,
+      "rating_bin": "1600-1799",
+      "games": 100,
+      "training_positions": 3275,
+      "validation_positions": 929
+    },
+    {
+      "id": 72,
+      "name": "Shiylamoh999",
+      "username": "Shiylamoh999",
+      "rating": 1777,
+      "rating_bin": "1600-1799",
+      "games": 100,
+      "training_positions": 2614,
+      "validation_positions": 613
+    },
+    {
+      "id": 73,
+      "name": "Sowbhagya0505",
+      "username": "Sowbhagya0505",
+      "rating": 1718,
+      "rating_bin": "1600-1799",
+      "games": 100,
+      "training_positions": 2924,
+      "validation_positions": 752
+    },
+    {
+      "id": 74,
+      "name": "vovchuk11",
+      "username": "vovchuk11",
+      "rating": 1658,
+      "rating_bin": "1600-1799",
+      "games": 100,
+      "training_positions": 2654,
+      "validation_positions": 655
+    },
+    {
+      "id": 75,
+      "name": "alexandrgolovach",
+      "username": "alexandrgolovach",
+      "rating": 1896,
+      "rating_bin": "1800-1999",
+      "games": 100,
+      "training_positions": 2606,
+      "validation_positions": 588
+    },
+    {
+      "id": 76,
+      "name": "Bomua",
+      "username": "Bomua",
+      "rating": 1800,
+      "rating_bin": "1800-1999",
+      "games": 100,
+      "training_positions": 2877,
+      "validation_positions": 662
+    },
+    {
+      "id": 77,
+      "name": "cicerojoao2",
+      "username": "cicerojoao2",
+      "rating": 1801,
+      "rating_bin": "1800-1999",
+      "games": 100,
+      "training_positions": 3017,
+      "validation_positions": 635
+    },
+    {
+      "id": 78,
+      "name": "Elagin12",
+      "username": "Elagin12",
+      "rating": 1856,
+      "rating_bin": "1800-1999",
+      "games": 100,
+      "training_positions": 3160,
+      "validation_positions": 709
+    },
+    {
+      "id": 79,
+      "name": "Emanz5",
+      "username": "Emanz5",
+      "rating": 1823,
+      "rating_bin": "1800-1999",
+      "games": 100,
+      "training_positions": 2717,
+      "validation_positions": 596
+    },
+    {
+      "id": 80,
+      "name": "G_devansh",
+      "username": "G_devansh",
+      "rating": 1804,
+      "rating_bin": "1800-1999",
+      "games": 100,
+      "training_positions": 2699,
+      "validation_positions": 748
+    },
+    {
+      "id": 81,
+      "name": "ghostrider_67",
+      "username": "ghostrider_67",
+      "rating": 1934,
+      "rating_bin": "1800-1999",
+      "games": 100,
+      "training_positions": 2668,
+      "validation_positions": 653
+    },
+    {
+      "id": 82,
+      "name": "goker531",
+      "username": "goker531",
+      "rating": 1960,
+      "rating_bin": "1800-1999",
+      "games": 100,
+      "training_positions": 1938,
+      "validation_positions": 543
+    },
+    {
+      "id": 83,
+      "name": "kingqueenpnb",
+      "username": "kingqueenpnb",
+      "rating": 1849,
+      "rating_bin": "1800-1999",
+      "games": 100,
+      "training_positions": 3282,
+      "validation_positions": 873
+    },
+    {
+      "id": 84,
+      "name": "kiril_prodanov",
+      "username": "kiril_prodanov",
+      "rating": 1988,
+      "rating_bin": "1800-1999",
+      "games": 100,
+      "training_positions": 3162,
+      "validation_positions": 693
+    },
+    {
+      "id": 85,
+      "name": "Mandito1231",
+      "username": "Mandito1231",
+      "rating": 1840,
+      "rating_bin": "1800-1999",
+      "games": 100,
+      "training_positions": 2680,
+      "validation_positions": 646
+    },
+    {
+      "id": 86,
+      "name": "Night-Warrior",
+      "username": "Night-Warrior",
+      "rating": 1945,
+      "rating_bin": "1800-1999",
+      "games": 100,
+      "training_positions": 2769,
+      "validation_positions": 799
+    },
+    {
+      "id": 87,
+      "name": "nwthmitha2015",
+      "username": "nwthmitha2015",
+      "rating": 1990,
+      "rating_bin": "1800-1999",
+      "games": 100,
+      "training_positions": 2667,
+      "validation_positions": 713
+    },
+    {
+      "id": 88,
+      "name": "Taoh",
+      "username": "Taoh",
+      "rating": 1840,
+      "rating_bin": "1800-1999",
+      "games": 100,
+      "training_positions": 2747,
+      "validation_positions": 810
+    },
+    {
+      "id": 89,
+      "name": "VICTORY1027",
+      "username": "VICTORY1027",
+      "rating": 1904,
+      "rating_bin": "1800-1999",
+      "games": 100,
+      "training_positions": 3159,
+      "validation_positions": 733
+    },
+    {
+      "id": 90,
+      "name": "ak_rgo_ng",
+      "username": "ak_rgo_ng",
+      "rating": 2034,
+      "rating_bin": "2000-2199",
+      "games": 100,
+      "training_positions": 3109,
+      "validation_positions": 780
+    },
+    {
+      "id": 91,
+      "name": "AleksandrVuktyl",
+      "username": "AleksandrVuktyl",
+      "rating": 2060,
+      "rating_bin": "2000-2199",
+      "games": 100,
+      "training_positions": 2790,
+      "validation_positions": 769
+    },
+    {
+      "id": 92,
+      "name": "AraratSarkisyan",
+      "username": "AraratSarkisyan",
+      "rating": 2136,
+      "rating_bin": "2000-2199",
+      "games": 100,
+      "training_positions": 2438,
+      "validation_positions": 672
+    },
+    {
+      "id": 93,
+      "name": "BLTX",
+      "username": "BLTX",
+      "rating": 2127,
+      "rating_bin": "2000-2199",
+      "games": 100,
+      "training_positions": 2694,
+      "validation_positions": 760
+    },
+    {
+      "id": 94,
+      "name": "DrSantaMan123",
+      "username": "DrSantaMan123",
+      "rating": 2126,
+      "rating_bin": "2000-2199",
+      "games": 100,
+      "training_positions": 2664,
+      "validation_positions": 863
+    },
+    {
+      "id": 95,
+      "name": "DVG_KrD_2016",
+      "username": "DVG_KrD_2016",
+      "rating": 2124,
+      "rating_bin": "2000-2199",
+      "games": 100,
+      "training_positions": 3477,
+      "validation_positions": 715
+    },
+    {
+      "id": 96,
+      "name": "javaf",
+      "username": "javaf",
+      "rating": 2033,
+      "rating_bin": "2000-2199",
+      "games": 100,
+      "training_positions": 2992,
+      "validation_positions": 856
+    },
+    {
+      "id": 97,
+      "name": "joo_4",
+      "username": "joo_4",
+      "rating": 2058,
+      "rating_bin": "2000-2199",
+      "games": 100,
+      "training_positions": 2809,
+      "validation_positions": 709
+    },
+    {
+      "id": 98,
+      "name": "kachithought2",
+      "username": "kachithought2",
+      "rating": 2192,
+      "rating_bin": "2000-2199",
+      "games": 100,
+      "training_positions": 2741,
+      "validation_positions": 601
+    },
+    {
+      "id": 99,
+      "name": "RoccoTaco1",
+      "username": "RoccoTaco1",
+      "rating": 2128,
+      "rating_bin": "2000-2199",
+      "games": 100,
+      "training_positions": 3078,
+      "validation_positions": 781
+    },
+    {
+      "id": 100,
+      "name": "Sagic8",
+      "username": "Sagic8",
+      "rating": 2005,
+      "rating_bin": "2000-2199",
+      "games": 100,
+      "training_positions": 3143,
+      "validation_positions": 830
+    },
+    {
+      "id": 101,
+      "name": "Tom288",
+      "username": "Tom288",
+      "rating": 2138,
+      "rating_bin": "2000-2199",
+      "games": 100,
+      "training_positions": 3264,
+      "validation_positions": 835
+    },
+    {
+      "id": 102,
+      "name": "Viktor-05",
+      "username": "Viktor-05",
+      "rating": 2026,
+      "rating_bin": "2000-2199",
+      "games": 100,
+      "training_positions": 3039,
+      "validation_positions": 720
+    },
+    {
+      "id": 103,
+      "name": "Wackypenguin",
+      "username": "Wackypenguin",
+      "rating": 2147,
+      "rating_bin": "2000-2199",
+      "games": 100,
+      "training_positions": 3438,
+      "validation_positions": 911
+    },
+    {
+      "id": 104,
+      "name": "zoloman",
+      "username": "zoloman",
+      "rating": 2088,
+      "rating_bin": "2000-2199",
+      "games": 100,
+      "training_positions": 2855,
+      "validation_positions": 849
+    },
+    {
+      "id": 105,
+      "name": "AAPA23",
+      "username": "AAPA23",
+      "rating": 2407,
+      "rating_bin": "2200plus",
+      "games": 100,
+      "training_positions": 3355,
+      "validation_positions": 843
+    },
+    {
+      "id": 106,
+      "name": "Ange_lina_jolie",
+      "username": "Ange_lina_jolie",
+      "rating": 2231,
+      "rating_bin": "2200plus",
+      "games": 100,
+      "training_positions": 3013,
+      "validation_positions": 875
+    },
+    {
+      "id": 107,
+      "name": "Chessw47",
+      "username": "Chessw47",
+      "rating": 2301,
+      "rating_bin": "2200plus",
+      "games": 100,
+      "training_positions": 2749,
+      "validation_positions": 720
+    },
+    {
+      "id": 108,
+      "name": "CoachChuah",
+      "username": "CoachChuah",
+      "rating": 2205,
+      "rating_bin": "2200plus",
+      "games": 100,
+      "training_positions": 3156,
+      "validation_positions": 947
+    },
+    {
+      "id": 109,
+      "name": "EminovOrkhan",
+      "username": "EminovOrkhan",
+      "rating": 2618,
+      "rating_bin": "2200plus",
+      "games": 100,
+      "training_positions": 3477,
+      "validation_positions": 979
+    },
+    {
+      "id": 110,
+      "name": "Ferstep",
+      "username": "Ferstep",
+      "rating": 2361,
+      "rating_bin": "2200plus",
+      "games": 100,
+      "training_positions": 3373,
+      "validation_positions": 665
+    },
+    {
+      "id": 111,
+      "name": "gajiyev",
+      "username": "gajiyev",
+      "rating": 2583,
+      "rating_bin": "2200plus",
+      "games": 100,
+      "training_positions": 3449,
+      "validation_positions": 834
+    },
+    {
+      "id": 112,
+      "name": "hdushd",
+      "username": "hdushd",
+      "rating": 2323,
+      "rating_bin": "2200plus",
+      "games": 100,
+      "training_positions": 2560,
+      "validation_positions": 568
+    },
+    {
+      "id": 113,
+      "name": "HonqueSagatame",
+      "username": "HonqueSagatame",
+      "rating": 2416,
+      "rating_bin": "2200plus",
+      "games": 100,
+      "training_positions": 3633,
+      "validation_positions": 846
+    },
+    {
+      "id": 114,
+      "name": "NaaIhr",
+      "username": "NaaIhr",
+      "rating": 2237,
+      "rating_bin": "2200plus",
+      "games": 100,
+      "training_positions": 3052,
+      "validation_positions": 873
+    },
+    {
+      "id": 115,
+      "name": "nextgm4",
+      "username": "nextgm4",
+      "rating": 2548,
+      "rating_bin": "2200plus",
+      "games": 100,
+      "training_positions": 3823,
+      "validation_positions": 814
+    },
+    {
+      "id": 116,
+      "name": "PolishEngland",
+      "username": "PolishEngland",
+      "rating": 2538,
+      "rating_bin": "2200plus",
+      "games": 100,
+      "training_positions": 3189,
+      "validation_positions": 666
+    },
+    {
+      "id": 117,
+      "name": "realandante",
+      "username": "realandante",
+      "rating": 2246,
+      "rating_bin": "2200plus",
+      "games": 100,
+      "training_positions": 2633,
+      "validation_positions": 744
+    },
+    {
+      "id": 118,
+      "name": "VasilyLoginov",
+      "username": "VasilyLoginov",
+      "rating": 2327,
+      "rating_bin": "2200plus",
+      "games": 100,
+      "training_positions": 3866,
+      "validation_positions": 922
+    },
+    {
+      "id": 119,
+      "name": "WillyCasanova",
+      "username": "WillyCasanova",
+      "rating": 2667,
+      "rating_bin": "2200plus",
+      "games": 100,
+      "training_positions": 3452,
+      "validation_positions": 1011
+    }
+  ],
+  "training": {
+    "epochs": 15,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "scheduler": "cosine_annealing",
+    "unfrozen_module": "chess_cnn.layers[-1]",
+    "early_stopping_patience": 3,
+    "best_epoch": 3,
+    "best_validation_top1": 0.5430782227554881,
+    "stopped_early": true,
+    "device": "cpu",
+    "train_positions": 326584,
+    "validation_positions": 81677,
+    "history": [
+      {
+        "epoch": 1,
+        "training_loss": 1.4529867814002608,
+        "training_top1": 0.5272089263405433,
+        "validation_loss": 1.4383515032594356,
+        "validation_top1": 0.5303451400026935,
+        "validation_move_jsd": 0.004094982704907503,
+        "validation_player_style_jsd": 0.14933297540978982,
+        "baseline_validation_top1": 0.5134860487040416,
+        "baseline_validation_move_jsd": 0.00944286202870762,
+        "baseline_validation_player_style_jsd": 0.15663446507104112,
+        "learning_rate": 0.0009890738003669028
+      },
+      {
+        "epoch": 2,
+        "training_loss": 1.3915179998979847,
+        "training_top1": 0.5455227445312691,
+        "validation_loss": 1.4106590161529107,
+        "validation_top1": 0.5392582979296497,
+        "validation_move_jsd": 0.0034261560357727256,
+        "validation_player_style_jsd": 0.14551406126574953,
+        "baseline_validation_top1": 0.5134860487040416,
+        "baseline_validation_move_jsd": 0.00944286202870762,
+        "baseline_validation_player_style_jsd": 0.15663446507104112,
+        "learning_rate": 0.0009567727288213003
+      },
+      {
+        "epoch": 3,
+        "training_loss": 1.3449830620720973,
+        "training_top1": 0.5601744114837224,
+        "validation_loss": 1.4119812764866568,
+        "validation_top1": 0.5430782227554881,
+        "validation_move_jsd": 0.003413600447119683,
+        "validation_player_style_jsd": 0.1443034062106322,
+        "baseline_validation_top1": 0.5134860487040416,
+        "baseline_validation_move_jsd": 0.00944286202870762,
+        "baseline_validation_player_style_jsd": 0.15663446507104112,
+        "learning_rate": 0.0009045084971874737
+      },
+      {
+        "epoch": 4,
+        "training_loss": 1.2918066505127452,
+        "training_top1": 0.57695110599417,
+        "validation_loss": 1.4187057474840064,
+        "validation_top1": 0.5403234692753162,
+        "validation_move_jsd": 0.0036148108106143885,
+        "validation_player_style_jsd": 0.14441516409871535,
+        "baseline_validation_top1": 0.5134860487040416,
+        "baseline_validation_move_jsd": 0.00944286202870762,
+        "baseline_validation_player_style_jsd": 0.15663446507104112,
+        "learning_rate": 0.0008345653031794292
+      },
+      {
+        "epoch": 5,
+        "training_loss": 1.2286949527435054,
+        "training_top1": 0.5968449158562575,
+        "validation_loss": 1.4509019548585862,
+        "validation_top1": 0.5371646852847191,
+        "validation_move_jsd": 0.0035712154903089974,
+        "validation_player_style_jsd": 0.14454022641024605,
+        "baseline_validation_top1": 0.5134860487040416,
+        "baseline_validation_move_jsd": 0.00944286202870762,
+        "baseline_validation_player_style_jsd": 0.15663446507104112,
+        "learning_rate": 0.00075
+      },
+      {
+        "epoch": 6,
+        "training_loss": 1.1571210528072406,
+        "training_top1": 0.6213194767655489,
+        "validation_loss": 1.486031825727196,
+        "validation_top1": 0.5332590570172754,
+        "validation_move_jsd": 0.003706125005031093,
+        "validation_player_style_jsd": 0.14639558910046435,
+        "baseline_validation_top1": 0.5134860487040416,
+        "baseline_validation_move_jsd": 0.00944286202870762,
+        "baseline_validation_player_style_jsd": 0.15663446507104112,
+        "learning_rate": 0.0006545084971874737
+      }
+    ]
+  },
+  "model": "maia4all_player.onnx",
+  "prototype_matcher": "maia4all_pmn.onnx",
+  "matcher_window_size": 16,
+  "matcher_opening_plies": 12,
+  "matcher_dropout": 0.5,
+  "matcher_weight_decay": 0.0001,
+  "matcher_minimum_games": 20,
+  "matcher_maximum_games": 50,
+  "matcher_history": [
+    {
+      "epoch": 1,
+      "training_loss": 4.6256160461543425,
+      "training_accuracy": 0.1892771254774367,
+      "validation_accuracy": 0.02631578947368421
+    },
+    {
+      "epoch": 2,
+      "training_loss": 3.5296246723502067,
+      "training_accuracy": 0.54123638421276,
+      "validation_accuracy": 0.013157894736842105
+    },
+    {
+      "epoch": 3,
+      "training_loss": 1.9787375791050248,
+      "training_accuracy": 0.921063799688782,
+      "validation_accuracy": 0.02631578947368421
+    },
+    {
+      "epoch": 4,
+      "training_loss": 0.912560477252053,
+      "training_accuracy": 0.9926439383222521,
+      "validation_accuracy": 0.02631578947368421,
+      "best_epoch": 1,
+      "best_validation_accuracy": 0.02631578947368421,
+      "stopped_early": true
+    }
+  ],
+  "board_dtype": "float32",
+  "move_vocabulary_size": 1880
+}

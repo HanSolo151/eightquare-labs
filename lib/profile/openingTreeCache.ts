@@ -5,8 +5,17 @@ const STORE = "trees";
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
-    request.onupgradeneeded = () => request.result.createObjectStore(STORE, { keyPath: "username" });
+    const request = indexedDB.open(DB_NAME, 2);
+    request.onupgradeneeded = (event) => {
+      const db = request.result;
+      if (event.oldVersion < 1) db.createObjectStore(STORE, { keyPath: "username" });
+      else if (event.oldVersion < 2) {
+        // The opening-position key now includes en-passant state, so old
+        // cached keys cannot safely be reused.
+        db.deleteObjectStore(STORE);
+        db.createObjectStore(STORE, { keyPath: "username" });
+      }
+    };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });

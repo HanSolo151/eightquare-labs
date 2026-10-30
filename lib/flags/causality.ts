@@ -1,70 +1,64 @@
-import type { GameEval, CausalityVerdict } from "@/types";
+import type { GameEval, CausalityVerdict, EvalPoint } from "@/types";
 import { MATE_EQUIVALENT_CP, toPlayerPerspective } from "@/lib/eval/toPlayerPerspective";
 
-const PARITY_THRESHOLD_CP = 50; // back within half a pawn counts as "recovered" — tunable, not validated
+/** A recovery within half a pawn of the pre-move evaluation counts as repaired. */
+export const RECOVERY_TOLERANCE_CP = 50;
 
-// Phase 2 edge case (flagged in the Phase 0/2 audit): flagEngine's mate-only
-// handling can now reach this function with a candidate whose cpAfter is
-// null but mateAfter isn't (see flagEngine.ts's resolvedCpLoss). This used
-// to be moot because flagEngine filtered those out before ever calling
-// checkCausality — now that it doesn't, a plain `cpAfter === null` guard
-// here would auto-fail causality for every mate-only flag and silently
-// defeat the point of surfacing them. Must stay large enough to always read
-// as "worse than any real cp score" — doesn't need to match flagEngine's
-// mate-equivalent constant exactly, just the same order of magnitude.
+function moverScore(cp: number | null, mate: number | null): number | null {
+  if (cp !== null && Number.isFinite(cp)) return cp;
+  if (mate === null || !Number.isFinite(mate)) return null;
+  // Preserve mate-vs-cp ordering and make shorter forced mates more valuable.
+  const distance = Math.min(Math.abs(mate), 999);
+  return mate > 0 ? MATE_EQUIVALENT_CP - distance : -MATE_EQUIVALENT_CP + distance;
+}
+
+function scoreForPlayer(point: EvalPoint, field: "before" | "after", ply: number, playerColor: "white" | "black"): number | null {
+  const score = moverScore(point[`cp${field === "before" ? "Before" : "After"}`], point[`mate${field === "before" ? "Before" : "After"}`]);
+  if (score === null) return null;
+  return toPlayerPerspective(score, ply, playerColor);
+}
+
+/**
+ * A candidate's damage is considered repaired only if the player's later
+ * position returns close to the score immediately before the candidate move.
+ * Missing evaluations never count as evidence of recovery.
+ */
 export function checkCausality(
   gameEval: GameEval,
   candidatePly: number,
   playerColor: "white" | "black"
 ): CausalityVerdict {
-  const atCandidate = gameEval.points[candidatePly];
-  if (!atCandidate) {
+  const points = [...gameEval.points].sort((a, b) => a.ply - b.ply);
+  const atCandidate = points.find((point) => point.ply === candidatePly);
+  if (!atCandidate || candidatePly % 2 !== (playerColor === "white" ? 0 : 1)) {
     return { heldToEnd: false, worstFollowingCpLoss: 0, recoveredAtPly: null, plyChecked: candidatePly };
   }
 
-  let cpAfterMove: number;
-  if (atCandidate.cpAfter !== null) {
-    cpAfterMove = toPlayerPerspective(atCandidate.cpAfter, candidatePly, playerColor);
-  } else if (atCandidate.mateAfter !== null && atCandidate.mateAfter < 0) {
-    // mateAfter is already in the mover's POV (see evalCache.normalizeEvalPoint);
-    // negative means the MOVER is the one facing forced mate — substitute a
-    // large synthetic cp value so the walk-forward recovery check below
-    // still works the same way it does for a real cp score.
-    cpAfterMove = -MATE_EQUIVALENT_CP;
-  } else {
-    // No usable eval (still-missing cp, or mateAfter positive — mover
-    // delivers mate, which flagEngine never treats as a blunder and
-    // shouldn't be reaching this function in the first place).
+  const baseline = scoreForPlayer(atCandidate, "before", candidatePly, playerColor);
+  const afterCandidate = scoreForPlayer(atCandidate, "after", candidatePly, playerColor);
+  if (baseline === null || afterCandidate === null) {
     return { heldToEnd: false, worstFollowingCpLoss: 0, recoveredAtPly: null, plyChecked: candidatePly };
   }
 
-  let worst = cpAfterMove;
-  let recoveredAtPly: number | null = null;
-
-  for (let ply = candidatePly + 1; ply < gameEval.points.length; ply++) {
-    const point = gameEval.points[ply];
-    let ownCp: number;
-    if (point.cpAfter !== null) {
-      ownCp = toPlayerPerspective(point.cpAfter, ply, playerColor);
-    } else if (point.mateAfter !== null) {
-      // mateAfter uses the mover's perspective: negative means that mover
-      // faces mate, positive means they delivered mate.
-      const moverCp = point.mateAfter < 0 ? -MATE_EQUIVALENT_CP : MATE_EQUIVALENT_CP;
-      ownCp = toPlayerPerspective(moverCp, ply, playerColor);
-    } else {
-      continue;
+  let worst = afterCandidate;
+  let plyChecked = candidatePly;
+  let expectedPly = candidatePly + 1;
+  for (const point of points) {
+    if (point.ply <= candidatePly) continue;
+    if (point.ply !== expectedPly) {
+      return { heldToEnd: false, worstFollowingCpLoss: worst, recoveredAtPly: null, plyChecked };
     }
-    worst = Math.min(worst, ownCp);
-    if (ownCp > -PARITY_THRESHOLD_CP) {
-      recoveredAtPly = ply;
-      break;
+    expectedPly++;
+    const ownScore = scoreForPlayer(point, "after", point.ply, playerColor);
+    if (ownScore === null) {
+      return { heldToEnd: false, worstFollowingCpLoss: worst, recoveredAtPly: null, plyChecked };
+    }
+    plyChecked = point.ply;
+    worst = Math.min(worst, ownScore);
+    if (ownScore >= baseline - RECOVERY_TOLERANCE_CP) {
+      return { heldToEnd: false, worstFollowingCpLoss: worst, recoveredAtPly: point.ply, plyChecked };
     }
   }
 
-  return {
-    heldToEnd: recoveredAtPly === null,
-    worstFollowingCpLoss: worst,
-    recoveredAtPly,
-    plyChecked: gameEval.points.length - 1,
-  };
+  return { heldToEnd: true, worstFollowingCpLoss: worst, recoveredAtPly: null, plyChecked };
 }

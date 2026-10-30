@@ -6,8 +6,11 @@ export const MIN_OCCURRENCES = 3;
 export const OPENING_BOOST_CAP = 3;
 
 export function openingFenKey(fen: string): string {
-  const [board, turn, castling] = fen.split(" ");
-  return `${board} ${turn} ${castling ?? "-"}`;
+  const [board, turn, castling, enPassant] = fen.split(" ");
+  // En-passant availability changes the legal move set. Omitting it can
+  // merge distinct positions and transfer a historical move preference to
+  // a position where that capture is illegal.
+  return `${board} ${turn} ${castling ?? "-"} ${enPassant ?? "-"}`;
 }
 
 export function emptyOpeningTree(username: string): OpeningTree {

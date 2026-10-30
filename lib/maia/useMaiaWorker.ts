@@ -6,8 +6,23 @@ export interface MaiaInferenceResult {
   logitsMaia: Float32Array;
 }
 
-type PendingResolve = (result: MaiaInferenceResult) => void;
+export interface MaiaPrototypeMatch {
+  playerId: number;
+  confidence: number;
+}
+
 type PendingReject = (err: Error) => void;
+type PendingRequest =
+  | {
+      type: "infer";
+      resolve: (result: MaiaInferenceResult) => void;
+      reject: PendingReject;
+    }
+  | {
+      type: "match";
+      resolve: (result: MaiaPrototypeMatch | null) => void;
+      reject: PendingReject;
+    };
 
 export function isMaiaWorkerStopped(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
@@ -21,7 +36,7 @@ function stoppedError(): Error {
 
 export function useMaiaWorker(enabled = true) {
   const workerRef = useRef<Worker | null>(null);
-  const pendingRef = useRef<Map<string, { resolve: PendingResolve; reject: PendingReject }>>(new Map());
+  const pendingRef = useRef<Map<string, PendingRequest>>(new Map());
 
   useEffect(() => {
     if (!enabled) return;
@@ -30,12 +45,22 @@ export function useMaiaWorker(enabled = true) {
     const pendingRequests = pendingRef.current;
 
     worker.onmessage = (e: MessageEvent) => {
-      const { id, ok } = e.data;
+      const { id, type, ok } = e.data;
       const pending = pendingRef.current.get(id);
       if (!pending) return;
       pendingRef.current.delete(id);
       if (ok) {
-        pending.resolve({ topMoveIndex: e.data.topMoveIndex, topMoveUci: e.data.topMoveUci, logitsMaia: e.data.logitsMaia });
+        if (pending.type !== type) {
+          pending.reject(new Error("Maia worker returned a response for the wrong request."));
+        } else if (pending.type === "infer") {
+          pending.resolve({
+            topMoveIndex: e.data.topMoveIndex,
+            topMoveUci: e.data.topMoveUci,
+            logitsMaia: e.data.logitsMaia,
+          });
+        } else {
+          pending.resolve(e.data.match);
+        }
       } else {
         pending.reject(new Error(e.data.error));
       }
@@ -63,17 +88,22 @@ export function useMaiaWorker(enabled = true) {
   }, [enabled]);
 
   const infer = useCallback(
-    (fen: string, selfRating: number | null, oppRating: number | null) => {
-      return new Promise<{ topMoveIndex: number; topMoveUci: string; logitsMaia: Float32Array }>((resolve, reject) => { 
+    (
+      fen: string,
+      selfRating: number | null,
+      oppRating: number | null,
+      playerId?: number,
+    ) => {
+      return new Promise<MaiaInferenceResult>((resolve, reject) => {
         const worker = workerRef.current;
         if (!worker) {
           reject(new Error("Worker not initialized"));
           return;
         }
         const id = crypto.randomUUID();
-        pendingRef.current.set(id, { resolve, reject });
+        pendingRef.current.set(id, { type: "infer", resolve, reject });
         try {
-          worker.postMessage({ id, fen, selfRating, oppRating });
+          worker.postMessage({ type: "infer", id, fen, selfRating, oppRating, playerId });
         } catch (error) {
           pendingRef.current.delete(id);
           reject(error instanceof Error ? error : new Error(String(error)));
@@ -83,7 +113,28 @@ export function useMaiaWorker(enabled = true) {
     []
   );
 
-  return { infer };
+  const matchPrototype = useCallback((
+    gameMoveUcis: string[][],
+    playerName?: string | null,
+  ) => {
+    return new Promise<MaiaPrototypeMatch | null>((resolve, reject) => {
+      const worker = workerRef.current;
+      if (!worker) {
+        reject(new Error("Worker not initialized"));
+        return;
+      }
+      const id = crypto.randomUUID();
+      pendingRef.current.set(id, { type: "match", resolve, reject });
+      try {
+        worker.postMessage({ type: "match", id, gameMoveUcis, playerName });
+      } catch (error) {
+        pendingRef.current.delete(id);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
+  }, []);
+
+  return { infer, matchPrototype };
 }
 
 

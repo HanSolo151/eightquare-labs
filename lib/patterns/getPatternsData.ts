@@ -184,6 +184,12 @@ export async function getPatternsData(userId: string): Promise<PatternsData> {
     ? (weaknessRow.patterns as unknown as WeaknessPattern[])
     : [];
   const weaknessPatterns: PatternsWeaknessPattern[] = [...patterns]
+    // Older rows contain only phase buckets (opening/middlegame/endgame).
+    // A phase is not a weakness motif, so keep those legacy claims off the
+    // surfaced analysis until an actual motif classifier is available.
+    .filter((pattern) => Array.isArray(pattern.tags) && pattern.tags.some((tag) =>
+      tag !== "opening" && tag !== "middlegame" && tag !== "endgame"
+    ))
     .sort((a, b) => b.occurrences.length - a.occurrences.length)
     .slice(0, MAX_WEAKNESS_PATTERNS_RETURNED)
     .map((pattern) => ({

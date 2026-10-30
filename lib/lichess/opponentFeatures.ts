@@ -136,7 +136,11 @@ export async function extractOpponentFeatures(
     perfType: "rapid",
   });
   const games = parseGames(raw, opponentUsername);
+  return buildOpponentFeaturesFromGames(opponentUsername, games);
+}
 
+/** Build an opponent profile from a caller-supplied corpus (used by temporal holdouts). */
+export function buildOpponentFeaturesFromGames(opponentUsername: string, games: ParsedGame[]): OpponentFeatures {
   if (games.length === 0) {
     return emptyOpponentFeatures(opponentUsername);
   }

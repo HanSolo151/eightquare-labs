@@ -2,6 +2,9 @@
 
 # dependencies
 /node_modules
+/.venv-player-model/
+__pycache__/
+*.py[cod]
 /.pnp
 .pnp.*
 .yarn/*
@@ -17,7 +20,9 @@
 /test-results/
 /data/bigshots/*
 !/data/bigshots/README.md
+/data/player_model/prototypes/
 /artifacts/profile-matcher-dry-run.json
+/artifacts/player_model/
 /artifacts/bigshot-staging/
 /backups/
 

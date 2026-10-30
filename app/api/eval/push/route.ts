@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { updateWeaknessProfile } from "@/lib/profile/weaknessProfile";
 import { updateBiasProfile, type BiasProfileState } from "@/lib/bias/updateBiasProfile";
+import { extractMoveFeatures } from "@/lib/features/extractFeatures";
+import { flagMoves } from "@/lib/flags/flagEngine";
 import type { GameEval, MoveFeature, WeaknessProfile, FlaggedMove, PlayerProfile } from "@/types";
 
 interface PushBody {
@@ -58,6 +60,18 @@ function pushBodyValidationError(value: unknown): string | null {
       return `gameEval.points[${ply}] has a score that is neither finite nor null`;
     }
     if (!isFiniteNumber(point.depth)) return `gameEval.points[${ply}].depth must be finite`;
+    if (point.depth < 8) return `gameEval.points[${ply}].depth is too shallow to save`;
+    const beforeHasScore = point.cpBefore !== null || point.mateBefore !== null;
+    const afterHasScore = point.cpAfter !== null || point.mateAfter !== null;
+    const beforeIsExclusive = (point.cpBefore === null) !== (point.mateBefore === null);
+    const afterIsExclusive = (point.cpAfter === null) !== (point.mateAfter === null);
+    if (!beforeHasScore || !afterHasScore || !beforeIsExclusive || !afterIsExclusive) {
+      return `gameEval.points[${ply}] must contain exactly one finite cp or mate score before and after`;
+    }
+    if (!(point.bestMoveUci === null || typeof point.bestMoveUci === "string" &&
+      /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(point.bestMoveUci))) {
+      return `gameEval.points[${ply}].bestMoveUci must be valid UCI or null`;
+    }
   }
 
   for (let index = 0; index < value.moveFeatures.length; index++) {
@@ -99,7 +113,7 @@ export async function POST(req: NextRequest) {
     );
   }
   const body = payload as PushBody;
-  const { gameId, gameEval, moveFeatures, flags, playerProfile } = body;
+  const { gameId, gameEval, playerProfile } = body;
   // The profile type represents an average and can legitimately be
   // fractional; the PostgreSQL column is Int, so normalize at persistence.
   const storedAvgOpponentRating = playerProfile.avgOpponentRating === null
@@ -112,16 +126,63 @@ export async function POST(req: NextRequest) {
   if (!game) {
     return NextResponse.json({ error: "game not found" }, { status: 404 });
   }
-  const storedMoves = Array.isArray(game.moves) ? game.moves : null;
+  const storedMoves = Array.isArray(game.moves) && game.moves.every((move): move is string => typeof move === "string")
+    ? game.moves
+    : null;
   if (!storedMoves || gameEval.points.length !== storedMoves.length) {
     return NextResponse.json({ error: "evaluation does not match the stored game" }, { status: 400 });
   }
-  if (
-    moveFeatures.some((feature) => feature.ply < 0 || feature.ply >= storedMoves.length) ||
-    flags.some((flag) => flag.ply < 0 || flag.ply >= storedMoves.length)
-  ) {
-    return NextResponse.json({ error: "move data contains a ply outside the stored game" }, { status: 400 });
+  if (game.playerColor !== "white" && game.playerColor !== "black") {
+    return NextResponse.json({ error: "stored game has an invalid player color" }, { status: 400 });
   }
+
+  // The database game is the source of truth for move features. Do not let a
+  // stale or edited browser payload attach a valid-looking flag to a different
+  // SAN move, color, clock, or ply. Recompute flags from those canonical moves
+  // and the submitted engine scores; the client flags remain in the request
+  // only for backward compatibility and are never persisted.
+  const parsedGame = {
+    id: gameId,
+    playerColor: game.playerColor,
+    opponentUsername: game.opponentUsername,
+    opponentRating: game.opponentRating,
+    playerRating: game.playerRating,
+    moves: storedMoves,
+    clocks: Array.isArray(game.clocks) && game.clocks.every((clock) => typeof clock === "number")
+      ? game.clocks
+      : null,
+    clockInitialSec: game.clockInitialSec,
+    clockIncrementSec: game.clockIncrementSec,
+    openingName: game.openingName,
+    openingEco: game.openingEco,
+    result: game.result === "win" || game.result === "loss" ? game.result : "draw",
+    rated: game.rated,
+    speed: game.speed,
+    createdAt: game.lichessCreatedAt?.getTime() ?? null,
+  } as const;
+  const canonicalMoveFeatures = extractMoveFeatures(parsedGame);
+  if (canonicalMoveFeatures.length !== storedMoves.length) {
+    return NextResponse.json({ error: "stored game contains an invalid or incomplete move sequence" }, { status: 400 });
+  }
+  const neutralPlayerProfile: PlayerProfile = {
+    username: session?.user?.name ?? "",
+    gamesAnalyzed: 0,
+    avgMoveTimeSecByPhase: { opening: null, middlegame: null, endgame: null },
+    premoveRate: 0,
+    mostCommonOpenings: [],
+    avgOpponentRating: null,
+  };
+  const emptyWeaknessProfile: WeaknessProfile = {
+    username: neutralPlayerProfile.username,
+    patterns: [], evaluatedGameIds: [], gamesEvaluated: 0, gamesFetched: 0, confidence: "low", builtAt: Date.now(),
+  };
+  const canonicalFlags = flagMoves(
+    canonicalMoveFeatures,
+    neutralPlayerProfile,
+    emptyWeaknessProfile,
+    gameEval,
+    game.playerColor,
+  );
 
   let transactionAttempt = 0;
   while (true) {
@@ -141,9 +202,9 @@ export async function POST(req: NextRequest) {
     });
 
     await tx.flaggedMove.deleteMany({ where: { gameId: game.id } });
-    if (flags.length > 0) {
+    if (canonicalFlags.length > 0) {
       await tx.flaggedMove.createMany({
-        data: flags.map((f) => ({
+        data: canonicalFlags.map((f) => ({
           gameId: game.id,
           ply: f.ply,
           moveNumber: f.moveNumber,
@@ -200,7 +261,7 @@ export async function POST(req: NextRequest) {
       existing,
       gameId,
       gameEval,
-      moveFeatures,
+      canonicalMoveFeatures,
       game.playerColor as "white" | "black"
     );
 
@@ -241,8 +302,8 @@ export async function POST(req: NextRequest) {
       existingBias,
       gameId,
       storedMoves as string[],
-      moveFeatures,
-      flags,
+      canonicalMoveFeatures,
+      canonicalFlags,
       game.playerColor as "white" | "black"
     );
 
