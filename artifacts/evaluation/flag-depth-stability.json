@@ -1,0 +1,2997 @@
+{
+  "generatedAt": "2026-10-31T22:13:14.126Z",
+  "source": "full census of persisted flags and saved game evaluations",
+  "census": true,
+  "requestedSearchDepth": 22,
+  "engine": "Stockfish 19 full single-threaded WASM",
+  "population": 64,
+  "evaluated": 64,
+  "groups": {
+    "depth:depth16": {
+      "total": 64,
+      "confirmed": 55,
+      "downgraded": 7,
+      "reversed": 2
+    },
+    "depth:depth8-9": {
+      "total": 0,
+      "confirmed": 0,
+      "downgraded": 0,
+      "reversed": 0
+    },
+    "depth:other": {
+      "total": 0,
+      "confirmed": 0,
+      "downgraded": 0,
+      "reversed": 0
+    },
+    "overall": {
+      "total": 64,
+      "confirmed": 55,
+      "downgraded": 7,
+      "reversed": 2
+    },
+    "exact-depth:16": {
+      "total": 64,
+      "confirmed": 55,
+      "downgraded": 7,
+      "reversed": 2
+    },
+    "stratum:high": {
+      "total": 39,
+      "confirmed": 33,
+      "downgraded": 4,
+      "reversed": 2
+    },
+    "phase:opening": {
+      "total": 9,
+      "confirmed": 9,
+      "downgraded": 0,
+      "reversed": 0
+    },
+    "stratum:low": {
+      "total": 9,
+      "confirmed": 6,
+      "downgraded": 3,
+      "reversed": 0
+    },
+    "phase:middlegame": {
+      "total": 25,
+      "confirmed": 22,
+      "downgraded": 2,
+      "reversed": 1
+    },
+    "stratum:cascade": {
+      "total": 13,
+      "confirmed": 13,
+      "downgraded": 0,
+      "reversed": 0
+    },
+    "phase:endgame": {
+      "total": 30,
+      "confirmed": 24,
+      "downgraded": 5,
+      "reversed": 1
+    },
+    "stratum:medium": {
+      "total": 3,
+      "confirmed": 3,
+      "downgraded": 0,
+      "reversed": 0
+    }
+  },
+  "rows": [
+    {
+      "flagId": "cmvwfqvjd0019vveojf0gxcn6",
+      "sample": 1,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "opening",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 393,
+      "higherDepthCpLoss": 443,
+      "deltaCp": 50,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 1,
+      "top3Lines": [
+        {
+          "uci": "f1e1",
+          "san": "Re1",
+          "scoreCp": 31,
+          "mate": null
+        },
+        {
+          "uci": "h2h3",
+          "san": "h3",
+          "scoreCp": 30,
+          "mate": null
+        },
+        {
+          "uci": "d1c1",
+          "san": "Qc1",
+          "scoreCp": -16,
+          "mate": null
+        }
+      ],
+      "fenBefore": "r2q1rk1/pp1nbppp/5n2/3pp3/6b1/1P1P1NP1/PBPN1PBP/R2Q1RK1 w - - 0 11",
+      "san": "c4",
+      "uci": "c2c4",
+      "sequenceSan": "c4",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfqvje001avveotd8mdznj",
+      "sample": 2,
+      "stratum": "low",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "low",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 131,
+      "higherDepthCpLoss": 162,
+      "deltaCp": 31,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 36,
+      "top3Lines": [
+        {
+          "uci": "d2e4",
+          "san": "Nxe4",
+          "scoreCp": -420,
+          "mate": null
+        },
+        {
+          "uci": "h2h3",
+          "san": "h3",
+          "scoreCp": -456,
+          "mate": null
+        },
+        {
+          "uci": "a2a3",
+          "san": "a3",
+          "scoreCp": -460,
+          "mate": null
+        }
+      ],
+      "fenBefore": "r2q1rk1/pp1nbppp/5n2/8/2P1p1b1/1P3NP1/PB1N1PBP/R2Q1RK1 w - - 0 13",
+      "san": "Bxf6",
+      "uci": "b2f6",
+      "sequenceSan": "Bxf6",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfqwi5001bvveo4xu1nul9",
+      "sample": 3,
+      "stratum": "cascade",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "endgame",
+      "flagType": "evaluation_cascade",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 263,
+      "higherDepthCpLoss": 398,
+      "deltaCp": 135,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 23,
+      "top3Lines": [
+        {
+          "uci": "h3g2",
+          "san": "Kg2",
+          "scoreCp": -92,
+          "mate": null
+        },
+        {
+          "uci": "c2c1",
+          "san": "Rc1",
+          "scoreCp": -115,
+          "mate": null
+        },
+        {
+          "uci": "c2d2",
+          "san": "Rd2",
+          "scoreCp": -128,
+          "mate": null
+        }
+      ],
+      "fenBefore": "8/p5b1/1pn1k1p1/2p1ppP1/4P3/1PP1BN1K/P1R2P2/3r4 w - - 0 27",
+      "san": "exf5+",
+      "uci": "e4f5",
+      "sequenceSan": "exf5+ Kg2",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfqwi5001cvveoyq4rdh13",
+      "sample": 4,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 229,
+      "higherDepthCpLoss": 221,
+      "deltaCp": -8,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 0,
+      "top3Lines": [
+        {
+          "uci": "c2c1",
+          "san": "Rc1",
+          "scoreCp": -570,
+          "mate": null
+        },
+        {
+          "uci": "f3h2",
+          "san": "Nh2",
+          "scoreCp": -570,
+          "mate": null
+        },
+        {
+          "uci": "f3e1",
+          "san": "Ne1",
+          "scoreCp": -629,
+          "mate": null
+        }
+      ],
+      "fenBefore": "8/p5b1/1pn5/2p1pkP1/5p2/1PP2N2/P1RB1PK1/3r4 w - - 2 30",
+      "san": "c4",
+      "uci": "c3c4",
+      "sequenceSan": "c4",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfqwi6001dvveoefy69qep",
+      "sample": 5,
+      "stratum": "low",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "low",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 104,
+      "higherDepthCpLoss": 708,
+      "deltaCp": 604,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 80,
+      "top3Lines": [
+        {
+          "uci": "e1f3",
+          "san": "Nxf3",
+          "scoreCp": -929,
+          "mate": null
+        },
+        {
+          "uci": "b7f7",
+          "san": "Rf7+",
+          "scoreCp": -1009,
+          "mate": null
+        },
+        {
+          "uci": "f1g1",
+          "san": "Kg1",
+          "scoreCp": -1208,
+          "mate": null
+        }
+      ],
+      "fenBefore": "8/pR6/8/2p2k2/2Pbp3/P4p2/3r1P2/4NK2 w - - 2 39",
+      "san": "Rf7+",
+      "uci": "b7f7",
+      "sequenceSan": "Rf7+",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfqwi6001evveor1t3p4v2",
+      "sample": 6,
+      "stratum": "low",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "low",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 101,
+      "higherDepthCpLoss": 269,
+      "deltaCp": 168,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 180,
+      "top3Lines": [
+        {
+          "uci": "e1f3",
+          "san": "Nxf3",
+          "scoreCp": -701,
+          "mate": null
+        },
+        {
+          "uci": "b3f3",
+          "san": "Rxf3+",
+          "scoreCp": -881,
+          "mate": null
+        },
+        {
+          "uci": "b3b7",
+          "san": "Rb7",
+          "scoreCp": -947,
+          "mate": null
+        }
+      ],
+      "fenBefore": "8/p5b1/8/2p2k2/2P1p3/PR3p2/3r1P2/4NK2 w - - 0 38",
+      "san": "Rb7",
+      "uci": "b3b7",
+      "sequenceSan": "Rb7",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfqyee001fvveoalrrid66",
+      "sample": 7,
+      "stratum": "cascade",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "endgame",
+      "flagType": "evaluation_cascade",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 647,
+      "higherDepthCpLoss": 876,
+      "deltaCp": 229,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 167,
+      "top3Lines": [
+        {
+          "uci": "c7b6",
+          "san": "Kb6",
+          "scoreCp": -180,
+          "mate": null
+        },
+        {
+          "uci": "c7d8",
+          "san": "Kd8",
+          "scoreCp": -347,
+          "mate": null
+        },
+        {
+          "uci": "c8d7",
+          "san": "Bd7",
+          "scoreCp": -653,
+          "mate": null
+        }
+      ],
+      "fenBefore": "2b5/2k3R1/4p2p/p2pP3/2pN1P2/P1P2K2/1r6/8 b - - 5 48",
+      "san": "Bd7",
+      "uci": "c8d7",
+      "sequenceSan": "Bd7 Kc6 Kc7",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfqyee001gvveo4um4m6wh",
+      "sample": 8,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 420,
+      "higherDepthCpLoss": 545,
+      "deltaCp": 125,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 317,
+      "top3Lines": [
+        {
+          "uci": "d5d4",
+          "san": "d4",
+          "scoreCp": 545,
+          "mate": null
+        },
+        {
+          "uci": "h5h4",
+          "san": "h4",
+          "scoreCp": 228,
+          "mate": null
+        },
+        {
+          "uci": "g7g6",
+          "san": "Rg6",
+          "scoreCp": 0,
+          "mate": null
+        }
+      ],
+      "fenBefore": "6r1/3k2r1/2b1p2p/p2pPp1p/2p2P2/P1P2NPP/1P4R1/2K3R1 b - - 6 37",
+      "san": "Kc7",
+      "uci": "d7c7",
+      "sequenceSan": "Kc7",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr04o001hvveobeoh5ml9",
+      "sample": 9,
+      "stratum": "low",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "low",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 117,
+      "higherDepthCpLoss": 34,
+      "deltaCp": -83,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "downgraded",
+      "forcedish": true,
+      "bestSecondGapCp": 7,
+      "top3Lines": [
+        {
+          "uci": "b2a3",
+          "san": "Ba3",
+          "scoreCp": 813,
+          "mate": null
+        },
+        {
+          "uci": "b2c3",
+          "san": "Bc3",
+          "scoreCp": 806,
+          "mate": null
+        },
+        {
+          "uci": "g1h1",
+          "san": "Kh1",
+          "scoreCp": 795,
+          "mate": null
+        }
+      ],
+      "fenBefore": "3r4/p5pk/4bp1p/qP2p3/P3P3/5NP1/1BQ3BP/2R3K1 w - - 3 29",
+      "san": "Qc7",
+      "uci": "c2c7",
+      "sequenceSan": "Qc7",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr16q001ivveokbmty193",
+      "sample": 10,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 795,
+      "higherDepthCpLoss": 9259,
+      "deltaCp": 8464,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 68,
+      "top3Lines": [
+        {
+          "uci": "f2g1",
+          "san": "Kg1",
+          "scoreCp": -733,
+          "mate": null
+        },
+        {
+          "uci": "f2e1",
+          "san": "Ke1",
+          "scoreCp": -801,
+          "mate": null
+        },
+        {
+          "uci": "f2e3",
+          "san": "Ke3",
+          "scoreCp": -994,
+          "mate": null
+        }
+      ],
+      "fenBefore": "6k1/p4qpp/1p6/2p1n3/2P5/PP4P1/4RK1P/R7 w - - 2 27",
+      "san": "Kg2",
+      "uci": "f2g2",
+      "sequenceSan": "Kg2",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr16q001jvveom0cfyk3p",
+      "sample": 11,
+      "stratum": "cascade",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "middlegame",
+      "flagType": "evaluation_cascade",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 478,
+      "higherDepthCpLoss": 638,
+      "deltaCp": 160,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 86,
+      "top3Lines": [
+        {
+          "uci": "a1d1",
+          "san": "Rad1",
+          "scoreCp": -71,
+          "mate": null
+        },
+        {
+          "uci": "e2e4",
+          "san": "Qe4",
+          "scoreCp": -157,
+          "mate": null
+        },
+        {
+          "uci": "g2g1",
+          "san": "Kg1",
+          "scoreCp": -189,
+          "mate": null
+        }
+      ],
+      "fenBefore": "3r2k1/p1q2rpp/1pnb4/2p1p3/2P4N/PP4P1/1B2QPKP/R3R3 w - - 1 21",
+      "san": "Nf3",
+      "uci": "h4f3",
+      "sequenceSan": "Nf3 Nxe5",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr1ws001kvveocddlvesr",
+      "sample": 12,
+      "stratum": "cascade",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "middlegame",
+      "flagType": "evaluation_cascade",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 1579,
+      "higherDepthCpLoss": 10001,
+      "deltaCp": 8422,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 35,
+      "top3Lines": [
+        {
+          "uci": "f2h4",
+          "san": "Qh4+",
+          "scoreCp": 0,
+          "mate": null
+        },
+        {
+          "uci": "g8g7",
+          "san": "Kg7",
+          "scoreCp": -35,
+          "mate": null
+        },
+        {
+          "uci": "h7h6",
+          "san": "h6",
+          "scoreCp": -89,
+          "mate": null
+        }
+      ],
+      "fenBefore": "r1b3kr/ppp1p2p/6p1/6N1/8/2P5/PP3qPK/RNBQ4 b - - 0 17",
+      "san": "Bf5",
+      "uci": "c8f5",
+      "sequenceSan": "Bf5 Kg7 Kh6",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr1wt001lvveo1kh1i3dp",
+      "sample": 13,
+      "stratum": "cascade",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "opening",
+      "flagType": "evaluation_cascade",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 598,
+      "higherDepthCpLoss": 844,
+      "deltaCp": 246,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 231,
+      "top3Lines": [
+        {
+          "uci": "f7e8",
+          "san": "Ke8",
+          "scoreCp": 611,
+          "mate": null
+        },
+        {
+          "uci": "f7g8",
+          "san": "Kg8",
+          "scoreCp": 380,
+          "mate": null
+        },
+        {
+          "uci": "f7f8",
+          "san": "Kf8",
+          "scoreCp": 8,
+          "mate": null
+        }
+      ],
+      "fenBefore": "r1bq3r/ppp1pkbp/2n3p1/4P1N1/3P2n1/8/PPP3PP/RNBQK2R b KQ - 1 9",
+      "san": "Kg8",
+      "uci": "f7g8",
+      "sequenceSan": "Kg8 Qf8 Ncxe5",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr1wt001mvveoq3sffnw6",
+      "sample": 14,
+      "stratum": "medium",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "medium",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 161,
+      "higherDepthCpLoss": 130,
+      "deltaCp": -31,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 120,
+      "top3Lines": [
+        {
+          "uci": "c8f5",
+          "san": "Bf5",
+          "scoreCp": 120,
+          "mate": null
+        },
+        {
+          "uci": "g4f2",
+          "san": "Nf2+",
+          "scoreCp": 0,
+          "mate": null
+        },
+        {
+          "uci": "f8e8",
+          "san": "Qe8",
+          "scoreCp": -22,
+          "mate": null
+        }
+      ],
+      "fenBefore": "r1b2qkr/ppp1p2p/6p1/6N1/6n1/2P5/PP4Pb/RNBQ1R1K b - - 1 15",
+      "san": "Nf2+",
+      "uci": "g4f2",
+      "sequenceSan": "Nf2+",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr2qv001nvveo37rgqcu2",
+      "sample": 15,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 516,
+      "higherDepthCpLoss": -7,
+      "deltaCp": -523,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "reversed",
+      "forcedish": true,
+      "bestSecondGapCp": 2,
+      "top3Lines": [
+        {
+          "uci": "b3b4",
+          "san": "b4",
+          "scoreCp": 721,
+          "mate": null
+        },
+        {
+          "uci": "f5f6",
+          "san": "Kf6",
+          "scoreCp": 719,
+          "mate": null
+        },
+        {
+          "uci": "d7b7",
+          "san": "Rb7",
+          "scoreCp": 718,
+          "mate": null
+        }
+      ],
+      "fenBefore": "5k2/3R4/7p/1p3K1P/8/1P2b3/2P5/8 w - - 5 51",
+      "san": "Rb7",
+      "uci": "d7b7",
+      "sequenceSan": "Rb7",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr4wb001ovveoeuchb5bm",
+      "sample": 16,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 559,
+      "higherDepthCpLoss": 616,
+      "deltaCp": 57,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 3,
+      "top3Lines": [
+        {
+          "uci": "g6g5",
+          "san": "g5",
+          "scoreCp": 5,
+          "mate": null
+        },
+        {
+          "uci": "g2f2",
+          "san": "Rf2",
+          "scoreCp": 2,
+          "mate": null
+        },
+        {
+          "uci": "g7f7",
+          "san": "Kf7",
+          "scoreCp": 0,
+          "mate": null
+        }
+      ],
+      "fenBefore": "8/6k1/2R3p1/8/P2N1p2/1P6/1KP3rr/8 b - - 1 44",
+      "san": "Rh3",
+      "uci": "h2h3",
+      "sequenceSan": "Rh3",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr4wb001pvveoh3lca63y",
+      "sample": 17,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 290,
+      "higherDepthCpLoss": 294,
+      "deltaCp": 4,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 18,
+      "top3Lines": [
+        {
+          "uci": "h3h8",
+          "san": "Rh8",
+          "scoreCp": -595,
+          "mate": null
+        },
+        {
+          "uci": "h3h6",
+          "san": "Rh6",
+          "scoreCp": -613,
+          "mate": null
+        },
+        {
+          "uci": "f7e6",
+          "san": "Ke6",
+          "scoreCp": -630,
+          "mate": null
+        }
+      ],
+      "fenBefore": "8/5k2/8/P5p1/2R5/1P5r/1KP5/8 b - - 1 49",
+      "san": "Rh4",
+      "uci": "h3h4",
+      "sequenceSan": "Rh4",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr4wb001qvveor0w9d7rw",
+      "sample": 18,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 205,
+      "higherDepthCpLoss": 280,
+      "deltaCp": 75,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 96,
+      "top3Lines": [
+        {
+          "uci": "g6g5",
+          "san": "g5",
+          "scoreCp": 312,
+          "mate": null
+        },
+        {
+          "uci": "g2f2",
+          "san": "Rf2",
+          "scoreCp": 216,
+          "mate": null
+        },
+        {
+          "uci": "g2e2",
+          "san": "Re2",
+          "scoreCp": 178,
+          "mate": null
+        }
+      ],
+      "fenBefore": "8/5pk1/2R3p1/1N6/8/1P6/PKP3rr/8 b - - 5 42",
+      "san": "f5",
+      "uci": "f7f5",
+      "sequenceSan": "f5",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr4wb001rvveoyntw74aa",
+      "sample": 19,
+      "stratum": "medium",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "medium",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 189,
+      "higherDepthCpLoss": 324,
+      "deltaCp": 135,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 88,
+      "top3Lines": [
+        {
+          "uci": "g5e5",
+          "san": "Re5",
+          "scoreCp": 529,
+          "mate": null
+        },
+        {
+          "uci": "h8d8",
+          "san": "Rd8",
+          "scoreCp": 441,
+          "mate": null
+        },
+        {
+          "uci": "h8f8",
+          "san": "Rf8",
+          "scoreCp": 413,
+          "mate": null
+        }
+      ],
+      "fenBefore": "7r/5pk1/1R4p1/6r1/8/1PN5/PKP5/8 b - - 1 40",
+      "san": "Rh2",
+      "uci": "h8h2",
+      "sequenceSan": "Rh2",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr5ru001svveoeqzr59el",
+      "sample": 20,
+      "stratum": "cascade",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "endgame",
+      "flagType": "evaluation_cascade",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 293,
+      "higherDepthCpLoss": 289,
+      "deltaCp": -4,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 16,
+      "top3Lines": [
+        {
+          "uci": "b7e4",
+          "san": "Be4",
+          "scoreCp": -317,
+          "mate": null
+        },
+        {
+          "uci": "a3a4",
+          "san": "a4",
+          "scoreCp": -333,
+          "mate": null
+        },
+        {
+          "uci": "b2c1",
+          "san": "Bc1",
+          "scoreCp": -337,
+          "mate": null
+        }
+      ],
+      "fenBefore": "8/pB2k3/1p1b1pb1/2p2n2/2Pp4/PP1P4/1B1KN3/8 w - - 2 37",
+      "san": "Ng1",
+      "uci": "e2g1",
+      "sequenceSan": "Ng1 Kc2",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr5ru001tvveo9lmchwrv",
+      "sample": 21,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 221,
+      "higherDepthCpLoss": 413,
+      "deltaCp": 192,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 318,
+      "top3Lines": [
+        {
+          "uci": "g2e4",
+          "san": "Be4",
+          "scoreCp": -93,
+          "mate": null
+        },
+        {
+          "uci": "d2e1",
+          "san": "Ke1",
+          "scoreCp": -411,
+          "mate": null
+        },
+        {
+          "uci": "g2b7",
+          "san": "Bb7",
+          "scoreCp": -438,
+          "mate": null
+        }
+      ],
+      "fenBefore": "8/p3k3/1p1b1pb1/2p2np1/2Pp4/PP1P2P1/1B1KN1BP/8 w - - 8 34",
+      "san": "h4",
+      "uci": "h2h4",
+      "sequenceSan": "h4",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr6tn001uvveoxxg8jj8x",
+      "sample": 22,
+      "stratum": "cascade",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "opening",
+      "flagType": "evaluation_cascade",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 431,
+      "higherDepthCpLoss": 403,
+      "deltaCp": -28,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 32,
+      "top3Lines": [
+        {
+          "uci": "c7c5",
+          "san": "c5",
+          "scoreCp": 216,
+          "mate": null
+        },
+        {
+          "uci": "h7h6",
+          "san": "h6",
+          "scoreCp": 184,
+          "mate": null
+        },
+        {
+          "uci": "b7b5",
+          "san": "b5",
+          "scoreCp": 171,
+          "mate": null
+        }
+      ],
+      "fenBefore": "r1bq1rk1/ppp2pbp/3p1np1/4n1B1/4P1P1/1BN2P2/PPP4P/R2QK1NR b KQ - 1 9",
+      "san": "Qd7",
+      "uci": "d8d7",
+      "sequenceSan": "Qd7 h5",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr6tn001vvveo5t3moant",
+      "sample": 23,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 420,
+      "higherDepthCpLoss": 536,
+      "deltaCp": 116,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 21,
+      "top3Lines": [
+        {
+          "uci": "c8h3",
+          "san": "Bxh3",
+          "scoreCp": 54,
+          "mate": null
+        },
+        {
+          "uci": "e4b4",
+          "san": "Qb4",
+          "scoreCp": 33,
+          "mate": null
+        },
+        {
+          "uci": "g8h7",
+          "san": "Kh7",
+          "scoreCp": 15,
+          "mate": null
+        }
+      ],
+      "fenBefore": "r1b2rk1/ppp2p2/2np2p1/6Bn/4qP1P/1BQ4N/PPP5/2KR3R b - - 1 16",
+      "san": "Re8",
+      "uci": "f8e8",
+      "sequenceSan": "Re8",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr8e0001wvveomwefly5z",
+      "sample": 24,
+      "stratum": "cascade",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "endgame",
+      "flagType": "evaluation_cascade",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 674,
+      "higherDepthCpLoss": 628,
+      "deltaCp": -46,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 30,
+      "top3Lines": [
+        {
+          "uci": "d4e5",
+          "san": "Ke5",
+          "scoreCp": 0,
+          "mate": null
+        },
+        {
+          "uci": "g3g4",
+          "san": "g4",
+          "scoreCp": -30,
+          "mate": null
+        },
+        {
+          "uci": "d4e3",
+          "san": "Ke3",
+          "scoreCp": -570,
+          "mate": null
+        }
+      ],
+      "fenBefore": "8/8/1Pk3p1/2P4p/3K3P/6P1/4b3/8 w - - 0 49",
+      "san": "b7",
+      "uci": "b6b7",
+      "sequenceSan": "b7 Kd5",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr8e0001xvveon5sgrmi6",
+      "sample": 25,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 642,
+      "higherDepthCpLoss": 8325,
+      "deltaCp": 7683,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 15,
+      "top3Lines": [
+        {
+          "uci": "g1f1",
+          "san": "Kf1",
+          "scoreCp": -1640,
+          "mate": null
+        },
+        {
+          "uci": "g1h2",
+          "san": "Kh2",
+          "scoreCp": -1655,
+          "mate": null
+        },
+        {
+          "uci": "g1f2",
+          "san": "Kf2",
+          "scoreCp": -1655,
+          "mate": null
+        }
+      ],
+      "fenBefore": "8/8/2b3p1/7p/6kP/6P1/8/6K1 w - - 8 66",
+      "san": "Kh2",
+      "uci": "g1h2",
+      "sequenceSan": "Kh2",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr8e0001yvveow3vbsvkg",
+      "sample": 26,
+      "stratum": "low",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "low",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 114,
+      "higherDepthCpLoss": 48,
+      "deltaCp": -66,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "downgraded",
+      "forcedish": false,
+      "bestSecondGapCp": 42,
+      "top3Lines": [
+        {
+          "uci": "e6f7",
+          "san": "Kf7",
+          "scoreCp": -755,
+          "mate": null
+        },
+        {
+          "uci": "e6f6",
+          "san": "Kf6",
+          "scoreCp": -797,
+          "mate": null
+        },
+        {
+          "uci": "e6e5",
+          "san": "Ke5",
+          "scoreCp": -800,
+          "mate": null
+        }
+      ],
+      "fenBefore": "8/8/k1b1K1p1/2P4p/7P/6P1/8/8 w - - 6 53",
+      "san": "Kf6",
+      "uci": "e6f6",
+      "sequenceSan": "Kf6",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr9cu001zvveo6cql8uji",
+      "sample": 27,
+      "stratum": "cascade",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "middlegame",
+      "flagType": "evaluation_cascade",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 589,
+      "higherDepthCpLoss": 556,
+      "deltaCp": -33,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 97,
+      "top3Lines": [
+        {
+          "uci": "d2c4",
+          "san": "Nc4",
+          "scoreCp": 216,
+          "mate": null
+        },
+        {
+          "uci": "e2f3",
+          "san": "Qf3",
+          "scoreCp": 119,
+          "mate": null
+        },
+        {
+          "uci": "a2a3",
+          "san": "a3",
+          "scoreCp": 111,
+          "mate": null
+        }
+      ],
+      "fenBefore": "1r1qr1k1/p3nppp/3b2b1/8/3p4/3P2P1/PP1NQPBP/R1B1R1K1 w - - 3 16",
+      "san": "Be4",
+      "uci": "g2e4",
+      "sequenceSan": "Be4 Qf3 Qg2 Re2",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfr9cu0020vveont8f9975",
+      "sample": 28,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 401,
+      "higherDepthCpLoss": 319,
+      "deltaCp": -82,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 4,
+      "top3Lines": [
+        {
+          "uci": "f2f3",
+          "san": "f3",
+          "scoreCp": -470,
+          "mate": null
+        },
+        {
+          "uci": "d2f3",
+          "san": "Nf3",
+          "scoreCp": -474,
+          "mate": null
+        },
+        {
+          "uci": "g2h3",
+          "san": "Qh3",
+          "scoreCp": -517,
+          "mate": null
+        }
+      ],
+      "fenBefore": "1r1qr1k1/p4ppp/3b4/7b/3pB3/3n2P1/PP1NRPQP/R1B3K1 w - - 2 20",
+      "san": "Bf3",
+      "uci": "e4f3",
+      "sequenceSan": "Bf3",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfrcb60021vveonl0py1ow",
+      "sample": 29,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 973,
+      "higherDepthCpLoss": 947,
+      "deltaCp": -26,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 0,
+      "top3Lines": [
+        {
+          "uci": "d7e7",
+          "san": "Qe7",
+          "scoreCp": 0,
+          "mate": null
+        },
+        {
+          "uci": "d7f5",
+          "san": "Qf5",
+          "scoreCp": 0,
+          "mate": null
+        },
+        {
+          "uci": "d7d8",
+          "san": "Qd8",
+          "scoreCp": -133,
+          "mate": null
+        }
+      ],
+      "fenBefore": "r3r3/2pq2kp/bp3pp1/p2P4/2PQN1n1/PP6/2B3PP/R3R1K1 b - - 0 21",
+      "san": "Qd6",
+      "uci": "d7d6",
+      "sequenceSan": "Qd6",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfrcb60022vveo166ft9aa",
+      "sample": 30,
+      "stratum": "cascade",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "middlegame",
+      "flagType": "evaluation_cascade",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 837,
+      "higherDepthCpLoss": 1056,
+      "deltaCp": 219,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 306,
+      "top3Lines": [
+        {
+          "uci": "e8e5",
+          "san": "Rxe5",
+          "scoreCp": 613,
+          "mate": null
+        },
+        {
+          "uci": "a5a4",
+          "san": "a4",
+          "scoreCp": 307,
+          "mate": null
+        },
+        {
+          "uci": "e8e7",
+          "san": "Re7",
+          "scoreCp": 100,
+          "mate": null
+        }
+      ],
+      "fenBefore": "r3r1k1/2pq1pbp/bp3np1/p1nPB3/2P5/PPN3N1/2B3PP/R2QR1K1 b - - 0 17",
+      "san": "Ng4",
+      "uci": "f6g4",
+      "sequenceSan": "Ng4 Kxg7",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfretk0023vveo56t1312w",
+      "sample": 31,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 9253,
+      "higherDepthCpLoss": 9036,
+      "deltaCp": -217,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 36,
+      "top3Lines": [
+        {
+          "uci": "f8h8",
+          "san": "Rh8",
+          "scoreCp": -956,
+          "mate": null
+        },
+        {
+          "uci": "h7g7",
+          "san": "Kg7",
+          "scoreCp": -992,
+          "mate": null
+        },
+        {
+          "uci": "d7e5",
+          "san": "Ne5",
+          "scoreCp": -1424,
+          "mate": null
+        }
+      ],
+      "fenBefore": "1r1q1r2/2pn3k/1p1p1pp1/p2B2PP/3QPP2/8/PPP5/2KR3R b - - 0 20",
+      "san": "gxh5",
+      "uci": "g6h5",
+      "sequenceSan": "gxh5",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfretk0024vveo2eixyn1t",
+      "sample": 32,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 420,
+      "higherDepthCpLoss": 427,
+      "deltaCp": 7,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 139,
+      "top3Lines": [
+        {
+          "uci": "f7f6",
+          "san": "f6",
+          "scoreCp": -472,
+          "mate": null
+        },
+        {
+          "uci": "d7e5",
+          "san": "Ne5",
+          "scoreCp": -611,
+          "mate": null
+        },
+        {
+          "uci": "c7c6",
+          "san": "c6",
+          "scoreCp": -612,
+          "mate": null
+        }
+      ],
+      "fenBefore": "1r1q1r2/p1pn1p1k/1p1p2p1/3B2Pp/3QPP2/8/PPP3P1/2KR3R b - - 0 18",
+      "san": "a5",
+      "uci": "a7a5",
+      "sequenceSan": "a5",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfretk0025vveonkuijikx",
+      "sample": 33,
+      "stratum": "low",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "opening",
+      "flagType": "decision_error",
+      "severity": "low",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 143,
+      "higherDepthCpLoss": 138,
+      "deltaCp": -5,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 77,
+      "top3Lines": [
+        {
+          "uci": "c7c5",
+          "san": "c5",
+          "scoreCp": -25,
+          "mate": null
+        },
+        {
+          "uci": "e7e5",
+          "san": "e5",
+          "scoreCp": -102,
+          "mate": null
+        },
+        {
+          "uci": "c7c6",
+          "san": "c6",
+          "scoreCp": -150,
+          "mate": null
+        }
+      ],
+      "fenBefore": "r1bq1rk1/pppnppbp/3p1np1/8/3PPB1P/2N5/PPPQ1PP1/2KR1BNR b - - 0 7",
+      "san": "h5",
+      "uci": "h7h5",
+      "sequenceSan": "h5",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwfretk0026vveo49x3rviz",
+      "sample": 34,
+      "stratum": "low",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "low",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 118,
+      "higherDepthCpLoss": 278,
+      "deltaCp": 160,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 115,
+      "top3Lines": [
+        {
+          "uci": "c7c5",
+          "san": "c5",
+          "scoreCp": -141,
+          "mate": null
+        },
+        {
+          "uci": "d7e5",
+          "san": "Ne5",
+          "scoreCp": -256,
+          "mate": null
+        },
+        {
+          "uci": "b6b5",
+          "san": "b5",
+          "scoreCp": -310,
+          "mate": null
+        }
+      ],
+      "fenBefore": "r2q1r2/pbpn1pk1/1p1p2p1/3N2Pp/2BpP3/5P2/PPPQ2P1/2KR3R b - - 1 15",
+      "san": "Bxd5",
+      "uci": "b7d5",
+      "sequenceSan": "Bxd5",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwrkpeu0000vviorla99rgn",
+      "sample": 35,
+      "stratum": "cascade",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "opening",
+      "flagType": "evaluation_cascade",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 575,
+      "higherDepthCpLoss": 903,
+      "deltaCp": 328,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 63,
+      "top3Lines": [
+        {
+          "uci": "g2g4",
+          "san": "g4",
+          "scoreCp": -122,
+          "mate": null
+        },
+        {
+          "uci": "f1e2",
+          "san": "Be2",
+          "scoreCp": -185,
+          "mate": null
+        },
+        {
+          "uci": "g1h1",
+          "san": "Rh1",
+          "scoreCp": -191,
+          "mate": null
+        }
+      ],
+      "fenBefore": "r1bqk2r/pp2bppp/2n2n2/2ppp3/4P2P/2PP4/PP1N1PP1/RNBQKBR1 w Qkq - 0 8",
+      "san": "exd5",
+      "uci": "e4d5",
+      "sequenceSan": "exd5 c4 g3 Ne4",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwrkpev0001vvio4lbt9noj",
+      "sample": 36,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "opening",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 212,
+      "higherDepthCpLoss": 197,
+      "deltaCp": -15,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 19,
+      "top3Lines": [
+        {
+          "uci": "b1c3",
+          "san": "Nbc3",
+          "scoreCp": -411,
+          "mate": null
+        },
+        {
+          "uci": "e4d2",
+          "san": "Ned2",
+          "scoreCp": -430,
+          "mate": null
+        },
+        {
+          "uci": "e4c3",
+          "san": "Nec3",
+          "scoreCp": -430,
+          "mate": null
+        }
+      ],
+      "fenBefore": "r1bq1rk1/pp2bppp/2n1n3/2p1p3/2P1N2P/3P2P1/PP3P2/RNBQKBR1 w Q - 3 12",
+      "san": "Be3",
+      "uci": "c1e3",
+      "sequenceSan": "Be3",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwrkpev0002vvios6vx4ozn",
+      "sample": 37,
+      "stratum": "low",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "opening",
+      "flagType": "decision_error",
+      "severity": "low",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 114,
+      "higherDepthCpLoss": 134,
+      "deltaCp": 20,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 26,
+      "top3Lines": [
+        {
+          "uci": "c3c4",
+          "san": "c4",
+          "scoreCp": -48,
+          "mate": null
+        },
+        {
+          "uci": "c1g5",
+          "san": "Bg5",
+          "scoreCp": -74,
+          "mate": null
+        },
+        {
+          "uci": "h4h5",
+          "san": "h5",
+          "scoreCp": -83,
+          "mate": null
+        }
+      ],
+      "fenBefore": "r1bqk2r/pp1pbppp/2n2n2/2p1p3/4P2P/2PP1N2/PP3PP1/RNBQKB1R w KQkq - 1 6",
+      "san": "Rg1",
+      "uci": "h1g1",
+      "sequenceSan": "Rg1",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwrnprm0003vvio6jn2vf71",
+      "sample": 38,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 8907,
+      "higherDepthCpLoss": 10,
+      "deltaCp": -8897,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "downgraded",
+      "forcedish": true,
+      "bestSecondGapCp": 0,
+      "top3Lines": [
+        {
+          "uci": "c1d2",
+          "san": "Qd2",
+          "scoreCp": 9997,
+          "mate": 3
+        },
+        {
+          "uci": "c1b2",
+          "san": "Qb2",
+          "scoreCp": 9997,
+          "mate": 3
+        },
+        {
+          "uci": "c1c2",
+          "san": "Qc2",
+          "scoreCp": 9997,
+          "mate": 3
+        }
+      ],
+      "fenBefore": "2b5/2p5/p1k1p3/7p/8/6P1/r6P/2q1RK2 b - - 1 40",
+      "san": "Qxe1+",
+      "uci": "c1e1",
+      "sequenceSan": "Qxe1+",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwrokjz0004vvio9yzjzyoz",
+      "sample": 39,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 9509,
+      "higherDepthCpLoss": 9202,
+      "deltaCp": -307,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 0,
+      "top3Lines": [
+        {
+          "uci": "c7c8q",
+          "san": "c8=Q",
+          "scoreCp": 9989,
+          "mate": 11
+        },
+        {
+          "uci": "b6b5",
+          "san": "Kb5",
+          "scoreCp": 9989,
+          "mate": 11
+        },
+        {
+          "uci": "b6a5",
+          "san": "Ka5",
+          "scoreCp": 9988,
+          "mate": 12
+        }
+      ],
+      "fenBefore": "8/2P5/1K6/3k4/8/8/8/8 w - - 1 62",
+      "san": "c8=R",
+      "uci": "c7c8r",
+      "sequenceSan": "c8=R",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwrpuya0005vviou80f9fne",
+      "sample": 40,
+      "stratum": "medium",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "opening",
+      "flagType": "decision_error",
+      "severity": "medium",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 150,
+      "higherDepthCpLoss": 233,
+      "deltaCp": 83,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 112,
+      "top3Lines": [
+        {
+          "uci": "e4e5",
+          "san": "e5",
+          "scoreCp": 229,
+          "mate": null
+        },
+        {
+          "uci": "b1c3",
+          "san": "Nc3",
+          "scoreCp": 117,
+          "mate": null
+        },
+        {
+          "uci": "c1f4",
+          "san": "Bf4",
+          "scoreCp": 79,
+          "mate": null
+        }
+      ],
+      "fenBefore": "r1bqkb1r/pppp1ppp/5n2/8/3QP3/8/PPP2PPP/RNB1KB1R w KQkq - 1 6",
+      "san": "Qe5+",
+      "uci": "d4e5",
+      "sequenceSan": "Qe5+",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwrred80006vvio5qt6rssf",
+      "sample": 41,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 9285,
+      "higherDepthCpLoss": 9182,
+      "deltaCp": -103,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 102,
+      "top3Lines": [
+        {
+          "uci": "c4d3",
+          "san": "Bd3",
+          "scoreCp": -815,
+          "mate": null
+        },
+        {
+          "uci": "f1f3",
+          "san": "Rf3",
+          "scoreCp": -917,
+          "mate": null
+        },
+        {
+          "uci": "f1f2",
+          "san": "Rf2",
+          "scoreCp": -1065,
+          "mate": null
+        }
+      ],
+      "fenBefore": "5r2/p5pk/3b2pp/2p5/P1B1QPPq/1Pr5/2P3K1/4RR2 w - - 5 34",
+      "san": "g5",
+      "uci": "g4g5",
+      "sequenceSan": "g5",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwrred80007vvio4bije33p",
+      "sample": 42,
+      "stratum": "cascade",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "middlegame",
+      "flagType": "evaluation_cascade",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 866,
+      "higherDepthCpLoss": 1044,
+      "deltaCp": 178,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 492,
+      "top3Lines": [
+        {
+          "uci": "c4d3",
+          "san": "Bd3",
+          "scoreCp": -24,
+          "mate": null
+        },
+        {
+          "uci": "f1f2",
+          "san": "Rf2",
+          "scoreCp": -516,
+          "mate": null
+        },
+        {
+          "uci": "a1e1",
+          "san": "Rae1",
+          "scoreCp": -580,
+          "mate": null
+        }
+      ],
+      "fenBefore": "5r2/pQ2b1pk/5qpp/2p5/P1B2PP1/1Pr5/2P3K1/R4R2 w - - 1 32",
+      "san": "Rae1",
+      "uci": "a1e1",
+      "sequenceSan": "Rae1 Qe4",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwrred80008vvio96wjcbmp",
+      "sample": 43,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 855,
+      "higherDepthCpLoss": 1191,
+      "deltaCp": 336,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 51,
+      "top3Lines": [
+        {
+          "uci": "f2f4",
+          "san": "f4",
+          "scoreCp": 572,
+          "mate": null
+        },
+        {
+          "uci": "a4a5",
+          "san": "a5",
+          "scoreCp": 521,
+          "mate": null
+        },
+        {
+          "uci": "d3c4",
+          "san": "Bc4+",
+          "scoreCp": 512,
+          "mate": null
+        }
+      ],
+      "fenBefore": "r5k1/pp2b1p1/1q3rpp/2p3n1/P3P1P1/1P1BQ2P/2P1NP2/R4RK1 w - - 0 24",
+      "san": "Kh2",
+      "uci": "g1h2",
+      "sequenceSan": "Kh2",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwrred80009vviotvkinqfn",
+      "sample": 44,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 659,
+      "higherDepthCpLoss": 846,
+      "deltaCp": 187,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 766,
+      "top3Lines": [
+        {
+          "uci": "g4g5",
+          "san": "g5",
+          "scoreCp": 151,
+          "mate": null
+        },
+        {
+          "uci": "e2c3",
+          "san": "Nxc3",
+          "scoreCp": -615,
+          "mate": null
+        },
+        {
+          "uci": "d5g5",
+          "san": "Qg5",
+          "scoreCp": -676,
+          "mate": null
+        }
+      ],
+      "fenBefore": "r7/pp2b1pk/5qpp/2pQ4/P1B2PP1/1Pn4r/2P1N1K1/R4R2 w - - 2 30",
+      "san": "Nxc3",
+      "uci": "e2c3",
+      "sequenceSan": "Nxc3",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwrvy72000avviouoeb6lvd",
+      "sample": 45,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 9498,
+      "higherDepthCpLoss": 9384,
+      "deltaCp": -114,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 0,
+      "top3Lines": [
+        {
+          "uci": "c7c6",
+          "san": "Kc6",
+          "scoreCp": 9990,
+          "mate": 10
+        },
+        {
+          "uci": "b7b8q",
+          "san": "b8=Q",
+          "scoreCp": 9990,
+          "mate": 10
+        },
+        {
+          "uci": "c7b6",
+          "san": "Kb6",
+          "scoreCp": 9989,
+          "mate": 11
+        }
+      ],
+      "fenBefore": "8/1PK5/4k3/8/8/8/8/8 w - - 1 78",
+      "san": "b8=R",
+      "uci": "b7b8r",
+      "sequenceSan": "b8=R",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwl3lw0000vvw8ra7uj39b",
+      "sample": 46,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 365,
+      "higherDepthCpLoss": 179,
+      "deltaCp": -186,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 24,
+      "top3Lines": [
+        {
+          "uci": "f8d6",
+          "san": "Bd6",
+          "scoreCp": 990,
+          "mate": null
+        },
+        {
+          "uci": "f8e7",
+          "san": "Be7",
+          "scoreCp": 966,
+          "mate": null
+        },
+        {
+          "uci": "f8b4",
+          "san": "Bb4",
+          "scoreCp": 962,
+          "mate": null
+        }
+      ],
+      "fenBefore": "3rkb1r/1p3ppp/4b3/3nN3/N7/8/PPn1KPPP/2BR4 b k - 0 19",
+      "san": "Nf4+",
+      "uci": "d5f4",
+      "sequenceSan": "Nf4+",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwmjwh0001vvw8suwuhid1",
+      "sample": 47,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 9301,
+      "higherDepthCpLoss": 9227,
+      "deltaCp": -74,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 9219,
+      "top3Lines": [
+        {
+          "uci": "e5h5",
+          "san": "Rh5#",
+          "scoreCp": 9999,
+          "mate": 1
+        },
+        {
+          "uci": "e5d5",
+          "san": "Red5",
+          "scoreCp": 780,
+          "mate": null
+        },
+        {
+          "uci": "e5f5",
+          "san": "Rf5",
+          "scoreCp": 733,
+          "mate": null
+        }
+      ],
+      "fenBefore": "3R4/1pr2ppk/6n1/1pP1R3/1P6/P7/5PPP/5K2 w - - 1 41",
+      "san": "Red5",
+      "uci": "e5d5",
+      "sequenceSan": "Red5",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwnovj0002vvw8rgtwlgqp",
+      "sample": 48,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 339,
+      "higherDepthCpLoss": 451,
+      "deltaCp": 112,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 122,
+      "top3Lines": [
+        {
+          "uci": "a5d5",
+          "san": "Qd5",
+          "scoreCp": 1454,
+          "mate": null
+        },
+        {
+          "uci": "a5a8",
+          "san": "Qa8",
+          "scoreCp": 1332,
+          "mate": null
+        },
+        {
+          "uci": "a5a4",
+          "san": "Qa4",
+          "scoreCp": 1302,
+          "mate": null
+        }
+      ],
+      "fenBefore": "3r2r1/3P1kpp/5p2/q3p3/8/5P2/P2B1P1P/3R2K1 b - - 2 30",
+      "san": "Rxd7",
+      "uci": "d8d7",
+      "sequenceSan": "Rxd7",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwo8rl0003vvw8n0q4gprb",
+      "sample": 49,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 864,
+      "higherDepthCpLoss": 1127,
+      "deltaCp": 263,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 294,
+      "top3Lines": [
+        {
+          "uci": "b4d5",
+          "san": "Nd5",
+          "scoreCp": 593,
+          "mate": null
+        },
+        {
+          "uci": "h1g1",
+          "san": "Rg1",
+          "scoreCp": 299,
+          "mate": null
+        },
+        {
+          "uci": "f1e2",
+          "san": "Be2",
+          "scoreCp": -270,
+          "mate": null
+        }
+      ],
+      "fenBefore": "rn2r1k1/ppp2ppp/8/2n5/1N2qPQ1/4B3/PPP4P/3RKB1R w K - 1 20",
+      "san": "Bg2",
+      "uci": "f1g2",
+      "sequenceSan": "Bg2",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwo8rl0004vvw8wl1wcigf",
+      "sample": 50,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 369,
+      "higherDepthCpLoss": 473,
+      "deltaCp": 104,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 454,
+      "top3Lines": [
+        {
+          "uci": "d2d8",
+          "san": "Rxd8",
+          "scoreCp": 205,
+          "mate": null
+        },
+        {
+          "uci": "f1d1",
+          "san": "Rfd1",
+          "scoreCp": -249,
+          "mate": null
+        },
+        {
+          "uci": "d2d1",
+          "san": "Rdd1",
+          "scoreCp": -321,
+          "mate": null
+        }
+      ],
+      "fenBefore": "3rr1k1/ppp2ppp/1qn5/2n5/5P2/2P1BQ2/P2R2BP/5RK1 w - - 6 25",
+      "san": "Rfd1",
+      "uci": "f1d1",
+      "sequenceSan": "Rfd1",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwouze0005vvw8iegomwe5",
+      "sample": 51,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 9355,
+      "higherDepthCpLoss": 9158,
+      "deltaCp": -197,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 9171,
+      "top3Lines": [
+        {
+          "uci": "f1f7",
+          "san": "Rf7",
+          "scoreCp": 9995,
+          "mate": 5
+        },
+        {
+          "uci": "a2b3",
+          "san": "axb3",
+          "scoreCp": 824,
+          "mate": null
+        },
+        {
+          "uci": "a1b1",
+          "san": "Rab1",
+          "scoreCp": 772,
+          "mate": null
+        }
+      ],
+      "fenBefore": "1r2r2k/pp1Q3p/1q4p1/4P3/6P1/1p1P3P/P5B1/R4R1K w - - 1 25",
+      "san": "axb3",
+      "uci": "a2b3",
+      "sequenceSan": "axb3",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwouze0006vvw8en50cb18",
+      "sample": 52,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 393,
+      "higherDepthCpLoss": 342,
+      "deltaCp": -51,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 107,
+      "top3Lines": [
+        {
+          "uci": "f1f8",
+          "san": "Rf8+",
+          "scoreCp": 1031,
+          "mate": null
+        },
+        {
+          "uci": "g2b7",
+          "san": "Bxb7",
+          "scoreCp": 924,
+          "mate": null
+        },
+        {
+          "uci": "d7c8",
+          "san": "Qc8+",
+          "scoreCp": 823,
+          "mate": null
+        }
+      ],
+      "fenBefore": "7k/1r1Q3p/6p1/4r3/6P1/1q1P3P/6B1/5R1K w - - 0 28",
+      "san": "Qxb7",
+      "uci": "d7b7",
+      "sequenceSan": "Qxb7",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwq3gq0007vvw8wuf5rsbc",
+      "sample": 53,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 10103,
+      "higherDepthCpLoss": 10138,
+      "deltaCp": 35,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 1,
+      "top3Lines": [
+        {
+          "uci": "f6d4",
+          "san": "Bd4+",
+          "scoreCp": 9994,
+          "mate": 6
+        },
+        {
+          "uci": "d3d1",
+          "san": "Qd1+",
+          "scoreCp": 9993,
+          "mate": 7
+        },
+        {
+          "uci": "a8e8",
+          "san": "Re8",
+          "scoreCp": 9993,
+          "mate": 7
+        }
+      ],
+      "fenBefore": "r6k/ppp3p1/5b1p/5p2/2P2P2/3q4/PP4QP/6K1 b - - 1 36",
+      "san": "Qf1+",
+      "uci": "d3f1",
+      "sequenceSan": "Qf1+",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwr9zt0008vvw8zg5e31ez",
+      "sample": 54,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 8409,
+      "higherDepthCpLoss": 8809,
+      "deltaCp": 400,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 2,
+      "top3Lines": [
+        {
+          "uci": "h2h4",
+          "san": "h4#",
+          "scoreCp": 9999,
+          "mate": 1
+        },
+        {
+          "uci": "e8g8",
+          "san": "Qg8+",
+          "scoreCp": 9997,
+          "mate": 3
+        },
+        {
+          "uci": "e8a8",
+          "san": "Qxa8",
+          "scoreCp": 1241,
+          "mate": null
+        }
+      ],
+      "fenBefore": "b3Q3/p7/5p1p/2p2pk1/8/1P1P1PP1/P5KP/8 w - - 3 35",
+      "san": "Qxa8",
+      "uci": "e8a8",
+      "sequenceSan": "Qxa8",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwsxue0009vvw8d6uctany",
+      "sample": 55,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 9637,
+      "higherDepthCpLoss": 9630,
+      "deltaCp": -7,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 9491,
+      "top3Lines": [
+        {
+          "uci": "d1d8",
+          "san": "Rd8+",
+          "scoreCp": 9994,
+          "mate": 6
+        },
+        {
+          "uci": "g5f4",
+          "san": "Bf4",
+          "scoreCp": 503,
+          "mate": null
+        },
+        {
+          "uci": "g5c1",
+          "san": "Bc1",
+          "scoreCp": 467,
+          "mate": null
+        }
+      ],
+      "fenBefore": "6k1/pbp2pbp/4r1p1/1B4B1/PP6/2P2nN1/2K5/3R2R1 w - - 2 29",
+      "san": "Bc4",
+      "uci": "b5c4",
+      "sequenceSan": "Bc4",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwtwd6000avvw884qdyekt",
+      "sample": 56,
+      "stratum": "cascade",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "evaluation_cascade",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 707,
+      "higherDepthCpLoss": 9157,
+      "deltaCp": 8450,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 8617,
+      "top3Lines": [
+        {
+          "uci": "e2b5",
+          "san": "Bb5",
+          "scoreCp": 9991,
+          "mate": 9
+        },
+        {
+          "uci": "e2d3",
+          "san": "Bd3",
+          "scoreCp": 1374,
+          "mate": null
+        },
+        {
+          "uci": "g3h5",
+          "san": "Nxh5",
+          "scoreCp": 1216,
+          "mate": null
+        }
+      ],
+      "fenBefore": "8/P2k1pb1/2b3p1/4P2p/5P2/6NP/2K1B3/1R6 w - - 3 44",
+      "san": "Rb8",
+      "uci": "b1b8",
+      "sequenceSan": "Rb8 a8=Q",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwtwd6000bvvw8jzhl2as8",
+      "sample": 57,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 259,
+      "higherDepthCpLoss": 1,
+      "deltaCp": -258,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": true,
+      "result": "downgraded",
+      "forcedish": true,
+      "bestSecondGapCp": 1,
+      "top3Lines": [
+        {
+          "uci": "f3g2",
+          "san": "Bg2",
+          "scoreCp": 9992,
+          "mate": 8
+        },
+        {
+          "uci": "e5e6",
+          "san": "e6",
+          "scoreCp": 9991,
+          "mate": 9
+        },
+        {
+          "uci": "c2c3",
+          "san": "Kc3",
+          "scoreCp": 9991,
+          "mate": 9
+        }
+      ],
+      "fenBefore": "8/5R2/6p1/2k1P3/8/5BpP/2K5/8 w - - 2 51",
+      "san": "Rg7",
+      "uci": "f7g7",
+      "sequenceSan": "Rg7",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwua7z000cvvw8xaavu6f3",
+      "sample": 58,
+      "stratum": "low",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "low",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 133,
+      "higherDepthCpLoss": 93,
+      "deltaCp": -40,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "downgraded",
+      "forcedish": true,
+      "bestSecondGapCp": 23,
+      "top3Lines": [
+        {
+          "uci": "e8e2",
+          "san": "Re2",
+          "scoreCp": 559,
+          "mate": null
+        },
+        {
+          "uci": "b6b5",
+          "san": "b5",
+          "scoreCp": 536,
+          "mate": null
+        },
+        {
+          "uci": "d8d7",
+          "san": "Qd7",
+          "scoreCp": 500,
+          "mate": null
+        }
+      ],
+      "fenBefore": "r2qr1k1/p4p1p/1p1b2p1/2p3P1/2Pp1P1P/1P1R2Q1/PB6/R5K1 b - - 2 23",
+      "san": "Re6",
+      "uci": "e8e6",
+      "sequenceSan": "Re6",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwuj8u000dvvw8tdldkfxy",
+      "sample": 59,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "opening",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 416,
+      "higherDepthCpLoss": 584,
+      "deltaCp": 168,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 397,
+      "top3Lines": [
+        {
+          "uci": "f4h5",
+          "san": "Nxh5",
+          "scoreCp": 852,
+          "mate": null
+        },
+        {
+          "uci": "d1a4",
+          "san": "Qxa4",
+          "scoreCp": 455,
+          "mate": null
+        },
+        {
+          "uci": "c4c5",
+          "san": "c5",
+          "scoreCp": 450,
+          "mate": null
+        }
+      ],
+      "fenBefore": "1nbqkbnr/1pppppp1/8/7r/p1PPPN1p/2N5/PP3PPP/R1BQKB1R w KQk - 4 7",
+      "san": "Be2",
+      "uci": "f1e2",
+      "sequenceSan": "Be2",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwxd14000evvw8rga9rg0c",
+      "sample": 60,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 436,
+      "higherDepthCpLoss": 395,
+      "deltaCp": -41,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 0,
+      "top3Lines": [
+        {
+          "uci": "e8d8",
+          "san": "Rd8",
+          "scoreCp": 415,
+          "mate": null
+        },
+        {
+          "uci": "f6g5",
+          "san": "Kg5",
+          "scoreCp": 415,
+          "mate": null
+        },
+        {
+          "uci": "e8e3",
+          "san": "Re3",
+          "scoreCp": 396,
+          "mate": null
+        }
+      ],
+      "fenBefore": "4r3/8/5k2/5p2/2K5/8/8/5R2 b - - 11 70",
+      "san": "Re2",
+      "uci": "e8e2",
+      "sequenceSan": "Re2",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwxz5g000fvvw8g3w2aqnb",
+      "sample": 61,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 226,
+      "higherDepthCpLoss": -1,
+      "deltaCp": -227,
+      "originalContainsMate": false,
+      "higherDepthContainsMate": false,
+      "result": "reversed",
+      "forcedish": true,
+      "bestSecondGapCp": 15,
+      "top3Lines": [
+        {
+          "uci": "e5f5",
+          "san": "Qxf5",
+          "scoreCp": 997,
+          "mate": null
+        },
+        {
+          "uci": "g6f5",
+          "san": "gxf5",
+          "scoreCp": 982,
+          "mate": null
+        },
+        {
+          "uci": "d7d8",
+          "san": "Kd8",
+          "scoreCp": 772,
+          "mate": null
+        }
+      ],
+      "fenBefore": "r3bb1r/p1pk4/1p1p2pp/4qB2/2P5/1P2B3/P4PPP/R3R1K1 b - - 0 22",
+      "san": "gxf5",
+      "uci": "g6f5",
+      "sequenceSan": "gxf5",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwzjcp000gvvw8rw1k5kl9",
+      "sample": 62,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 8913,
+      "higherDepthCpLoss": 4,
+      "deltaCp": -8909,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "downgraded",
+      "forcedish": false,
+      "bestSecondGapCp": 8807,
+      "top3Lines": [
+        {
+          "uci": "f3g3",
+          "san": "Kxg3",
+          "scoreCp": 9994,
+          "mate": 6
+        },
+        {
+          "uci": "f3e4",
+          "san": "Ke4",
+          "scoreCp": 1187,
+          "mate": null
+        },
+        {
+          "uci": "f3f4",
+          "san": "Kf4",
+          "scoreCp": 1080,
+          "mate": null
+        }
+      ],
+      "fenBefore": "8/4k3/p1R5/2R1P3/2P5/1P3Kr1/P7/8 w - - 1 55",
+      "san": "Ke4",
+      "uci": "f3e4",
+      "sequenceSan": "Ke4",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwx4br0000hvvw8ol50qbpl",
+      "sample": 63,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 7497,
+      "higherDepthCpLoss": 8734,
+      "deltaCp": 1237,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 0,
+      "top3Lines": [
+        {
+          "uci": "f8d6",
+          "san": "Qd6+",
+          "scoreCp": 9998,
+          "mate": 2
+        },
+        {
+          "uci": "f8f4",
+          "san": "Qf4+",
+          "scoreCp": 9998,
+          "mate": 2
+        },
+        {
+          "uci": "f8d8",
+          "san": "Qd8",
+          "scoreCp": 9994,
+          "mate": 6
+        }
+      ],
+      "fenBefore": "5Q2/6q1/7k/7p/7P/p2BP1P1/P4P2/6K1 w - - 11 55",
+      "san": "Qxg7+",
+      "uci": "f8g7",
+      "sequenceSan": "Qxg7+",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwx9n1y0000vvqcn087c1tb",
+      "sample": 64,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": 8041,
+      "higherDepthCpLoss": 6,
+      "deltaCp": -8035,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "downgraded",
+      "forcedish": true,
+      "bestSecondGapCp": 7,
+      "top3Lines": [
+        {
+          "uci": "e3g5",
+          "san": "Bg5+",
+          "scoreCp": 9998,
+          "mate": 2
+        },
+        {
+          "uci": "h7h8",
+          "san": "Rh8+",
+          "scoreCp": 9991,
+          "mate": 9
+        },
+        {
+          "uci": "c3c8",
+          "san": "Rxc8+",
+          "scoreCp": 9989,
+          "mate": 11
+        }
+      ],
+      "fenBefore": "2rk4/pp5R/3p4/8/8/P1RPB3/5PP1/4K3 w - - 1 29",
+      "san": "Rh8+",
+      "uci": "h7h8",
+      "sequenceSan": "Rh8+",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    }
+  ],
+  "depthInventory": [
+    {
+      "engineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "depth": 16,
+      "flagCount": 30
+    },
+    {
+      "engineVersion": "stockfish-19-lite-single-depth16-v2",
+      "depth": 16,
+      "flagCount": 34
+    }
+  ],
+  "caveat": "Higher-depth Stockfish agreement is evaluation stability, not human-annotated mistake accuracy. `forcedish` means top-1 vs top-2 MultiPV score gap <30 cp.",
+  "sampledSeverityProjectionAt150Cp": {
+    "low": 9,
+    "medium": 3,
+    "high": 52
+  },
+  "thresholdStabilityByOriginalCpLoss": {
+    "100-149cp": {
+      "total": 9,
+      "confirmed": 6,
+      "downgraded": 3,
+      "reversed": 0
+    },
+    "150-200cp": {
+      "total": 3,
+      "confirmed": 3,
+      "downgraded": 0,
+      "reversed": 0
+    }
+  }
+}

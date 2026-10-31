@@ -1,0 +1,31 @@
+{
+  "retrievalWeight": 0.25,
+  "bucketWeight": 0,
+  "k": 3,
+  "distanceThreshold": 0.15,
+  "tuningAccuracy": 0.4855570839064649,
+  "tuningPositions": 3635,
+  "tunedOpponents": [
+    "aliafrooz",
+    "Anush_Borse",
+    "hempatel3215",
+    "Jasmine-Jane",
+    "josueg12chess",
+    "kamallllll",
+    "Madi_bugg",
+    "mhdaaqil",
+    "MolyGreaseNinja",
+    "pawnstorm22",
+    "punjablion",
+    "remoon74",
+    "samguerra",
+    "Shiningknight8",
+    "Tomorrow_Never_Knows",
+    "Alkaly1982",
+    "ArshavirAghaei1396",
+    "DharmenderArora_77",
+    "Emmitt1",
+    "Gagik20130614"
+  ],
+  "frozenAt": "2026-10-31T07:52:43.741Z"
+}

@@ -5,11 +5,11 @@ import { createPortal } from "react-dom";
 import { Chess } from "chess.js";
 import type { Key } from "chessground/types";
 import { isMaiaWorkerStopped, useMaiaWorker, type MaiaInferenceResult } from "@/lib/maia/useMaiaWorker";
-import { rerankMoves } from "@/lib/maia/rerank";
+import { selectTopLegalMaiaMove } from "@/lib/maia/selectLegalMove";
 import type { OpponentFeatures } from "@/lib/lichess/opponentFeatures";
 import { loadOpponentMimicProfiles } from "@/lib/profile/opponentMimicProfiles";
 import { resolveOpponentTier } from "@/lib/opponent/resolveTier";
-import { openingTreeHitsAt } from "@/lib/profile/openingTree";
+import { openingTreeHitsAt, openingTreeMove } from "@/lib/profile/openingTree";
 import { evalFenMultiPv } from "@/lib/eval/stockfishEngine";
 import type { OpeningTree } from "@/types";
 import ChessgroundBoard from "./ChessgroundBoard";
@@ -26,16 +26,6 @@ interface SparBoardProps {
 
 type SparStatus = "loading-style" | "your-turn" | "maia-thinking" | "error" | "game-over";
 type SparMode = "maia" | "mimic";
-const NEUTRAL_FEATURES: OpponentFeatures = {
-  username: "",
-  gamesAnalyzed: 0,
-  mostCommonOpenings: [],
-  queenTradeRate: 0.5,
-  aggressionIndex: 0.5,
-  avgRating: null,
-  fetchedAt: 0,
-};
-
 function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("Maia inference timed out.")), milliseconds);
@@ -131,8 +121,7 @@ export default function PositionSpar({
     opponentGamesAnalyzed: opponentFeatures?.gamesAnalyzed ?? 0,
   }) : null, [effectiveRatingFires, fen, hasOpponent, openingTree, opponentFeatures, tierProfiles]);
   const canMimic = hasOpponent && (tier?.tier === 1 || tier?.tier === 2);
-  // The current opponent-specific adjustments did not clear the held-out
-  // fidelity bar, so Maia is the honest default until they do.
+  // Opponent mimicry uses exact opening history, then rating-conditioned Base Maia.
   const displayedMode: SparMode = !userChoseMode ? "maia" : canMimic || sparMode === "maia" ? sparMode : "maia";
   const modeledGameCount = tierProfiles?.openingTree?.gamesEvaluated ?? openingTree?.gamesEvaluated ?? 0;
   const closeSpar = useCallback(() => {
@@ -248,33 +237,35 @@ export default function PositionSpar({
 
   async function playMaia(chess: Chess, session: number) {
     const isStale = () => sessionRef.current !== session;
+    const shouldAssist = assistEnabled;
+    const assistRequest = assistSessionRef.current;
     setStatus("maia-thinking");
     setErrorMessage(null);
     try {
       const inferenceFen = chess.fen();
-      const shouldAssist = assistEnabled;
-      const assistRequest = assistSessionRef.current;
-      const warm = warmInferenceRef.current;
-      const warmed = warm?.fen === inferenceFen && warm.selfRating === maiaRating && warm.oppRating === humanRating
-        ? warm.promise
-        : null;
-      if (warmed) warmInferenceRef.current = null;
-      const inference = await (warmed ?? withTimeout(infer(inferenceFen, maiaRating, humanRating), 60_000));
-      if (isStale()) return;
       const mimic = activeModeRef.current === "mimic";
-      const result = await rerankMoves({
-        fen: inferenceFen,
-        logitsMaia: inference.logitsMaia,
-        opponentFeatures: opponentFeatures ?? NEUTRAL_FEATURES,
-        openingTree: mimic ? openingTreeRef.current : null,
-      });
-      if (isStale()) return;
-
-      const delay = 1_000 + Math.random() * 2_000;
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      if (isStale()) return;
-
-      const uci = result.topMove?.uci ?? result.baseTopMove?.uci;
+      const fenFields = inferenceFen.split(" ");
+      const fullmove = Number.parseInt(fenFields[5] ?? "1", 10) || 1;
+      const positionPly = (fullmove - 1) * 2 + (fenFields[1] === "b" ? 1 : 0);
+      const treeUci = mimic && positionPly < 12 ? openingTreeMove(openingTreeRef.current, inferenceFen) : null;
+      const treeMoveIsLegal = !!treeUci && chess.moves({ verbose: true }).some((move) =>
+        move.from + move.to + (move.promotion ?? "") === treeUci,
+      );
+      let uci: string | null = treeMoveIsLegal ? treeUci! : null;
+      if (!uci) {
+        const warm = warmInferenceRef.current;
+        const warmed = warm?.fen === inferenceFen && warm.selfRating === maiaRating && warm.oppRating === humanRating
+          ? warm.promise
+          : null;
+        if (warmed) warmInferenceRef.current = null;
+        const inference = await (warmed ?? withTimeout(infer(inferenceFen, maiaRating, humanRating), 60_000));
+        if (isStale()) return;
+        uci = await selectTopLegalMaiaMove(inferenceFen, inference.logitsMaia);
+        if (isStale()) return;
+        const delay = 1_000 + Math.random() * 2_000;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        if (isStale()) return;
+      }
       if (!uci) {
         setStatus("game-over");
         return;
@@ -285,6 +276,11 @@ export default function PositionSpar({
         promotion: uci.length > 4 ? uci.slice(4) : undefined,
       });
       if (!move) throw new Error("Maia returned no legal move for this position.");
+      console.info("Maia spar move", {
+        usedOpeningTree: treeMoveIsLegal,
+        openingMove: treeMoveIsLegal ? uci : null,
+        rerankerApplied: false,
+      });
       chessRef.current = chess;
       setLastMove([move.from as Key, move.to as Key]);
       setSparFen(chess.fen());
@@ -420,25 +416,25 @@ export default function PositionSpar({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="w-full">
             <p className="text-sm text-neutral-200">Play this position</p>
-            <p className="mt-1 text-xs text-neutral-500">Choose rating-conditioned Maia or try experimental opponent-informed adjustments. The held-out move test has not shown a reliable improvement yet.</p>
+            <p className="mt-1 text-xs text-neutral-500">Choose rating-conditioned Maia or mimic this opponent's opening history, then continue as rating-conditioned Maia.</p>
             {maiaWarmState === "warming" && <p className="mt-2 text-[10px] text-neutral-500" aria-live="polite">Warming Maia’s local model in the background…</p>}
             {maiaWarmState === "unavailable" && <p className="mt-2 text-[10px] text-amber-200/80">Maia could not prewarm; it will initialize when you start the spar.</p>}
-            {canMimic && <p className="mt-2 text-[10px] text-neutral-500" aria-live="polite">{mimicWarmState === "warming" ? `Preparing ${opponentUsername}’s style profile in the background…` : mimicWarmState === "ready" ? `${opponentUsername}’s approximate style profile is ready.` : mimicWarmState === "partial" ? "The approximate style profile is partial; unavailable signals will be skipped." : "Approximate style data will be prepared in the background."}</p>}
+            {canMimic && <p className="mt-2 text-[10px] text-neutral-500" aria-live="polite">{mimicWarmState === "warming" ? `Preparing ${opponentUsername}’s opening history in the background…` : mimicWarmState === "ready" ? `${opponentUsername}’s opening history is ready.` : mimicWarmState === "partial" ? "Opening history is unavailable; rating-conditioned Maia will be used." : "Opponent opening history will be loaded in the background."}</p>}
             <fieldset className="mt-4">
               <legend className="mb-2 text-[10px] uppercase tracking-widest text-neutral-500">Spar style</legend>
               <div className="grid gap-2 sm:grid-cols-2">
                 <label className={`cursor-pointer rounded-lg border p-3 transition ${displayedMode === "maia" ? "border-emerald-300/40 bg-emerald-300/10" : "border-white/10 hover:border-white/20"}`}>
                   <input className="sr-only" type="radio" name="spar-mode" value="maia" checked={displayedMode === "maia"} onChange={() => { setUserChoseMode(true); setSparMode("maia"); }} />
                   <span className="block text-xs text-neutral-100">Maia</span>
-                  <span className="mt-1 block text-[10px] leading-4 text-neutral-500">Rating-conditioned Maia, without opponent-specific style adjustments.</span>
+                  <span className="mt-1 block text-[10px] leading-4 text-neutral-500">Rating-conditioned Maia throughout the game.</span>
                 </label>
                 <label className={`cursor-pointer rounded-lg border p-3 transition ${displayedMode === "mimic" ? "border-violet-300/40 bg-violet-300/10" : "border-white/10 hover:border-white/20"} ${!canMimic ? "cursor-not-allowed opacity-50" : ""}`}>
                   <input className="sr-only" type="radio" name="spar-mode" value="mimic" checked={displayedMode === "mimic"} onChange={() => { setUserChoseMode(true); setSparMode("mimic"); }} disabled={!canMimic} />
-                  <span className="block text-xs text-neutral-100">Approximate {opponentUsername ? opponentUsername : "opponent"}</span>
+                  <span className="block text-xs text-neutral-100">Mimic {opponentUsername ? opponentUsername : "opponent"}</span>
                   <span className="mt-1 block text-[10px] leading-4 text-neutral-500">
-                    {tier?.tier === 1 && `Experimental profile adjustments — ${tier.firedSignals.join(", ")}. Not validated as a better move predictor.`}
-                    {tier?.tier === 2 && `Partial experimental adjustments — ${tier.firedSignals.join(", ")} only. Not validated as a better move predictor.`}
-                    {(!tier || tier.tier === 3) && "Not enough matchup data to prepare opponent-informed adjustments yet."}
+                    {tier?.tier === 1 && "Plays this opponent's actual opening moves from their game history, then continues as rating-conditioned Maia."}
+                    {tier?.tier === 2 && "Plays this opponent's actual opening moves from their game history, then continues as rating-conditioned Maia."}
+                    {(!tier || tier.tier === 3) && "Not enough matchup data to enable mimic yet."}
                   </span>
                 </label>
               </div>
@@ -449,16 +445,16 @@ export default function PositionSpar({
       ) : (
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
-            <div><p className="text-sm text-neutral-100">Sparring from this position</p><p className="mt-1 text-xs text-neutral-500">You play {humanColor}; {activeSparMode === "mimic" && opponentUsername ? `Maia uses approximate adjustments based on ${opponentUsername}` : "Maia uses its baseline style"}.</p>
+            <div><p className="text-sm text-neutral-100">Sparring from this position</p><p className="mt-1 text-xs text-neutral-500">You play {humanColor}; {activeSparMode === "mimic" && opponentUsername ? `Mimics ${opponentUsername}'s opening history, then uses rating-conditioned Maia` : "Maia uses rating-conditioned play"}.</p>
               {activeSparMode === "mimic" && opponentUsername && tier && tier.tier < 3
-                ? <span className="mt-2 inline-flex rounded-full border border-violet-300/25 bg-violet-300/10 px-2.5 py-1 text-[10px] text-violet-100">Approximate profile: {opponentUsername}{modeledGameCount > 0 ? ` · ${modeledGameCount} games` : " · profile active"}</span>
+                ? <span className="mt-2 inline-flex rounded-full border border-violet-300/25 bg-violet-300/10 px-2.5 py-1 text-[10px] text-violet-100">Opening-tree mimic: {opponentUsername}{modeledGameCount > 0 ? ` · ${modeledGameCount} games` : " · opening history active"}</span>
                 : <span className="mt-2 inline-flex rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] text-neutral-300">Base Maia</span>}
             </div>
             <button type="button" onClick={closeSpar} className="rounded border border-white/10 px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/5">Close</button>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
             <p aria-live="polite" className="text-neutral-300">
-              {status === "loading-style" && "Loading opponent style locally. First-time profiling may take a while…"}
+              {status === "loading-style" && "Loading opponent opening history…"}
               {status === "your-turn" && "Your move"}
               {status === "maia-thinking" && "Maia is thinking…"}
               {status === "error" && (errorMessage ?? "Maia could not move.")}
@@ -482,9 +478,9 @@ export default function PositionSpar({
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
               <h2 id="position-spar-title" className="text-base font-medium text-white">Spar from this position</h2>
-              <p className="mt-1 text-xs text-neutral-400">You play {humanColor}; {activeSparMode === "mimic" && opponentUsername ? `Maia uses approximate adjustments based on ${opponentUsername}` : "Maia uses its baseline style"}.</p>
+              <p className="mt-1 text-xs text-neutral-400">You play {humanColor}; {activeSparMode === "mimic" && opponentUsername ? `Mimics ${opponentUsername}'s opening history, then uses rating-conditioned Maia` : "Maia uses rating-conditioned play"}.</p>
               {activeSparMode === "mimic" && opponentUsername && tier && tier.tier < 3
-                ? <span className="mt-2 inline-flex rounded-full border border-violet-300/25 bg-violet-300/10 px-2.5 py-1 text-[10px] text-violet-100">Approximate profile: {opponentUsername}{modeledGameCount > 0 ? ` · ${modeledGameCount} games` : " · profile active"}</span>
+                ? <span className="mt-2 inline-flex rounded-full border border-violet-300/25 bg-violet-300/10 px-2.5 py-1 text-[10px] text-violet-100">Opening-tree mimic: {opponentUsername}{modeledGameCount > 0 ? ` · ${modeledGameCount} games` : " · opening history active"}</span>
                 : <span className="mt-2 inline-flex rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] text-neutral-300">Base Maia</span>}
             </div>
             <button type="button" onClick={closeSpar} className="shrink-0 rounded border border-white/10 px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/5">Back to game review</button>
@@ -510,7 +506,7 @@ export default function PositionSpar({
             {assistEnabled && <p className="text-neutral-400">Engine assist: the blue arrow and ghost piece show Stockfish&apos;s top move for your turn. Once a hint appears, a win or draw here won&apos;t count as resolving the position.</p>}
             {assistEnabled && assistLine && <p className="text-sky-300" aria-live="polite">Stockfish&apos;s top move for you: <strong>{assistLine.san ?? "unavailable"}</strong>{assistLine.mate !== null ? ` (mate in ${Math.abs(assistLine.mate)} ${assistLine.mate > 0 ? "for you" : "against you"})` : assistLine.cp !== null ? ` (${assistLine.cp > 0 ? "+" : ""}${(assistLine.cp / 100).toFixed(2)} pawns for you)` : ""}.</p>}
             <p aria-live="polite" className="text-neutral-300">
-              {status === "loading-style" && "Loading opponent style locally. First-time profiling may take a while…"}
+              {status === "loading-style" && "Loading opponent opening history…"}
               {status === "your-turn" && "Your move"}
               {status === "maia-thinking" && "Maia is thinking…"}
               {status === "error" && (errorMessage ?? "Maia could not move.")}
@@ -529,7 +525,7 @@ export default function PositionSpar({
               <div className="mb-4 flex items-start justify-between gap-4">
                 <div>
                   <h2 id="position-spar-title" className="text-base font-medium text-white">Spar from this position</h2>
-                  <p className="mt-1 text-xs text-neutral-400">You play {humanColor}; {activeSparMode === "mimic" && opponentUsername ? `Maia uses approximate adjustments based on ${opponentUsername}` : "Maia uses its baseline style"}.</p>
+                  <p className="mt-1 text-xs text-neutral-400">You play {humanColor}; {activeSparMode === "mimic" && opponentUsername ? `Mimics ${opponentUsername}'s opening history, then uses rating-conditioned Maia` : "Maia uses rating-conditioned play"}.</p>
                 </div>
                 <button type="button" onClick={closeSpar} className="rounded border border-white/10 px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/5">Close</button>
               </div>
@@ -559,7 +555,7 @@ export default function PositionSpar({
                   {assistLine.mate !== null ? ` (mate in ${Math.abs(assistLine.mate)} ${assistLine.mate > 0 ? "for you" : "against you"})` : assistLine.cp !== null ? ` (${assistLine.cp > 0 ? "+" : ""}${(assistLine.cp / 100).toFixed(2)} pawns for you)` : ""}.
                 </p>}
                 <p aria-live="polite" className="text-neutral-300">
-                  {status === "loading-style" && "Loading opponent style locally. First-time profiling may take a while…"}
+                  {status === "loading-style" && "Loading opponent opening history…"}
                   {status === "your-turn" && "Your move"}
                   {status === "maia-thinking" && "Maia is thinking…"}
                   {status === "error" && (errorMessage ?? "Maia could not move.")}

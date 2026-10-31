@@ -199,7 +199,7 @@ export interface FlaggedMove {
   // How much to trust the evaluation backing this flag. Mate-backed losses
   // use a synthetic mate-distance scale; searches below depth 10 are marked
   // degraded. Partial games are rejected before flagging.
-  evalConfidence: "full" | "mate_only" | "degraded";
+  evalConfidence: "full" | "mate_only" | "degraded" | "degraded_mate_only";
 
   explanation: string;            // human-readable, built from the above (feeds VerdictCard)
 }

@@ -32,7 +32,7 @@ export function loadOpponentMimicProfiles(username: string): Promise<OpponentMim
     return {
       openingTree,
       notice: unavailable.length
-        ? `${unavailable.join(", ")} profile${unavailable.length === 1 ? " is" : "s are"} unavailable; Maia will use the other available mimic signals.`
+        ? `${unavailable.includes("opening") ? "Opponent opening history is unavailable" : "Opponent data is unavailable"}; rating-conditioned Maia will be used.`
         : null,
     };
   })();

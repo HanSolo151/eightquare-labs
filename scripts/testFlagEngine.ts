@@ -17,8 +17,8 @@ const weaknesses: WeaknessProfile = {
   gamesFetched: 1, confidence: "low", builtAt: 0,
 };
 
-function point(ply: number, cpBefore: number | null, cpAfter: number | null, mateBefore: number | null = null, mateAfter: number | null = null): EvalPoint {
-  return { ply, cpBefore, cpAfter, mateBefore, mateAfter, depth: 16, bestMoveUci: null };
+function point(ply: number, cpBefore: number | null, cpAfter: number | null, mateBefore: number | null = null, mateAfter: number | null = null, depth = 16): EvalPoint {
+  return { ply, cpBefore, cpAfter, mateBefore, mateAfter, depth, bestMoveUci: null };
 }
 function gameEval(points: EvalPoint[]): GameEval {
   return { gameId: "g", points, evaluatedAt: 0, engineVersion: "test" };
@@ -82,15 +82,72 @@ const cascadeFlags = flagMoves(
 assert(cascadeFlags.length === 1 && cascadeFlags[0].flagType === "evaluation_cascade" && cascadeFlags[0].cpLoss === 250,
   "a lasting multi-move decline produces one cascade summary instead of duplicate individual flags");
 
-function flagForLoss(cpLoss: number) {
+function flagForLoss(cpLoss: number, depth = 16) {
   const after = 500 - cpLoss;
   return flagMoves(
     [feature(0, "white"), feature(1, "black")], profile, weaknesses,
-    gameEval([point(0, 500, after), point(1, -after, -after)]), "white",
+    gameEval([point(0, 500, after, null, null, depth), point(1, -after, -after, null, null, depth)]), "white",
   )[0];
 }
-assert(flagForLoss(100)?.severity === "medium", "a 1.0-pawn unrecovered loss is medium severity");
+assert(flagForLoss(100)?.severity === "low", "a 1.0-pawn loss remains a flag but is low severity below the 1.5-pawn medium floor");
+assert(flagForLoss(149)?.severity === "low", "a loss below 1.5 pawns is low severity");
+assert(!flagForLoss(100, 10) && !flagForLoss(149, 10),
+  "100-149cp flags are suppressed below depth 16");
+assert(flagForLoss(150, 10)?.severity === "medium",
+  "150cp flags retain the degraded-depth path");
+assert(flagForLoss(150)?.severity === "medium", "a 1.5-pawn unrecovered loss is medium severity");
 assert(flagForLoss(200)?.severity === "medium", "a 2.0-pawn unrecovered loss remains medium severity");
 assert(flagForLoss(201)?.severity === "high", "an unrecovered loss above 2.0 pawns is high severity");
+
+assert(resolveCpLoss({ ...point(0, 200, 100), depth: 7 }) === null,
+  "depth below 8 is unusable for move-loss resolution");
+assert(resolveCpLoss({ ...point(0, 200, 100), depth: 8 })?.evalConfidence === "degraded",
+  "depth 8 is accepted but marked degraded");
+assert(resolveCpLoss({ ...point(0, 200, 100), depth: 9 })?.evalConfidence === "degraded",
+  "depth 9 is accepted but marked degraded");
+assert(resolveCpLoss({ ...point(0, 200, 100), depth: 10 })?.evalConfidence === "degraded",
+  "depth 10 remains below the configured depth-16 target and is marked degraded");
+assert(resolveCpLoss({ ...point(0, 200, 100), depth: 15 })?.evalConfidence === "degraded",
+  "depth 15 is marked degraded below the configured depth-16 target");
+assert(resolveCpLoss({ ...point(0, 200, 100), depth: 16 })?.evalConfidence === "full",
+  "depth 16 meets the full-confidence target");
+assert(resolveCpLoss({ ...point(0, 200, null, null, 3), depth: 10 })?.evalConfidence === "degraded_mate_only",
+  "shallow mate-backed loss retains its mate-only label and degraded-depth caution");
+
+const exactRecovery = gameEval([point(0, 500, 400), point(1, -400, -450)]);
+assert(!checkCausality(exactRecovery, 0, "white").heldToEnd &&
+  checkCausality(exactRecovery, 0, "white").recoveredAtPly === 1,
+  "recovery exactly at the 50cp tolerance is considered recovered");
+const outsideRecovery = gameEval([point(0, 500, 400), point(1, -400, -449)]);
+assert(checkCausality(outsideRecovery, 0, "white").heldToEnd,
+  "recovery 51cp below baseline is not considered recovered");
+
+const timedFeature = feature(0, "white", { timeSpentSec: 0.1, likelyPremove: true, isForcing: true });
+const timedFlags = flagMoves([timedFeature, feature(1, "black")], profile, weaknesses, unrecovered, "white");
+assert(timedFlags.length === 1 && timedFlags[0].timeRatio === 1 &&
+  timedFlags[0].phaseAvgSec === 0 && timedFlags[0].styleDeviationScore === 0,
+  "clock speed is display-only: premove timing does not change eligibility or add a timing bonus");
+
+const noEvalLoss = flagMoves([feature(0, "white"), feature(1, "black")], profile, weaknesses,
+  gameEval([point(0, 99, 0), point(1, 0, 0)]), "white");
+assert(noEvalLoss.length === 0, "a 99cp loss is below the 100cp minimum");
+
+const brokenSequence = gameEval([point(0, 500, 400), point(2, 400, 200)]);
+assert(flagMoves([feature(0, "white"), feature(1, "black"), feature(2, "white")], profile, weaknesses,
+  brokenSequence, "white").length === 0,
+  "a missing evaluation ply prevents a causality conclusion");
+
+const recoveryBeforeLaterCascade = gameEval([
+  point(0, 500, 300), point(1, -300, -500),
+  point(2, 500, 440), point(3, -440, -440),
+  point(4, 440, 250), point(5, -250, -250),
+]);
+const recoveryBeforeLaterFlags = flagMoves(
+  [feature(0, "white"), feature(1, "black"), feature(2, "white"), feature(3, "black"), feature(4, "white"), feature(5, "black")],
+  profile, weaknesses, recoveryBeforeLaterCascade, "white",
+);
+assert(!recoveryBeforeLaterFlags.some((flag) => flag.flagType === "evaluation_cascade") &&
+  recoveryBeforeLaterFlags.some((flag) => flag.flagType === "decision_error" && flag.ply === 4),
+  "diagnostic limitation: a recovered early loss can consume a later qualifying cascade run");
 
 console.log("All flag-engine checks passed.");

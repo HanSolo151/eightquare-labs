@@ -1,0 +1,1411 @@
+{
+  "generatedAt": "2026-10-31T10:43:31.430Z",
+  "corpus": "cached chronological 60-opponent corpus",
+  "split": {
+    "training": 64,
+    "test": 20
+  },
+  "route": "opening tree for ply < 12 when exact position match exists; otherwise rating-conditioned Base Maia top legal move; reranker disabled",
+  "totals": {
+    "Opening (<12)": {
+      "total": 7053,
+      "baseCorrect": 2508,
+      "shippedCorrect": 3949,
+      "treeMatches": 2954
+    },
+    "Middlegame (12-40)": {
+      "total": 14793,
+      "baseCorrect": 7475,
+      "shippedCorrect": 7475,
+      "treeMatches": 0
+    },
+    "Endgame (>40)": {
+      "total": 15913,
+      "baseCorrect": 8870,
+      "shippedCorrect": 8870,
+      "treeMatches": 0
+    }
+  },
+  "players": [
+    {
+      "username": "aliafrooz",
+      "phases": {
+        "Opening (<12)": {
+          "total": 118,
+          "baseCorrect": 38,
+          "shippedCorrect": 46,
+          "treeMatches": 37
+        },
+        "Middlegame (12-40)": {
+          "total": 235,
+          "baseCorrect": 112,
+          "shippedCorrect": 112,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 286,
+          "baseCorrect": 166,
+          "shippedCorrect": 166,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "anush_borse",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 37,
+          "shippedCorrect": 64,
+          "treeMatches": 47
+        },
+        "Middlegame (12-40)": {
+          "total": 227,
+          "baseCorrect": 120,
+          "shippedCorrect": 120,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 161,
+          "baseCorrect": 92,
+          "shippedCorrect": 92,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "hempatel3215",
+      "phases": {
+        "Opening (<12)": {
+          "total": 109,
+          "baseCorrect": 29,
+          "shippedCorrect": 58,
+          "treeMatches": 39
+        },
+        "Middlegame (12-40)": {
+          "total": 217,
+          "baseCorrect": 110,
+          "shippedCorrect": 110,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 198,
+          "baseCorrect": 91,
+          "shippedCorrect": 91,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "jasmine-jane",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 36,
+          "shippedCorrect": 54,
+          "treeMatches": 38
+        },
+        "Middlegame (12-40)": {
+          "total": 249,
+          "baseCorrect": 128,
+          "shippedCorrect": 128,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 258,
+          "baseCorrect": 146,
+          "shippedCorrect": 146,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "josueg12chess",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 31,
+          "shippedCorrect": 80,
+          "treeMatches": 58
+        },
+        "Middlegame (12-40)": {
+          "total": 230,
+          "baseCorrect": 110,
+          "shippedCorrect": 110,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 228,
+          "baseCorrect": 124,
+          "shippedCorrect": 124,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "kamallllll",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 38,
+          "shippedCorrect": 62,
+          "treeMatches": 42
+        },
+        "Middlegame (12-40)": {
+          "total": 244,
+          "baseCorrect": 114,
+          "shippedCorrect": 114,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 226,
+          "baseCorrect": 136,
+          "shippedCorrect": 136,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "madi_bugg",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 47,
+          "shippedCorrect": 71,
+          "treeMatches": 47
+        },
+        "Middlegame (12-40)": {
+          "total": 231,
+          "baseCorrect": 118,
+          "shippedCorrect": 118,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 200,
+          "baseCorrect": 105,
+          "shippedCorrect": 105,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "mhdaaqil",
+      "phases": {
+        "Opening (<12)": {
+          "total": 118,
+          "baseCorrect": 36,
+          "shippedCorrect": 54,
+          "treeMatches": 39
+        },
+        "Middlegame (12-40)": {
+          "total": 223,
+          "baseCorrect": 93,
+          "shippedCorrect": 93,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 131,
+          "baseCorrect": 64,
+          "shippedCorrect": 64,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "molygreaseninja",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 32,
+          "shippedCorrect": 52,
+          "treeMatches": 43
+        },
+        "Middlegame (12-40)": {
+          "total": 271,
+          "baseCorrect": 125,
+          "shippedCorrect": 125,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 231,
+          "baseCorrect": 118,
+          "shippedCorrect": 118,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "pawnstorm22",
+      "phases": {
+        "Opening (<12)": {
+          "total": 115,
+          "baseCorrect": 36,
+          "shippedCorrect": 71,
+          "treeMatches": 56
+        },
+        "Middlegame (12-40)": {
+          "total": 216,
+          "baseCorrect": 119,
+          "shippedCorrect": 119,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 175,
+          "baseCorrect": 84,
+          "shippedCorrect": 84,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "punjablion",
+      "phases": {
+        "Opening (<12)": {
+          "total": 114,
+          "baseCorrect": 25,
+          "shippedCorrect": 40,
+          "treeMatches": 34
+        },
+        "Middlegame (12-40)": {
+          "total": 204,
+          "baseCorrect": 111,
+          "shippedCorrect": 111,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 227,
+          "baseCorrect": 125,
+          "shippedCorrect": 125,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "remoon74",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 38,
+          "shippedCorrect": 46,
+          "treeMatches": 33
+        },
+        "Middlegame (12-40)": {
+          "total": 266,
+          "baseCorrect": 121,
+          "shippedCorrect": 121,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 305,
+          "baseCorrect": 165,
+          "shippedCorrect": 165,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "samguerra",
+      "phases": {
+        "Opening (<12)": {
+          "total": 112,
+          "baseCorrect": 21,
+          "shippedCorrect": 44,
+          "treeMatches": 34
+        },
+        "Middlegame (12-40)": {
+          "total": 216,
+          "baseCorrect": 93,
+          "shippedCorrect": 93,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 127,
+          "baseCorrect": 58,
+          "shippedCorrect": 58,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "shiningknight8",
+      "phases": {
+        "Opening (<12)": {
+          "total": 95,
+          "baseCorrect": 32,
+          "shippedCorrect": 56,
+          "treeMatches": 46
+        },
+        "Middlegame (12-40)": {
+          "total": 194,
+          "baseCorrect": 113,
+          "shippedCorrect": 113,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 192,
+          "baseCorrect": 102,
+          "shippedCorrect": 102,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "tomorrow_never_knows",
+      "phases": {
+        "Opening (<12)": {
+          "total": 110,
+          "baseCorrect": 24,
+          "shippedCorrect": 43,
+          "treeMatches": 40
+        },
+        "Middlegame (12-40)": {
+          "total": 187,
+          "baseCorrect": 60,
+          "shippedCorrect": 60,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 121,
+          "baseCorrect": 46,
+          "shippedCorrect": 46,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "alkaly1982",
+      "phases": {
+        "Opening (<12)": {
+          "total": 119,
+          "baseCorrect": 40,
+          "shippedCorrect": 74,
+          "treeMatches": 61
+        },
+        "Middlegame (12-40)": {
+          "total": 215,
+          "baseCorrect": 102,
+          "shippedCorrect": 102,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 122,
+          "baseCorrect": 65,
+          "shippedCorrect": 65,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "arshaviraghaei1396",
+      "phases": {
+        "Opening (<12)": {
+          "total": 119,
+          "baseCorrect": 44,
+          "shippedCorrect": 86,
+          "treeMatches": 57
+        },
+        "Middlegame (12-40)": {
+          "total": 239,
+          "baseCorrect": 120,
+          "shippedCorrect": 120,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 250,
+          "baseCorrect": 162,
+          "shippedCorrect": 162,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "dharmenderarora_77",
+      "phases": {
+        "Opening (<12)": {
+          "total": 102,
+          "baseCorrect": 22,
+          "shippedCorrect": 53,
+          "treeMatches": 50
+        },
+        "Middlegame (12-40)": {
+          "total": 200,
+          "baseCorrect": 87,
+          "shippedCorrect": 87,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 119,
+          "baseCorrect": 60,
+          "shippedCorrect": 60,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "emmitt1",
+      "phases": {
+        "Opening (<12)": {
+          "total": 114,
+          "baseCorrect": 37,
+          "shippedCorrect": 67,
+          "treeMatches": 56
+        },
+        "Middlegame (12-40)": {
+          "total": 239,
+          "baseCorrect": 124,
+          "shippedCorrect": 124,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 370,
+          "baseCorrect": 210,
+          "shippedCorrect": 210,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "gagik20130614",
+      "phases": {
+        "Opening (<12)": {
+          "total": 114,
+          "baseCorrect": 40,
+          "shippedCorrect": 56,
+          "treeMatches": 45
+        },
+        "Middlegame (12-40)": {
+          "total": 232,
+          "baseCorrect": 124,
+          "shippedCorrect": 124,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 216,
+          "baseCorrect": 135,
+          "shippedCorrect": 135,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "generalblather",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 50,
+          "shippedCorrect": 74,
+          "treeMatches": 59
+        },
+        "Middlegame (12-40)": {
+          "total": 264,
+          "baseCorrect": 131,
+          "shippedCorrect": 131,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 363,
+          "baseCorrect": 197,
+          "shippedCorrect": 197,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "lucyfer874",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 53,
+          "shippedCorrect": 92,
+          "treeMatches": 71
+        },
+        "Middlegame (12-40)": {
+          "total": 206,
+          "baseCorrect": 106,
+          "shippedCorrect": 106,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 158,
+          "baseCorrect": 91,
+          "shippedCorrect": 91,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "mahmoud5468",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 40,
+          "shippedCorrect": 63,
+          "treeMatches": 40
+        },
+        "Middlegame (12-40)": {
+          "total": 225,
+          "baseCorrect": 114,
+          "shippedCorrect": 114,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 106,
+          "baseCorrect": 49,
+          "shippedCorrect": 49,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "omerbasar",
+      "phases": {
+        "Opening (<12)": {
+          "total": 115,
+          "baseCorrect": 40,
+          "shippedCorrect": 50,
+          "treeMatches": 35
+        },
+        "Middlegame (12-40)": {
+          "total": 247,
+          "baseCorrect": 129,
+          "shippedCorrect": 129,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 469,
+          "baseCorrect": 235,
+          "shippedCorrect": 235,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "resloz",
+      "phases": {
+        "Opening (<12)": {
+          "total": 117,
+          "baseCorrect": 40,
+          "shippedCorrect": 76,
+          "treeMatches": 61
+        },
+        "Middlegame (12-40)": {
+          "total": 247,
+          "baseCorrect": 140,
+          "shippedCorrect": 140,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 394,
+          "baseCorrect": 214,
+          "shippedCorrect": 214,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "santanahxcx",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 41,
+          "shippedCorrect": 42,
+          "treeMatches": 36
+        },
+        "Middlegame (12-40)": {
+          "total": 238,
+          "baseCorrect": 116,
+          "shippedCorrect": 116,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 173,
+          "baseCorrect": 91,
+          "shippedCorrect": 91,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "toinouh",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 35,
+          "shippedCorrect": 43,
+          "treeMatches": 46
+        },
+        "Middlegame (12-40)": {
+          "total": 247,
+          "baseCorrect": 123,
+          "shippedCorrect": 123,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 235,
+          "baseCorrect": 116,
+          "shippedCorrect": 116,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "tuul4",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 40,
+          "shippedCorrect": 50,
+          "treeMatches": 33
+        },
+        "Middlegame (12-40)": {
+          "total": 242,
+          "baseCorrect": 123,
+          "shippedCorrect": 123,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 171,
+          "baseCorrect": 89,
+          "shippedCorrect": 89,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "voxcaeli",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 59,
+          "shippedCorrect": 81,
+          "treeMatches": 53
+        },
+        "Middlegame (12-40)": {
+          "total": 240,
+          "baseCorrect": 130,
+          "shippedCorrect": 130,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 208,
+          "baseCorrect": 111,
+          "shippedCorrect": 111,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "albinlearning",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 51,
+          "shippedCorrect": 67,
+          "treeMatches": 43
+        },
+        "Middlegame (12-40)": {
+          "total": 273,
+          "baseCorrect": 156,
+          "shippedCorrect": 156,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 222,
+          "baseCorrect": 124,
+          "shippedCorrect": 124,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "beatatitiledoplayer",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 39,
+          "shippedCorrect": 81,
+          "treeMatches": 66
+        },
+        "Middlegame (12-40)": {
+          "total": 248,
+          "baseCorrect": 121,
+          "shippedCorrect": 121,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 208,
+          "baseCorrect": 114,
+          "shippedCorrect": 114,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "felipe80rodrigues",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 33,
+          "shippedCorrect": 64,
+          "treeMatches": 56
+        },
+        "Middlegame (12-40)": {
+          "total": 275,
+          "baseCorrect": 134,
+          "shippedCorrect": 134,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 236,
+          "baseCorrect": 140,
+          "shippedCorrect": 140,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "ichselber",
+      "phases": {
+        "Opening (<12)": {
+          "total": 118,
+          "baseCorrect": 56,
+          "shippedCorrect": 94,
+          "treeMatches": 72
+        },
+        "Middlegame (12-40)": {
+          "total": 256,
+          "baseCorrect": 139,
+          "shippedCorrect": 139,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 317,
+          "baseCorrect": 196,
+          "shippedCorrect": 196,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "italiangambit",
+      "phases": {
+        "Opening (<12)": {
+          "total": 114,
+          "baseCorrect": 44,
+          "shippedCorrect": 61,
+          "treeMatches": 43
+        },
+        "Middlegame (12-40)": {
+          "total": 250,
+          "baseCorrect": 130,
+          "shippedCorrect": 130,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 287,
+          "baseCorrect": 149,
+          "shippedCorrect": 149,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "luan_e",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 58,
+          "shippedCorrect": 82,
+          "treeMatches": 63
+        },
+        "Middlegame (12-40)": {
+          "total": 264,
+          "baseCorrect": 120,
+          "shippedCorrect": 120,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 238,
+          "baseCorrect": 125,
+          "shippedCorrect": 125,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "natalmo",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 31,
+          "shippedCorrect": 67,
+          "treeMatches": 50
+        },
+        "Middlegame (12-40)": {
+          "total": 269,
+          "baseCorrect": 116,
+          "shippedCorrect": 116,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 345,
+          "baseCorrect": 179,
+          "shippedCorrect": 179,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "opyegor",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 34,
+          "shippedCorrect": 34,
+          "treeMatches": 20
+        },
+        "Middlegame (12-40)": {
+          "total": 282,
+          "baseCorrect": 156,
+          "shippedCorrect": 156,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 378,
+          "baseCorrect": 233,
+          "shippedCorrect": 233,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "prostoandrew",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 43,
+          "shippedCorrect": 66,
+          "treeMatches": 57
+        },
+        "Middlegame (12-40)": {
+          "total": 266,
+          "baseCorrect": 131,
+          "shippedCorrect": 131,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 270,
+          "baseCorrect": 137,
+          "shippedCorrect": 137,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "sadinb",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 29,
+          "shippedCorrect": 47,
+          "treeMatches": 37
+        },
+        "Middlegame (12-40)": {
+          "total": 273,
+          "baseCorrect": 120,
+          "shippedCorrect": 120,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 384,
+          "baseCorrect": 234,
+          "shippedCorrect": 234,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "sainis",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 45,
+          "shippedCorrect": 76,
+          "treeMatches": 58
+        },
+        "Middlegame (12-40)": {
+          "total": 247,
+          "baseCorrect": 116,
+          "shippedCorrect": 116,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 211,
+          "baseCorrect": 125,
+          "shippedCorrect": 125,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "sarao1415",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 48,
+          "shippedCorrect": 86,
+          "treeMatches": 58
+        },
+        "Middlegame (12-40)": {
+          "total": 266,
+          "baseCorrect": 144,
+          "shippedCorrect": 144,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 303,
+          "baseCorrect": 161,
+          "shippedCorrect": 161,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "shashank-karkare",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 41,
+          "shippedCorrect": 60,
+          "treeMatches": 45
+        },
+        "Middlegame (12-40)": {
+          "total": 280,
+          "baseCorrect": 139,
+          "shippedCorrect": 139,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 536,
+          "baseCorrect": 305,
+          "shippedCorrect": 305,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "ted206",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 30,
+          "shippedCorrect": 81,
+          "treeMatches": 67
+        },
+        "Middlegame (12-40)": {
+          "total": 254,
+          "baseCorrect": 118,
+          "shippedCorrect": 118,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 191,
+          "baseCorrect": 104,
+          "shippedCorrect": 104,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "aleksandrvasilyev",
+      "phases": {
+        "Opening (<12)": {
+          "total": 114,
+          "baseCorrect": 35,
+          "shippedCorrect": 58,
+          "treeMatches": 49
+        },
+        "Middlegame (12-40)": {
+          "total": 272,
+          "baseCorrect": 132,
+          "shippedCorrect": 132,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 370,
+          "baseCorrect": 210,
+          "shippedCorrect": 210,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "aura_smart_homes",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 44,
+          "shippedCorrect": 56,
+          "treeMatches": 40
+        },
+        "Middlegame (12-40)": {
+          "total": 277,
+          "baseCorrect": 141,
+          "shippedCorrect": 141,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 291,
+          "baseCorrect": 182,
+          "shippedCorrect": 182,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "giogiogiogiogio",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 53,
+          "shippedCorrect": 67,
+          "treeMatches": 42
+        },
+        "Middlegame (12-40)": {
+          "total": 290,
+          "baseCorrect": 151,
+          "shippedCorrect": 151,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 336,
+          "baseCorrect": 181,
+          "shippedCorrect": 181,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "iamaaravthegoat",
+      "phases": {
+        "Opening (<12)": {
+          "total": 114,
+          "baseCorrect": 55,
+          "shippedCorrect": 76,
+          "treeMatches": 50
+        },
+        "Middlegame (12-40)": {
+          "total": 246,
+          "baseCorrect": 151,
+          "shippedCorrect": 151,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 280,
+          "baseCorrect": 174,
+          "shippedCorrect": 174,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "joesnooze",
+      "phases": {
+        "Opening (<12)": {
+          "total": 115,
+          "baseCorrect": 43,
+          "shippedCorrect": 78,
+          "treeMatches": 60
+        },
+        "Middlegame (12-40)": {
+          "total": 225,
+          "baseCorrect": 112,
+          "shippedCorrect": 112,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 170,
+          "baseCorrect": 106,
+          "shippedCorrect": 106,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "jrussell8",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 55,
+          "shippedCorrect": 77,
+          "treeMatches": 57
+        },
+        "Middlegame (12-40)": {
+          "total": 258,
+          "baseCorrect": 131,
+          "shippedCorrect": 131,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 334,
+          "baseCorrect": 177,
+          "shippedCorrect": 177,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "juan2012l",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 54,
+          "shippedCorrect": 60,
+          "treeMatches": 41
+        },
+        "Middlegame (12-40)": {
+          "total": 251,
+          "baseCorrect": 135,
+          "shippedCorrect": 135,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 320,
+          "baseCorrect": 178,
+          "shippedCorrect": 178,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "karzan12",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 45,
+          "shippedCorrect": 61,
+          "treeMatches": 40
+        },
+        "Middlegame (12-40)": {
+          "total": 262,
+          "baseCorrect": 122,
+          "shippedCorrect": 122,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 269,
+          "baseCorrect": 169,
+          "shippedCorrect": 169,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "matvei4",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 58,
+          "shippedCorrect": 86,
+          "treeMatches": 61
+        },
+        "Middlegame (12-40)": {
+          "total": 264,
+          "baseCorrect": 142,
+          "shippedCorrect": 142,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 240,
+          "baseCorrect": 138,
+          "shippedCorrect": 138,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "mehrzad_ghanbari",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 56,
+          "shippedCorrect": 74,
+          "treeMatches": 51
+        },
+        "Middlegame (12-40)": {
+          "total": 257,
+          "baseCorrect": 133,
+          "shippedCorrect": 133,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 439,
+          "baseCorrect": 253,
+          "shippedCorrect": 253,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "saidevsgambit",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 55,
+          "shippedCorrect": 85,
+          "treeMatches": 55
+        },
+        "Middlegame (12-40)": {
+          "total": 255,
+          "baseCorrect": 131,
+          "shippedCorrect": 131,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 302,
+          "baseCorrect": 172,
+          "shippedCorrect": 172,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "stw_097",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 49,
+          "shippedCorrect": 70,
+          "treeMatches": 45
+        },
+        "Middlegame (12-40)": {
+          "total": 248,
+          "baseCorrect": 125,
+          "shippedCorrect": 125,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 222,
+          "baseCorrect": 133,
+          "shippedCorrect": 133,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "sushanpanguluri",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 49,
+          "shippedCorrect": 79,
+          "treeMatches": 53
+        },
+        "Middlegame (12-40)": {
+          "total": 268,
+          "baseCorrect": 159,
+          "shippedCorrect": 159,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 229,
+          "baseCorrect": 146,
+          "shippedCorrect": 146,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "yusufekici0734",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 47,
+          "shippedCorrect": 88,
+          "treeMatches": 71
+        },
+        "Middlegame (12-40)": {
+          "total": 271,
+          "baseCorrect": 156,
+          "shippedCorrect": 156,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 487,
+          "baseCorrect": 281,
+          "shippedCorrect": 281,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "d_daniel",
+      "phases": {
+        "Opening (<12)": {
+          "total": 115,
+          "baseCorrect": 37,
+          "shippedCorrect": 62,
+          "treeMatches": 48
+        },
+        "Middlegame (12-40)": {
+          "total": 241,
+          "baseCorrect": 124,
+          "shippedCorrect": 124,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 348,
+          "baseCorrect": 201,
+          "shippedCorrect": 201,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "eagle727",
+      "phases": {
+        "Opening (<12)": {
+          "total": 112,
+          "baseCorrect": 49,
+          "shippedCorrect": 71,
+          "treeMatches": 52
+        },
+        "Middlegame (12-40)": {
+          "total": 261,
+          "baseCorrect": 142,
+          "shippedCorrect": 142,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 371,
+          "baseCorrect": 217,
+          "shippedCorrect": 217,
+          "treeMatches": 0
+        }
+      }
+    },
+    {
+      "username": "fibonacci1123",
+      "phases": {
+        "Opening (<12)": {
+          "total": 120,
+          "baseCorrect": 61,
+          "shippedCorrect": 87,
+          "treeMatches": 68
+        },
+        "Middlegame (12-40)": {
+          "total": 253,
+          "baseCorrect": 132,
+          "shippedCorrect": 132,
+          "treeMatches": 0
+        },
+        "Endgame (>40)": {
+          "total": 359,
+          "baseCorrect": 179,
+          "shippedCorrect": 179,
+          "treeMatches": 0
+        }
+      }
+    }
+  ]
+}

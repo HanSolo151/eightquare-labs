@@ -21,12 +21,13 @@ export function updateOpeningTree(
   tree: OpeningTree,
   gameId: string,
   moves: string[],
-  opponentColor: "white" | "black"
+  opponentColor: "white" | "black",
+  maxPlies = OPENING_TREE_PLIES
 ): OpeningTree {
   tree.evaluatedGameIds ??= [];
   if (tree.evaluatedGameIds.includes(gameId)) return tree;
   const chess = new Chess();
-  const plyLimit = Math.min(moves.length, OPENING_TREE_PLIES);
+  const plyLimit = Math.min(moves.length, Math.max(0, Math.floor(maxPlies)));
   for (let ply = 0; ply < plyLimit; ply++) {
     const moverColor = ply % 2 === 0 ? "white" : "black";
     const fenBefore = chess.fen();

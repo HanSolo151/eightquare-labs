@@ -13,7 +13,7 @@ interface ReplayFlag {
   severity: string;
   flagType: string;
   cpLoss: number;
-  evalConfidence: "full" | "mate_only" | "degraded";
+  evalConfidence: "full" | "mate_only" | "degraded" | "degraded_mate_only";
   explanation: string;
   timeSpentSec: number;
   phaseAvgSec: number;
@@ -176,7 +176,7 @@ export default function GameReplay({
         {currentFlag ? <section className="rounded-xl border border-amber-200/15 bg-amber-200/[0.04] p-4">
           <p className="text-[10px] uppercase tracking-widest text-amber-100/70">Flagged move · {currentFlag.severity}</p>
           <h2 className="mt-2 text-lg font-semibold">Move {Math.floor(currentFlag.ply / 2) + 1}: {currentFlag.san}</h2>
-          <p className="mt-1 text-xs capitalize text-amber-100">{currentFlag.severity} · {currentFlag.evalConfidence === "mate_only" ? "forced-mate evaluation change" : `−${(currentFlag.cpLoss / 100).toFixed(1)} eval swing`}</p>
+          <p className="mt-1 text-xs capitalize text-amber-100">{currentFlag.severity} · {currentFlag.evalConfidence === "mate_only" || currentFlag.evalConfidence === "degraded_mate_only" ? "forced-mate evaluation change" : `−${(currentFlag.cpLoss / 100).toFixed(1)} eval swing`}{currentFlag.evalConfidence === "degraded" || currentFlag.evalConfidence === "degraded_mate_only" ? " · lower-depth estimate; review with caution" : ""}</p>
           <p className="mt-2 text-xs leading-5 text-neutral-400">{currentFlag.explanation}</p>
           {currentFlag.timeSpentSec > 0 && currentFlag.phaseAvgSec > 0 && <p className="mt-3 text-xs leading-5 text-neutral-300">You played this in <strong>{currentFlag.timeSpentSec.toFixed(1)}s</strong>. Your {currentFlag.gamePhase} average is <strong>{currentFlag.phaseAvgSec.toFixed(1)}s</strong>.</p>}
           {currentFlag.patternDescription && <p className="mt-2 text-xs leading-5 text-neutral-300">This matches a recurring weakness: <strong>{currentFlag.patternDescription}</strong>.</p>}

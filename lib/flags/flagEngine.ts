@@ -6,6 +6,8 @@ import { MATE_EQUIVALENT_CP } from "@/lib/eval/toPlayerPerspective";
 // flagging this account's own objective evaluation losses.
 export const TIME_RATIO_COLLAPSE_THRESHOLD = 0.35;
 export const MIN_CP_LOSS = 100;
+export const MEDIUM_SEVERITY_MIN_CP_LOSS = 150;
+export const FULL_CONFIDENCE_MIN_DEPTH = 16;
 
 // Phase 2: same synthetic "getting mated" cp value used in causality.ts's
 // own mate handling (see that file's comment — magnitude needs to match,
@@ -50,6 +52,10 @@ export function flagMoves(
     if (!resolved) continue;
     const { cpLoss, evalConfidence } = resolved;
     if (cpLoss < MIN_CP_LOSS) continue;
+    // Borderline losses are too unstable at shallow search to present as findings.
+    // Keep them eligible after the configured full-depth target is reached.
+    if (cpLoss < MEDIUM_SEVERITY_MIN_CP_LOSS &&
+        (evalConfidence === "degraded" || evalConfidence === "degraded_mate_only")) continue;
 
     const causality = checkCausality(gameEval, move.ply, playerColor);
     if (!causality.heldToEnd) continue;
@@ -85,11 +91,13 @@ export function resolveCpLoss(evalPoint: EvalPoint): { cpLoss: number; evalConfi
   const before = scoreFromEval(evalPoint.cpBefore, evalPoint.mateBefore);
   const after = scoreFromEval(evalPoint.cpAfter, evalPoint.mateAfter);
   if (before === null || after === null) return null;
+  const hasMateScore = evalPoint.mateBefore !== null || evalPoint.mateAfter !== null;
+  const isDegraded = evalPoint.depth < FULL_CONFIDENCE_MIN_DEPTH;
   return {
     cpLoss: before - after,
-    evalConfidence: evalPoint.depth < 10
-      ? "degraded"
-      : evalPoint.mateBefore !== null || evalPoint.mateAfter !== null ? "mate_only" : "full",
+    evalConfidence: hasMateScore
+      ? isDegraded ? "degraded_mate_only" : "mate_only"
+      : isDegraded ? "degraded" : "full",
   };
 }
 
@@ -231,13 +239,14 @@ function computeSeverityBreakdown(opts: {
 function severityFromBreakdown(b: FlaggedMove["severityBreakdown"]): "low" | "medium" | "high" {
   const score = b.evalLoss + b.patternMatchBonus + b.rushBonus + b.tiltBonus;
   if (score > 200) return "high";
-  if (score >= 100) return "medium";
+  if (score >= MEDIUM_SEVERITY_MIN_CP_LOSS) return "medium";
   return "low";
 }
 
 function explain(flagType: FlaggedMove["flagType"], cpLoss: number, evalConfidence: FlaggedMove["evalConfidence"]): string {
-  if (evalConfidence === "mate_only") {
-    return "The engine's evaluation crossed or changed a forced-mate line. The stored loss uses a synthetic mate scale, not centipawns.";
+  if (evalConfidence === "mate_only" || evalConfidence === "degraded_mate_only") {
+    const caution = evalConfidence === "degraded_mate_only" ? " This is a lower-depth estimate." : "";
+    return `The engine's evaluation crossed or changed a forced-mate line. The stored loss uses a synthetic mate scale, not centipawns.${caution}`;
   }
   const loss = `${(cpLoss / 100).toFixed(1)} pawns`;
   if (flagType === "tilt_cascade" || flagType === "evaluation_cascade") return `The position evaluation fell by ${loss} across a run of consecutive moves and did not recover.`;

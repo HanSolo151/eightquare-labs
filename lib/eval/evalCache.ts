@@ -5,7 +5,7 @@ import { evaluateMoveSequenceWith } from "./moveSequence";
 // Phase 2e: SEARCH_DEPTH in stockfishEngine.ts bumped 14 -> 16, so this must
 // change too to invalidate every depth-14 cached eval (same cache-busting
 // pattern as Phase 0's bump to -v2).
-const ENGINE_VERSION = "stockfish-19-lite-single-depth16-v2";
+const ENGINE_VERSION = "stockfish-19-lite-single-depth16-target-v3";
 const DB_NAME = "eval-cache";
 const STORE = "games";
 const PARTIAL_STORE = "partials";

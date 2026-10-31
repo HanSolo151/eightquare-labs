@@ -68,7 +68,8 @@ export default function VerdictCard({
       {opponentLabel && <div style={{ fontSize: 12, opacity: 0.8 }}>{opponentLabel}</div>}
       <div style={{ fontSize: 13, margin: "6px 0" }}>{formatSentence(flag)}</div>
       <div style={{ fontSize: 12, opacity: 0.8 }}>
-        {flag.evalConfidence === "mate_only" ? "Forced-mate evaluation change" : `Eval loss: ${(flag.cpLoss / 100).toFixed(1)} pawns`}
+        {flag.evalConfidence === "mate_only" || flag.evalConfidence === "degraded_mate_only" ? "Forced-mate evaluation change" : `Eval loss: ${(flag.cpLoss / 100).toFixed(1)} pawns`}
+        {(flag.evalConfidence === "degraded" || flag.evalConfidence === "degraded_mate_only") && <> · lower-depth estimate; review with caution</>}
         {flag.timeSpentSec > 0 && <> · played in {flag.timeSpentSec.toFixed(1)}s</>}
       </div>
 

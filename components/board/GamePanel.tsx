@@ -9,12 +9,8 @@ import UsernameForm from "./UsernameForm";
 import VerdictCard from "./VerdictCard";
 import { dismissalId, isDismissed, loadDismissed, saveDismissed } from "@/lib/dismissals";
 import { isMaiaWorkerStopped, useMaiaWorker } from "@/lib/maia/useMaiaWorker";
-import { buildPrototypeMoveProfile } from "@/lib/maia/prototypeProfile";
-import { fetchGames } from "@/lib/lichess/fetchGames";
-import { parseGames } from "@/lib/lichess/parseGame";
-import { rerankMoves } from "@/lib/maia/rerank";
-import { buildOpponentProfile } from "@/lib/profile/opponentStyleProfile";
 import { openingTreeMove } from "@/lib/profile/openingTree";
+import { selectTopLegalMaiaMove } from "@/lib/maia/selectLegalMove";
 import { useOpponentFeatures } from "@/lib/useOpponentFeatures";
 import { extractAllMoveFeatures, buildPlayerProfile } from "@/lib/features/extractFeatures";
 import { flagMoves } from "@/lib/flags/flagEngine";
@@ -40,12 +36,10 @@ import {
 
  
 import type { ParsedGame, FlaggedMove, PivotMoveAttribution, PlayerProfile, GameEval } from "@/types";
-import type { OpponentFeatures } from "@/lib/lichess/opponentFeatures";
 
  
 
 type GameData = CachedGameDataShape;
-type OpponentPrototypeProfile = { username: string; games: string[][]; styleGames: ParsedGame[] };
 type EvalPushPayload = {
   gameId: string;
   gameEval: GameEval;
@@ -121,16 +115,6 @@ function tryPlayUci(chess: Chess, uci: string): boolean {
   }
 }
 
-const NEUTRAL_OPPONENT_FEATURES: OpponentFeatures = {
-  username: "",
-  gamesAnalyzed: 0,
-  mostCommonOpenings: [],
-  queenTradeRate: 0.5,
-  aggressionIndex: 0.35,
-  avgRating: null,
-  fetchedAt: Date.now(),
-};
-
 export default function GamePanel({
   authenticatedUsername = null,
   authenticatedUserId = null,
@@ -171,8 +155,6 @@ export default function GamePanel({
    
   const [activeFlag, setActiveFlag] = useState<FlaggedMove | null>(null);
   const [opponentOpeningTree, setOpponentOpeningTree] = useState<OpeningTree | null>(null);
-  const [opponentPrototypeProfile, setOpponentPrototypeProfile] =
-    useState<OpponentPrototypeProfile | null>(null);
   const [effectiveRatingFiresByOpponent, setEffectiveRatingFiresByOpponent] = useState<Record<string, boolean>>({});
   const [replayFirstMoveSan, setReplayFirstMoveSan] = useState<string | null>(null);
   const [replayFirstMoveTimeSec, setReplayFirstMoveTimeSec] = useState<number | null>(null);
@@ -284,7 +266,7 @@ export default function GamePanel({
 
 
 
-  const { infer, matchPrototype } = useMaiaWorker();
+  const { infer } = useMaiaWorker();
 
   // --- Step 12: auto-load last-used username on mount, skipping the intake form ---
   useEffect(() => {
@@ -421,10 +403,7 @@ export default function GamePanel({
       .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
   }, [data, dismissed]);
 
-  // Opponent features for whichever game is currently selected — needed by
-  // rerankMoves() during replay. Loaded eagerly once a game is selected
-  // (unlike VerdictCard's on-demand pattern from Step 8), since replay needs
-  // it the instant the user makes their first move, not after a click.
+  // Load matchup eligibility signals and the opponent opening tree. Later positions use Base Maia.
   const { features: opponentFeatures, load: loadOpponentFeatures } = useOpponentFeatures(authenticatedUserId);
   useEffect(() => {
     const opponentName = game?.opponentUsername;
@@ -453,43 +432,11 @@ export default function GamePanel({
 
     startTransition(() => {
       setOpponentOpeningTree(null);
-      setOpponentPrototypeProfile(null);
     });
 
-    // Lichess asks clients to make one API request at a time, so keep profile
-    // loading sequential; fetchGames coalesces repeated history requests.
+    // Keep the history request sequential with opponent-feature loading.
     void (async () => {
       await loadOpponentFeatures(opponentName);
-      if (cancelled) return;
-
-      try {
-        const rawGames = await fetchGames({
-          username: opponentName,
-          max: 50,
-          rated: true,
-          perfType: "rapid",
-        });
-        const parsedOpponentGames = parseGames(rawGames, opponentName);
-        const profile = buildPrototypeMoveProfile(
-          parsedOpponentGames,
-          50,
-        );
-        if (profile.invalidGames > 0) {
-          console.info("Skipped invalid opponent games for prototype matching", {
-            opponent: opponentName,
-            invalidGames: profile.invalidGames,
-          });
-        }
-        if (!cancelled) {
-          setOpponentPrototypeProfile({
-            username: opponentName,
-            games: profile.games,
-            styleGames: parsedOpponentGames,
-          });
-        }
-      } catch (error) {
-        console.error("Could not load opponent history for prototype matching:", error);
-      }
       if (cancelled) return;
 
       const profiles = await loadOpponentMimicProfiles(opponentName);
@@ -854,39 +801,14 @@ export default function GamePanel({
         if (!checkGameOver(chess, g)) setReplayStatus("your-turn");
         return;
       }
-      const currentOpponentProfile = opponentPrototypeProfile;
-      const prototypeGames =
-        currentOpponentProfile &&
-        sameUser(currentOpponentProfile.username, g.opponentUsername)
-          ? currentOpponentProfile.games
-          : [];
-      const prototypeMatch = await withTimeout(
-        matchPrototype(prototypeGames, g.opponentUsername),
-        MAIA_INFER_TIMEOUT_MS
-      );
-      if (stale()) return;
       const { logitsMaia } = await withTimeout(
-        infer(inferenceFen, selfRating, oppRating, prototypeMatch?.playerId),
+        infer(inferenceFen, selfRating, oppRating),
         MAIA_INFER_TIMEOUT_MS
       );
       if (stale()) return;
-
-      const matchingOpponentFeatures = sameUser(opponentFeatures?.username, g.opponentUsername)
-        ? opponentFeatures!
-        : NEUTRAL_OPPONENT_FEATURES;
-      const result = await rerankMoves({
-        fen: inferenceFen,
-        logitsMaia,
-        opponentFeatures: matchingOpponentFeatures,
-        openingTree: null,
-        opponentProfile: currentOpponentProfile && sameUser(currentOpponentProfile.username, g.opponentUsername)
-          ? buildOpponentProfile(currentOpponentProfile.styleGames)
-          : null,
-      });
+      const baseMoveUci = await selectTopLegalMaiaMove(inferenceFen, logitsMaia);
       if (stale()) return;
-
-      const profileInfluencedTurn = prototypeMatch !== null;
-      setTurnMode(profileInfluencedTurn ? "mimic" : "base");
+      setTurnMode("base");
 
       console.info("Maia replay choice", {
         gameId: g.id,
@@ -894,42 +816,20 @@ export default function GamePanel({
         maiaColor: g.playerColor === "white" ? "black" : "white",
         selfRating,
         oppRating,
-        prototypeId: prototypeMatch?.playerId ?? null,
-        prototypeConfidence: prototypeMatch?.confidence ?? null,
         usedOpeningTree: false,
-        baseTopMove: result.baseTopMove?.uci,
-        adjustedTopMove: result.topMove?.uci,
-        safetyChecked: result.safetyChecked,
-        safetyDowngraded: result.safetyDowngraded,
+        baseTopMove: baseMoveUci,
+        rerankerApplied: false,
       });
 
       const delay = MAIA_DELAY_MIN_MS + Math.random() * (MAIA_DELAY_MAX_MS - MAIA_DELAY_MIN_MS);
       await new Promise((res) => setTimeout(res, delay));
       if (stale()) return;
 
-      let playedUci: string | null = null;
-      const candidates = [result.topMove?.uci, result.baseTopMove?.uci, ...result.moves.map((move) => move.uci)]
-        .filter((uci): uci is string => !!uci);
-      for (const uci of candidates) {
-        if (playedUci) break;
-        if (tryPlayUci(chess, uci)) {
-          playedUci = uci;
-          break;
-        }
-        console.error("Maia candidate rejected by chess.js:", uci, "at fen", chess.fen());
-      }
+      const playedUci = baseMoveUci && tryPlayUci(chess, baseMoveUci) ? baseMoveUci : null;
 
       if (!playedUci) {
         if (!checkGameOver(chess, g)) setReplayStatus("maia-error");
         return;
-      }
-
-      if (playedUci !== (result.topMove?.uci ?? result.baseTopMove?.uci)) {
-        console.info("Maia played a fallback move after the ranked move was rejected", {
-          gameId: g.id,
-          playedUci,
-          rankedTopMove: result.topMove?.uci ?? null,
-        });
       }
 
       setReplayFen(chess.fen());
@@ -1129,13 +1029,13 @@ export default function GamePanel({
                 <span className="text-xs text-neutral-500">Move {activeFlag.moveNumber} · {activeFlag.san} · {activeFlag.severity} severity</span>
               </div>
               <p className="mt-2 text-sm leading-5 text-neutral-300">{activeFlag.explanation}</p>
-              <p className="mt-2 text-xs text-neutral-500">{activeFlag.evalConfidence === "mate_only" ? "Forced-mate evaluation change" : `Eval loss: ${(activeFlag.cpLoss / 100).toFixed(1)} pawns`}{activeFlag.timeSpentSec > 0 ? ` · played in ${activeFlag.timeSpentSec.toFixed(1)}s` : ""}</p>
+              <p className="mt-2 text-xs text-neutral-500">{activeFlag.evalConfidence === "mate_only" || activeFlag.evalConfidence === "degraded_mate_only" ? "Forced-mate evaluation change" : `Eval loss: ${(activeFlag.cpLoss / 100).toFixed(1)} pawns`}{activeFlag.evalConfidence === "degraded" || activeFlag.evalConfidence === "degraded_mate_only" ? " · lower-depth estimate; review with caution" : ""}{activeFlag.timeSpentSec > 0 ? ` · played in ${activeFlag.timeSpentSec.toFixed(1)}s` : ""}</p>
             </div>}
             <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-neutral-400" aria-live="polite">
               {turnMode === null ? <span className="text-neutral-500">Choosing Maia’s move…</span> : (
                 <span className="rounded border border-white/10 bg-white/5 px-2 py-1">
                   {turnMode === "mimic" && game?.opponentUsername
-                    ? `Approximate opponent style · ${game.opponentUsername}`
+                    ? `Opening-tree mimic · ${game.opponentUsername}`
                     : "Base Maia"}
                 </span>
               )}

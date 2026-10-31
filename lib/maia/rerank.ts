@@ -108,6 +108,7 @@ export function gamePhaseFromFen(chess: Chess): "opening" | "middlegame" | "endg
   return "middlegame";
 }
 
+// DISABLED: see v2 note — quiet-move tendency signal needed, see artifacts/evaluation/maia_candidate_coverage_60.md.
 export async function rerankMoves(params: {
   fen: string;
   logitsMaia: Float32Array;

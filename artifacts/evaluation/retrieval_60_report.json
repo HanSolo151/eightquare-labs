@@ -1,0 +1,1780 @@
+{
+  "hyperparameters": {
+    "retrievalWeight": 0.25,
+    "bucketWeight": 0,
+    "k": 3,
+    "distanceThreshold": 0.15,
+    "tuningAccuracy": 0.4855570839064649,
+    "tuningPositions": 3635,
+    "tunedOpponents": [
+      "aliafrooz",
+      "Anush_Borse",
+      "hempatel3215",
+      "Jasmine-Jane",
+      "josueg12chess",
+      "kamallllll",
+      "Madi_bugg",
+      "mhdaaqil",
+      "MolyGreaseNinja",
+      "pawnstorm22",
+      "punjablion",
+      "remoon74",
+      "samguerra",
+      "Shiningknight8",
+      "Tomorrow_Never_Knows",
+      "Alkaly1982",
+      "ArshavirAghaei1396",
+      "DharmenderArora_77",
+      "Emmitt1",
+      "Gagik20130614"
+    ],
+    "frozenAt": "2026-10-31T07:52:43.741Z"
+  },
+  "split": {
+    "training": 64,
+    "tuning": 16,
+    "test": 20
+  },
+  "players": [
+    {
+      "id": 0,
+      "username": "aliafrooz",
+      "counts": {
+        "Opening (<12)": {
+          "total": 118,
+          "base": 38,
+          "opening": 46,
+          "bucket": 46,
+          "retrieval": 46
+        },
+        "Middlegame (12–40)": {
+          "total": 235,
+          "base": 112,
+          "opening": 112,
+          "bucket": 112,
+          "retrieval": 112
+        },
+        "Endgame (>40)": {
+          "total": 286,
+          "base": 166,
+          "opening": 166,
+          "bucket": 166,
+          "retrieval": 166
+        }
+      },
+      "retrievalMatches": 4,
+      "middlePositions": 235
+    },
+    {
+      "id": 1,
+      "username": "Anush_Borse",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 37,
+          "opening": 64,
+          "bucket": 64,
+          "retrieval": 64
+        },
+        "Middlegame (12–40)": {
+          "total": 227,
+          "base": 120,
+          "opening": 120,
+          "bucket": 120,
+          "retrieval": 117
+        },
+        "Endgame (>40)": {
+          "total": 161,
+          "base": 92,
+          "opening": 92,
+          "bucket": 92,
+          "retrieval": 92
+        }
+      },
+      "retrievalMatches": 13,
+      "middlePositions": 227
+    },
+    {
+      "id": 2,
+      "username": "hempatel3215",
+      "counts": {
+        "Opening (<12)": {
+          "total": 109,
+          "base": 29,
+          "opening": 58,
+          "bucket": 58,
+          "retrieval": 58
+        },
+        "Middlegame (12–40)": {
+          "total": 217,
+          "base": 110,
+          "opening": 110,
+          "bucket": 110,
+          "retrieval": 110
+        },
+        "Endgame (>40)": {
+          "total": 198,
+          "base": 91,
+          "opening": 91,
+          "bucket": 91,
+          "retrieval": 91
+        }
+      },
+      "retrievalMatches": 6,
+      "middlePositions": 217
+    },
+    {
+      "id": 3,
+      "username": "Jasmine-Jane",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 36,
+          "opening": 54,
+          "bucket": 54,
+          "retrieval": 54
+        },
+        "Middlegame (12–40)": {
+          "total": 249,
+          "base": 128,
+          "opening": 128,
+          "bucket": 128,
+          "retrieval": 129
+        },
+        "Endgame (>40)": {
+          "total": 258,
+          "base": 146,
+          "opening": 146,
+          "bucket": 146,
+          "retrieval": 146
+        }
+      },
+      "retrievalMatches": 11,
+      "middlePositions": 249
+    },
+    {
+      "id": 4,
+      "username": "josueg12chess",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 31,
+          "opening": 80,
+          "bucket": 80,
+          "retrieval": 80
+        },
+        "Middlegame (12–40)": {
+          "total": 230,
+          "base": 110,
+          "opening": 110,
+          "bucket": 110,
+          "retrieval": 111
+        },
+        "Endgame (>40)": {
+          "total": 228,
+          "base": 124,
+          "opening": 124,
+          "bucket": 124,
+          "retrieval": 124
+        }
+      },
+      "retrievalMatches": 34,
+      "middlePositions": 230
+    },
+    {
+      "id": 5,
+      "username": "kamallllll",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 38,
+          "opening": 62,
+          "bucket": 62,
+          "retrieval": 62
+        },
+        "Middlegame (12–40)": {
+          "total": 244,
+          "base": 114,
+          "opening": 114,
+          "bucket": 114,
+          "retrieval": 114
+        },
+        "Endgame (>40)": {
+          "total": 226,
+          "base": 136,
+          "opening": 136,
+          "bucket": 136,
+          "retrieval": 136
+        }
+      },
+      "retrievalMatches": 16,
+      "middlePositions": 244
+    },
+    {
+      "id": 6,
+      "username": "Madi_bugg",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 47,
+          "opening": 71,
+          "bucket": 71,
+          "retrieval": 71
+        },
+        "Middlegame (12–40)": {
+          "total": 231,
+          "base": 118,
+          "opening": 118,
+          "bucket": 118,
+          "retrieval": 117
+        },
+        "Endgame (>40)": {
+          "total": 200,
+          "base": 105,
+          "opening": 105,
+          "bucket": 105,
+          "retrieval": 105
+        }
+      },
+      "retrievalMatches": 9,
+      "middlePositions": 231
+    },
+    {
+      "id": 7,
+      "username": "mhdaaqil",
+      "counts": {
+        "Opening (<12)": {
+          "total": 118,
+          "base": 36,
+          "opening": 54,
+          "bucket": 54,
+          "retrieval": 54
+        },
+        "Middlegame (12–40)": {
+          "total": 223,
+          "base": 93,
+          "opening": 93,
+          "bucket": 93,
+          "retrieval": 93
+        },
+        "Endgame (>40)": {
+          "total": 131,
+          "base": 64,
+          "opening": 64,
+          "bucket": 64,
+          "retrieval": 64
+        }
+      },
+      "retrievalMatches": 4,
+      "middlePositions": 223
+    },
+    {
+      "id": 8,
+      "username": "MolyGreaseNinja",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 32,
+          "opening": 52,
+          "bucket": 52,
+          "retrieval": 52
+        },
+        "Middlegame (12–40)": {
+          "total": 271,
+          "base": 125,
+          "opening": 125,
+          "bucket": 125,
+          "retrieval": 125
+        },
+        "Endgame (>40)": {
+          "total": 231,
+          "base": 118,
+          "opening": 118,
+          "bucket": 118,
+          "retrieval": 118
+        }
+      },
+      "retrievalMatches": 15,
+      "middlePositions": 271
+    },
+    {
+      "id": 9,
+      "username": "pawnstorm22",
+      "counts": {
+        "Opening (<12)": {
+          "total": 115,
+          "base": 36,
+          "opening": 71,
+          "bucket": 71,
+          "retrieval": 71
+        },
+        "Middlegame (12–40)": {
+          "total": 216,
+          "base": 119,
+          "opening": 119,
+          "bucket": 119,
+          "retrieval": 114
+        },
+        "Endgame (>40)": {
+          "total": 175,
+          "base": 84,
+          "opening": 84,
+          "bucket": 84,
+          "retrieval": 84
+        }
+      },
+      "retrievalMatches": 26,
+      "middlePositions": 216
+    },
+    {
+      "id": 10,
+      "username": "punjablion",
+      "counts": {
+        "Opening (<12)": {
+          "total": 114,
+          "base": 25,
+          "opening": 40,
+          "bucket": 40,
+          "retrieval": 40
+        },
+        "Middlegame (12–40)": {
+          "total": 204,
+          "base": 111,
+          "opening": 111,
+          "bucket": 111,
+          "retrieval": 109
+        },
+        "Endgame (>40)": {
+          "total": 227,
+          "base": 125,
+          "opening": 125,
+          "bucket": 125,
+          "retrieval": 125
+        }
+      },
+      "retrievalMatches": 10,
+      "middlePositions": 204
+    },
+    {
+      "id": 11,
+      "username": "remoon74",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 38,
+          "opening": 46,
+          "bucket": 46,
+          "retrieval": 46
+        },
+        "Middlegame (12–40)": {
+          "total": 266,
+          "base": 121,
+          "opening": 121,
+          "bucket": 121,
+          "retrieval": 121
+        },
+        "Endgame (>40)": {
+          "total": 305,
+          "base": 165,
+          "opening": 165,
+          "bucket": 165,
+          "retrieval": 165
+        }
+      },
+      "retrievalMatches": 0,
+      "middlePositions": 266
+    },
+    {
+      "id": 12,
+      "username": "samguerra",
+      "counts": {
+        "Opening (<12)": {
+          "total": 112,
+          "base": 21,
+          "opening": 44,
+          "bucket": 44,
+          "retrieval": 44
+        },
+        "Middlegame (12–40)": {
+          "total": 216,
+          "base": 93,
+          "opening": 93,
+          "bucket": 93,
+          "retrieval": 92
+        },
+        "Endgame (>40)": {
+          "total": 127,
+          "base": 58,
+          "opening": 58,
+          "bucket": 58,
+          "retrieval": 58
+        }
+      },
+      "retrievalMatches": 4,
+      "middlePositions": 216
+    },
+    {
+      "id": 13,
+      "username": "Shiningknight8",
+      "counts": {
+        "Opening (<12)": {
+          "total": 95,
+          "base": 32,
+          "opening": 56,
+          "bucket": 56,
+          "retrieval": 56
+        },
+        "Middlegame (12–40)": {
+          "total": 194,
+          "base": 113,
+          "opening": 113,
+          "bucket": 113,
+          "retrieval": 114
+        },
+        "Endgame (>40)": {
+          "total": 192,
+          "base": 102,
+          "opening": 102,
+          "bucket": 102,
+          "retrieval": 102
+        }
+      },
+      "retrievalMatches": 20,
+      "middlePositions": 194
+    },
+    {
+      "id": 14,
+      "username": "Tomorrow_Never_Knows",
+      "counts": {
+        "Opening (<12)": {
+          "total": 110,
+          "base": 24,
+          "opening": 43,
+          "bucket": 43,
+          "retrieval": 43
+        },
+        "Middlegame (12–40)": {
+          "total": 187,
+          "base": 60,
+          "opening": 60,
+          "bucket": 60,
+          "retrieval": 60
+        },
+        "Endgame (>40)": {
+          "total": 121,
+          "base": 46,
+          "opening": 46,
+          "bucket": 46,
+          "retrieval": 46
+        }
+      },
+      "retrievalMatches": 10,
+      "middlePositions": 187
+    },
+    {
+      "id": 15,
+      "username": "Alkaly1982",
+      "counts": {
+        "Opening (<12)": {
+          "total": 119,
+          "base": 40,
+          "opening": 74,
+          "bucket": 74,
+          "retrieval": 74
+        },
+        "Middlegame (12–40)": {
+          "total": 215,
+          "base": 102,
+          "opening": 102,
+          "bucket": 102,
+          "retrieval": 105
+        },
+        "Endgame (>40)": {
+          "total": 122,
+          "base": 65,
+          "opening": 65,
+          "bucket": 65,
+          "retrieval": 65
+        }
+      },
+      "retrievalMatches": 21,
+      "middlePositions": 215
+    },
+    {
+      "id": 16,
+      "username": "ArshavirAghaei1396",
+      "counts": {
+        "Opening (<12)": {
+          "total": 119,
+          "base": 44,
+          "opening": 86,
+          "bucket": 86,
+          "retrieval": 86
+        },
+        "Middlegame (12–40)": {
+          "total": 239,
+          "base": 120,
+          "opening": 120,
+          "bucket": 120,
+          "retrieval": 119
+        },
+        "Endgame (>40)": {
+          "total": 250,
+          "base": 162,
+          "opening": 162,
+          "bucket": 162,
+          "retrieval": 162
+        }
+      },
+      "retrievalMatches": 14,
+      "middlePositions": 239
+    },
+    {
+      "id": 17,
+      "username": "DharmenderArora_77",
+      "counts": {
+        "Opening (<12)": {
+          "total": 102,
+          "base": 22,
+          "opening": 53,
+          "bucket": 53,
+          "retrieval": 53
+        },
+        "Middlegame (12–40)": {
+          "total": 200,
+          "base": 87,
+          "opening": 87,
+          "bucket": 87,
+          "retrieval": 87
+        },
+        "Endgame (>40)": {
+          "total": 119,
+          "base": 60,
+          "opening": 60,
+          "bucket": 60,
+          "retrieval": 60
+        }
+      },
+      "retrievalMatches": 10,
+      "middlePositions": 200
+    },
+    {
+      "id": 18,
+      "username": "Emmitt1",
+      "counts": {
+        "Opening (<12)": {
+          "total": 114,
+          "base": 37,
+          "opening": 67,
+          "bucket": 67,
+          "retrieval": 67
+        },
+        "Middlegame (12–40)": {
+          "total": 239,
+          "base": 124,
+          "opening": 124,
+          "bucket": 124,
+          "retrieval": 123
+        },
+        "Endgame (>40)": {
+          "total": 370,
+          "base": 210,
+          "opening": 210,
+          "bucket": 210,
+          "retrieval": 210
+        }
+      },
+      "retrievalMatches": 12,
+      "middlePositions": 239
+    },
+    {
+      "id": 19,
+      "username": "Gagik20130614",
+      "counts": {
+        "Opening (<12)": {
+          "total": 114,
+          "base": 40,
+          "opening": 56,
+          "bucket": 56,
+          "retrieval": 56
+        },
+        "Middlegame (12–40)": {
+          "total": 232,
+          "base": 124,
+          "opening": 124,
+          "bucket": 124,
+          "retrieval": 123
+        },
+        "Endgame (>40)": {
+          "total": 216,
+          "base": 135,
+          "opening": 135,
+          "bucket": 135,
+          "retrieval": 135
+        }
+      },
+      "retrievalMatches": 7,
+      "middlePositions": 232
+    },
+    {
+      "id": 20,
+      "username": "GeneralBlather",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 50,
+          "opening": 74,
+          "bucket": 74,
+          "retrieval": 74
+        },
+        "Middlegame (12–40)": {
+          "total": 264,
+          "base": 131,
+          "opening": 131,
+          "bucket": 131,
+          "retrieval": 129
+        },
+        "Endgame (>40)": {
+          "total": 363,
+          "base": 197,
+          "opening": 197,
+          "bucket": 197,
+          "retrieval": 197
+        }
+      },
+      "retrievalMatches": 8,
+      "middlePositions": 264
+    },
+    {
+      "id": 21,
+      "username": "Lucyfer874",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 53,
+          "opening": 92,
+          "bucket": 92,
+          "retrieval": 92
+        },
+        "Middlegame (12–40)": {
+          "total": 206,
+          "base": 106,
+          "opening": 106,
+          "bucket": 106,
+          "retrieval": 108
+        },
+        "Endgame (>40)": {
+          "total": 158,
+          "base": 91,
+          "opening": 91,
+          "bucket": 91,
+          "retrieval": 91
+        }
+      },
+      "retrievalMatches": 29,
+      "middlePositions": 206
+    },
+    {
+      "id": 22,
+      "username": "mahmoud5468",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 40,
+          "opening": 63,
+          "bucket": 63,
+          "retrieval": 63
+        },
+        "Middlegame (12–40)": {
+          "total": 225,
+          "base": 114,
+          "opening": 114,
+          "bucket": 114,
+          "retrieval": 114
+        },
+        "Endgame (>40)": {
+          "total": 106,
+          "base": 49,
+          "opening": 49,
+          "bucket": 49,
+          "retrieval": 49
+        }
+      },
+      "retrievalMatches": 19,
+      "middlePositions": 225
+    },
+    {
+      "id": 23,
+      "username": "OmerBasar",
+      "counts": {
+        "Opening (<12)": {
+          "total": 115,
+          "base": 40,
+          "opening": 50,
+          "bucket": 50,
+          "retrieval": 50
+        },
+        "Middlegame (12–40)": {
+          "total": 247,
+          "base": 129,
+          "opening": 129,
+          "bucket": 129,
+          "retrieval": 127
+        },
+        "Endgame (>40)": {
+          "total": 469,
+          "base": 235,
+          "opening": 235,
+          "bucket": 235,
+          "retrieval": 235
+        }
+      },
+      "retrievalMatches": 19,
+      "middlePositions": 247
+    },
+    {
+      "id": 24,
+      "username": "resloz",
+      "counts": {
+        "Opening (<12)": {
+          "total": 117,
+          "base": 40,
+          "opening": 76,
+          "bucket": 76,
+          "retrieval": 76
+        },
+        "Middlegame (12–40)": {
+          "total": 247,
+          "base": 140,
+          "opening": 140,
+          "bucket": 140,
+          "retrieval": 137
+        },
+        "Endgame (>40)": {
+          "total": 394,
+          "base": 214,
+          "opening": 214,
+          "bucket": 214,
+          "retrieval": 214
+        }
+      },
+      "retrievalMatches": 12,
+      "middlePositions": 247
+    },
+    {
+      "id": 25,
+      "username": "Santanahxcx",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 41,
+          "opening": 42,
+          "bucket": 42,
+          "retrieval": 42
+        },
+        "Middlegame (12–40)": {
+          "total": 238,
+          "base": 116,
+          "opening": 116,
+          "bucket": 116,
+          "retrieval": 117
+        },
+        "Endgame (>40)": {
+          "total": 173,
+          "base": 91,
+          "opening": 91,
+          "bucket": 91,
+          "retrieval": 91
+        }
+      },
+      "retrievalMatches": 14,
+      "middlePositions": 238
+    },
+    {
+      "id": 26,
+      "username": "Toinouh",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 35,
+          "opening": 43,
+          "bucket": 43,
+          "retrieval": 43
+        },
+        "Middlegame (12–40)": {
+          "total": 247,
+          "base": 123,
+          "opening": 123,
+          "bucket": 123,
+          "retrieval": 123
+        },
+        "Endgame (>40)": {
+          "total": 235,
+          "base": 116,
+          "opening": 116,
+          "bucket": 116,
+          "retrieval": 116
+        }
+      },
+      "retrievalMatches": 13,
+      "middlePositions": 247
+    },
+    {
+      "id": 27,
+      "username": "Tuul4",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 40,
+          "opening": 50,
+          "bucket": 50,
+          "retrieval": 50
+        },
+        "Middlegame (12–40)": {
+          "total": 242,
+          "base": 123,
+          "opening": 123,
+          "bucket": 123,
+          "retrieval": 122
+        },
+        "Endgame (>40)": {
+          "total": 171,
+          "base": 89,
+          "opening": 89,
+          "bucket": 89,
+          "retrieval": 89
+        }
+      },
+      "retrievalMatches": 4,
+      "middlePositions": 242
+    },
+    {
+      "id": 28,
+      "username": "Voxcaeli",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 59,
+          "opening": 81,
+          "bucket": 81,
+          "retrieval": 81
+        },
+        "Middlegame (12–40)": {
+          "total": 240,
+          "base": 130,
+          "opening": 130,
+          "bucket": 130,
+          "retrieval": 129
+        },
+        "Endgame (>40)": {
+          "total": 208,
+          "base": 111,
+          "opening": 111,
+          "bucket": 111,
+          "retrieval": 111
+        }
+      },
+      "retrievalMatches": 24,
+      "middlePositions": 240
+    },
+    {
+      "id": 30,
+      "username": "albinlearning",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 51,
+          "opening": 67,
+          "bucket": 67,
+          "retrieval": 67
+        },
+        "Middlegame (12–40)": {
+          "total": 273,
+          "base": 156,
+          "opening": 156,
+          "bucket": 156,
+          "retrieval": 155
+        },
+        "Endgame (>40)": {
+          "total": 222,
+          "base": 124,
+          "opening": 124,
+          "bucket": 124,
+          "retrieval": 124
+        }
+      },
+      "retrievalMatches": 17,
+      "middlePositions": 273
+    },
+    {
+      "id": 31,
+      "username": "beatatitiledoplayer",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 39,
+          "opening": 81,
+          "bucket": 81,
+          "retrieval": 81
+        },
+        "Middlegame (12–40)": {
+          "total": 248,
+          "base": 121,
+          "opening": 121,
+          "bucket": 121,
+          "retrieval": 122
+        },
+        "Endgame (>40)": {
+          "total": 208,
+          "base": 114,
+          "opening": 114,
+          "bucket": 114,
+          "retrieval": 114
+        }
+      },
+      "retrievalMatches": 32,
+      "middlePositions": 248
+    },
+    {
+      "id": 33,
+      "username": "Felipe80rodrigues",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 33,
+          "opening": 64,
+          "bucket": 64,
+          "retrieval": 64
+        },
+        "Middlegame (12–40)": {
+          "total": 275,
+          "base": 134,
+          "opening": 134,
+          "bucket": 134,
+          "retrieval": 132
+        },
+        "Endgame (>40)": {
+          "total": 236,
+          "base": 140,
+          "opening": 140,
+          "bucket": 140,
+          "retrieval": 140
+        }
+      },
+      "retrievalMatches": 45,
+      "middlePositions": 275
+    },
+    {
+      "id": 34,
+      "username": "Ichselber",
+      "counts": {
+        "Opening (<12)": {
+          "total": 118,
+          "base": 56,
+          "opening": 94,
+          "bucket": 94,
+          "retrieval": 94
+        },
+        "Middlegame (12–40)": {
+          "total": 256,
+          "base": 139,
+          "opening": 139,
+          "bucket": 139,
+          "retrieval": 138
+        },
+        "Endgame (>40)": {
+          "total": 317,
+          "base": 196,
+          "opening": 196,
+          "bucket": 196,
+          "retrieval": 196
+        }
+      },
+      "retrievalMatches": 42,
+      "middlePositions": 256
+    },
+    {
+      "id": 35,
+      "username": "ItalianGambit",
+      "counts": {
+        "Opening (<12)": {
+          "total": 114,
+          "base": 44,
+          "opening": 61,
+          "bucket": 61,
+          "retrieval": 61
+        },
+        "Middlegame (12–40)": {
+          "total": 250,
+          "base": 130,
+          "opening": 130,
+          "bucket": 130,
+          "retrieval": 130
+        },
+        "Endgame (>40)": {
+          "total": 287,
+          "base": 149,
+          "opening": 149,
+          "bucket": 149,
+          "retrieval": 149
+        }
+      },
+      "retrievalMatches": 11,
+      "middlePositions": 250
+    },
+    {
+      "id": 36,
+      "username": "Luan_e",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 58,
+          "opening": 82,
+          "bucket": 82,
+          "retrieval": 82
+        },
+        "Middlegame (12–40)": {
+          "total": 264,
+          "base": 120,
+          "opening": 120,
+          "bucket": 120,
+          "retrieval": 122
+        },
+        "Endgame (>40)": {
+          "total": 238,
+          "base": 125,
+          "opening": 125,
+          "bucket": 125,
+          "retrieval": 125
+        }
+      },
+      "retrievalMatches": 29,
+      "middlePositions": 264
+    },
+    {
+      "id": 37,
+      "username": "natalMO",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 31,
+          "opening": 67,
+          "bucket": 67,
+          "retrieval": 67
+        },
+        "Middlegame (12–40)": {
+          "total": 269,
+          "base": 116,
+          "opening": 116,
+          "bucket": 116,
+          "retrieval": 118
+        },
+        "Endgame (>40)": {
+          "total": 345,
+          "base": 179,
+          "opening": 179,
+          "bucket": 179,
+          "retrieval": 179
+        }
+      },
+      "retrievalMatches": 23,
+      "middlePositions": 269
+    },
+    {
+      "id": 38,
+      "username": "opyegor",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 34,
+          "opening": 34,
+          "bucket": 34,
+          "retrieval": 34
+        },
+        "Middlegame (12–40)": {
+          "total": 282,
+          "base": 156,
+          "opening": 156,
+          "bucket": 156,
+          "retrieval": 156
+        },
+        "Endgame (>40)": {
+          "total": 378,
+          "base": 233,
+          "opening": 233,
+          "bucket": 233,
+          "retrieval": 233
+        }
+      },
+      "retrievalMatches": 2,
+      "middlePositions": 282
+    },
+    {
+      "id": 39,
+      "username": "prostoAndrew",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 43,
+          "opening": 66,
+          "bucket": 66,
+          "retrieval": 66
+        },
+        "Middlegame (12–40)": {
+          "total": 266,
+          "base": 131,
+          "opening": 131,
+          "bucket": 131,
+          "retrieval": 131
+        },
+        "Endgame (>40)": {
+          "total": 270,
+          "base": 137,
+          "opening": 137,
+          "bucket": 137,
+          "retrieval": 137
+        }
+      },
+      "retrievalMatches": 8,
+      "middlePositions": 266
+    },
+    {
+      "id": 40,
+      "username": "Sadinb",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 29,
+          "opening": 47,
+          "bucket": 47,
+          "retrieval": 47
+        },
+        "Middlegame (12–40)": {
+          "total": 273,
+          "base": 120,
+          "opening": 120,
+          "bucket": 120,
+          "retrieval": 120
+        },
+        "Endgame (>40)": {
+          "total": 384,
+          "base": 234,
+          "opening": 234,
+          "bucket": 234,
+          "retrieval": 234
+        }
+      },
+      "retrievalMatches": 1,
+      "middlePositions": 273
+    },
+    {
+      "id": 41,
+      "username": "sainis",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 45,
+          "opening": 76,
+          "bucket": 76,
+          "retrieval": 76
+        },
+        "Middlegame (12–40)": {
+          "total": 247,
+          "base": 116,
+          "opening": 116,
+          "bucket": 116,
+          "retrieval": 116
+        },
+        "Endgame (>40)": {
+          "total": 211,
+          "base": 125,
+          "opening": 125,
+          "bucket": 125,
+          "retrieval": 125
+        }
+      },
+      "retrievalMatches": 37,
+      "middlePositions": 247
+    },
+    {
+      "id": 42,
+      "username": "sarao1415",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 48,
+          "opening": 86,
+          "bucket": 86,
+          "retrieval": 86
+        },
+        "Middlegame (12–40)": {
+          "total": 266,
+          "base": 144,
+          "opening": 144,
+          "bucket": 144,
+          "retrieval": 144
+        },
+        "Endgame (>40)": {
+          "total": 303,
+          "base": 161,
+          "opening": 161,
+          "bucket": 161,
+          "retrieval": 161
+        }
+      },
+      "retrievalMatches": 12,
+      "middlePositions": 266
+    },
+    {
+      "id": 43,
+      "username": "Shashank-karkare",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 41,
+          "opening": 60,
+          "bucket": 60,
+          "retrieval": 60
+        },
+        "Middlegame (12–40)": {
+          "total": 280,
+          "base": 139,
+          "opening": 139,
+          "bucket": 139,
+          "retrieval": 138
+        },
+        "Endgame (>40)": {
+          "total": 536,
+          "base": 305,
+          "opening": 305,
+          "bucket": 305,
+          "retrieval": 305
+        }
+      },
+      "retrievalMatches": 3,
+      "middlePositions": 280
+    },
+    {
+      "id": 44,
+      "username": "ted206",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 30,
+          "opening": 81,
+          "bucket": 81,
+          "retrieval": 81
+        },
+        "Middlegame (12–40)": {
+          "total": 254,
+          "base": 118,
+          "opening": 118,
+          "bucket": 118,
+          "retrieval": 118
+        },
+        "Endgame (>40)": {
+          "total": 191,
+          "base": 104,
+          "opening": 104,
+          "bucket": 104,
+          "retrieval": 104
+        }
+      },
+      "retrievalMatches": 50,
+      "middlePositions": 254
+    },
+    {
+      "id": 45,
+      "username": "AleksandrVasilyev",
+      "counts": {
+        "Opening (<12)": {
+          "total": 114,
+          "base": 35,
+          "opening": 58,
+          "bucket": 58,
+          "retrieval": 58
+        },
+        "Middlegame (12–40)": {
+          "total": 272,
+          "base": 132,
+          "opening": 132,
+          "bucket": 132,
+          "retrieval": 131
+        },
+        "Endgame (>40)": {
+          "total": 370,
+          "base": 210,
+          "opening": 210,
+          "bucket": 210,
+          "retrieval": 210
+        }
+      },
+      "retrievalMatches": 9,
+      "middlePositions": 272
+    },
+    {
+      "id": 46,
+      "username": "Aura_smart_homes",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 44,
+          "opening": 56,
+          "bucket": 56,
+          "retrieval": 56
+        },
+        "Middlegame (12–40)": {
+          "total": 277,
+          "base": 141,
+          "opening": 141,
+          "bucket": 141,
+          "retrieval": 140
+        },
+        "Endgame (>40)": {
+          "total": 291,
+          "base": 182,
+          "opening": 182,
+          "bucket": 182,
+          "retrieval": 182
+        }
+      },
+      "retrievalMatches": 10,
+      "middlePositions": 277
+    },
+    {
+      "id": 47,
+      "username": "giogiogiogiogio",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 53,
+          "opening": 67,
+          "bucket": 67,
+          "retrieval": 67
+        },
+        "Middlegame (12–40)": {
+          "total": 290,
+          "base": 151,
+          "opening": 151,
+          "bucket": 151,
+          "retrieval": 150
+        },
+        "Endgame (>40)": {
+          "total": 336,
+          "base": 181,
+          "opening": 181,
+          "bucket": 181,
+          "retrieval": 181
+        }
+      },
+      "retrievalMatches": 8,
+      "middlePositions": 290
+    },
+    {
+      "id": 48,
+      "username": "IamAaravthegoat",
+      "counts": {
+        "Opening (<12)": {
+          "total": 114,
+          "base": 55,
+          "opening": 76,
+          "bucket": 76,
+          "retrieval": 76
+        },
+        "Middlegame (12–40)": {
+          "total": 246,
+          "base": 151,
+          "opening": 151,
+          "bucket": 151,
+          "retrieval": 153
+        },
+        "Endgame (>40)": {
+          "total": 280,
+          "base": 174,
+          "opening": 174,
+          "bucket": 174,
+          "retrieval": 174
+        }
+      },
+      "retrievalMatches": 20,
+      "middlePositions": 246
+    },
+    {
+      "id": 49,
+      "username": "joesnooze",
+      "counts": {
+        "Opening (<12)": {
+          "total": 115,
+          "base": 43,
+          "opening": 78,
+          "bucket": 78,
+          "retrieval": 78
+        },
+        "Middlegame (12–40)": {
+          "total": 225,
+          "base": 112,
+          "opening": 112,
+          "bucket": 112,
+          "retrieval": 114
+        },
+        "Endgame (>40)": {
+          "total": 170,
+          "base": 106,
+          "opening": 106,
+          "bucket": 106,
+          "retrieval": 106
+        }
+      },
+      "retrievalMatches": 26,
+      "middlePositions": 225
+    },
+    {
+      "id": 50,
+      "username": "Jrussell8",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 55,
+          "opening": 77,
+          "bucket": 77,
+          "retrieval": 77
+        },
+        "Middlegame (12–40)": {
+          "total": 258,
+          "base": 131,
+          "opening": 131,
+          "bucket": 131,
+          "retrieval": 132
+        },
+        "Endgame (>40)": {
+          "total": 334,
+          "base": 177,
+          "opening": 177,
+          "bucket": 177,
+          "retrieval": 177
+        }
+      },
+      "retrievalMatches": 51,
+      "middlePositions": 258
+    },
+    {
+      "id": 51,
+      "username": "Juan2012l",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 54,
+          "opening": 60,
+          "bucket": 60,
+          "retrieval": 60
+        },
+        "Middlegame (12–40)": {
+          "total": 251,
+          "base": 135,
+          "opening": 135,
+          "bucket": 135,
+          "retrieval": 135
+        },
+        "Endgame (>40)": {
+          "total": 320,
+          "base": 178,
+          "opening": 178,
+          "bucket": 178,
+          "retrieval": 178
+        }
+      },
+      "retrievalMatches": 13,
+      "middlePositions": 251
+    },
+    {
+      "id": 52,
+      "username": "Karzan12",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 45,
+          "opening": 61,
+          "bucket": 61,
+          "retrieval": 61
+        },
+        "Middlegame (12–40)": {
+          "total": 262,
+          "base": 122,
+          "opening": 122,
+          "bucket": 122,
+          "retrieval": 124
+        },
+        "Endgame (>40)": {
+          "total": 269,
+          "base": 169,
+          "opening": 169,
+          "bucket": 169,
+          "retrieval": 169
+        }
+      },
+      "retrievalMatches": 16,
+      "middlePositions": 262
+    },
+    {
+      "id": 53,
+      "username": "Matvei4",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 58,
+          "opening": 86,
+          "bucket": 86,
+          "retrieval": 86
+        },
+        "Middlegame (12–40)": {
+          "total": 264,
+          "base": 142,
+          "opening": 142,
+          "bucket": 142,
+          "retrieval": 142
+        },
+        "Endgame (>40)": {
+          "total": 240,
+          "base": 138,
+          "opening": 138,
+          "bucket": 138,
+          "retrieval": 138
+        }
+      },
+      "retrievalMatches": 16,
+      "middlePositions": 264
+    },
+    {
+      "id": 54,
+      "username": "mehrzad_Ghanbari",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 56,
+          "opening": 74,
+          "bucket": 74,
+          "retrieval": 74
+        },
+        "Middlegame (12–40)": {
+          "total": 257,
+          "base": 133,
+          "opening": 133,
+          "bucket": 133,
+          "retrieval": 132
+        },
+        "Endgame (>40)": {
+          "total": 439,
+          "base": 253,
+          "opening": 253,
+          "bucket": 253,
+          "retrieval": 253
+        }
+      },
+      "retrievalMatches": 23,
+      "middlePositions": 257
+    },
+    {
+      "id": 55,
+      "username": "SaidevsGambit",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 55,
+          "opening": 85,
+          "bucket": 85,
+          "retrieval": 85
+        },
+        "Middlegame (12–40)": {
+          "total": 255,
+          "base": 131,
+          "opening": 131,
+          "bucket": 131,
+          "retrieval": 135
+        },
+        "Endgame (>40)": {
+          "total": 302,
+          "base": 172,
+          "opening": 172,
+          "bucket": 172,
+          "retrieval": 172
+        }
+      },
+      "retrievalMatches": 42,
+      "middlePositions": 255
+    },
+    {
+      "id": 57,
+      "username": "stw_097",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 49,
+          "opening": 70,
+          "bucket": 70,
+          "retrieval": 70
+        },
+        "Middlegame (12–40)": {
+          "total": 248,
+          "base": 125,
+          "opening": 125,
+          "bucket": 125,
+          "retrieval": 124
+        },
+        "Endgame (>40)": {
+          "total": 222,
+          "base": 133,
+          "opening": 133,
+          "bucket": 133,
+          "retrieval": 133
+        }
+      },
+      "retrievalMatches": 14,
+      "middlePositions": 248
+    },
+    {
+      "id": 58,
+      "username": "sushanpanguluri",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 49,
+          "opening": 79,
+          "bucket": 79,
+          "retrieval": 79
+        },
+        "Middlegame (12–40)": {
+          "total": 268,
+          "base": 159,
+          "opening": 159,
+          "bucket": 159,
+          "retrieval": 157
+        },
+        "Endgame (>40)": {
+          "total": 229,
+          "base": 146,
+          "opening": 146,
+          "bucket": 146,
+          "retrieval": 146
+        }
+      },
+      "retrievalMatches": 30,
+      "middlePositions": 268
+    },
+    {
+      "id": 59,
+      "username": "yusufekici0734",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 47,
+          "opening": 88,
+          "bucket": 88,
+          "retrieval": 88
+        },
+        "Middlegame (12–40)": {
+          "total": 271,
+          "base": 156,
+          "opening": 156,
+          "bucket": 156,
+          "retrieval": 157
+        },
+        "Endgame (>40)": {
+          "total": 487,
+          "base": 281,
+          "opening": 281,
+          "bucket": 281,
+          "retrieval": 281
+        }
+      },
+      "retrievalMatches": 49,
+      "middlePositions": 271
+    },
+    {
+      "id": 60,
+      "username": "D_Daniel",
+      "counts": {
+        "Opening (<12)": {
+          "total": 115,
+          "base": 37,
+          "opening": 62,
+          "bucket": 62,
+          "retrieval": 62
+        },
+        "Middlegame (12–40)": {
+          "total": 241,
+          "base": 124,
+          "opening": 124,
+          "bucket": 124,
+          "retrieval": 125
+        },
+        "Endgame (>40)": {
+          "total": 348,
+          "base": 201,
+          "opening": 201,
+          "bucket": 201,
+          "retrieval": 201
+        }
+      },
+      "retrievalMatches": 19,
+      "middlePositions": 241
+    },
+    {
+      "id": 61,
+      "username": "eagle727",
+      "counts": {
+        "Opening (<12)": {
+          "total": 112,
+          "base": 49,
+          "opening": 71,
+          "bucket": 71,
+          "retrieval": 71
+        },
+        "Middlegame (12–40)": {
+          "total": 261,
+          "base": 142,
+          "opening": 142,
+          "bucket": 142,
+          "retrieval": 145
+        },
+        "Endgame (>40)": {
+          "total": 371,
+          "base": 217,
+          "opening": 217,
+          "bucket": 217,
+          "retrieval": 217
+        }
+      },
+      "retrievalMatches": 14,
+      "middlePositions": 261
+    },
+    {
+      "id": 62,
+      "username": "fibonacci1123",
+      "counts": {
+        "Opening (<12)": {
+          "total": 120,
+          "base": 61,
+          "opening": 87,
+          "bucket": 87,
+          "retrieval": 87
+        },
+        "Middlegame (12–40)": {
+          "total": 253,
+          "base": 132,
+          "opening": 132,
+          "bucket": 132,
+          "retrieval": 130
+        },
+        "Endgame (>40)": {
+          "total": 359,
+          "base": 179,
+          "opening": 179,
+          "bucket": 179,
+          "retrieval": 179
+        }
+      },
+      "retrievalMatches": 23,
+      "middlePositions": 253
+    }
+  ]
+}

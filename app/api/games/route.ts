@@ -23,6 +23,14 @@ function sameUser(a: string | null | undefined, b: string | null | undefined): b
   return !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
+function hasConfirmedLowTierDepth(points: unknown, ply: number): boolean {
+  if (!Array.isArray(points)) return false;
+  const point: unknown = points[ply];
+  if (typeof point !== "object" || point === null || Array.isArray(point)) return false;
+  const depth = "depth" in point ? point.depth : undefined;
+  return typeof depth === "number" && Number.isFinite(depth) && depth >= 16;
+}
+
 export async function GET(req: NextRequest) {
   await connection();
   const username = req.nextUrl.searchParams.get("username");
@@ -53,7 +61,7 @@ export async function GET(req: NextRequest) {
           }),
           prisma.flaggedMove.findMany({
             where: { game: { lichessGameId: { in: gameIds }, userId: sessionUserId } },
-            include: { game: { select: { lichessGameId: true } } },
+            include: { game: { select: { lichessGameId: true, eval: { select: { points: true } } } } },
           }),
         ]);
 
@@ -74,7 +82,10 @@ export async function GET(req: NextRequest) {
           );
         }
 
-        flagged = flagRows.map((f) => ({
+        flagged = flagRows
+          .filter((f) => f.cpLoss < 100 || f.cpLoss >= 150 ||
+            hasConfirmedLowTierDepth(f.game.eval?.points, f.ply))
+          .map((f) => ({
           gameId: f.game.lichessGameId,
           ply: f.ply,
           moveNumber: f.moveNumber,
@@ -98,7 +109,7 @@ export async function GET(req: NextRequest) {
           cascadeMeta: f.cascadeMeta as unknown as FlaggedMove["cascadeMeta"],
           evalConfidence: f.evalConfidence as FlaggedMove["evalConfidence"],
           explanation: f.explanation,
-        }));
+          }));
       }
     } catch (overlayErr) {
       console.error("Session/DB overlay failed for /api/games (serving live data without it):", overlayErr);
