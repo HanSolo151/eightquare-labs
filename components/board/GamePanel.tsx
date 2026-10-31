@@ -13,6 +13,8 @@ import { buildPrototypeMoveProfile } from "@/lib/maia/prototypeProfile";
 import { fetchGames } from "@/lib/lichess/fetchGames";
 import { parseGames } from "@/lib/lichess/parseGame";
 import { rerankMoves } from "@/lib/maia/rerank";
+import { buildOpponentProfile } from "@/lib/profile/opponentStyleProfile";
+import { openingTreeMove } from "@/lib/profile/openingTree";
 import { useOpponentFeatures } from "@/lib/useOpponentFeatures";
 import { extractAllMoveFeatures, buildPlayerProfile } from "@/lib/features/extractFeatures";
 import { flagMoves } from "@/lib/flags/flagEngine";
@@ -43,7 +45,7 @@ import type { OpponentFeatures } from "@/lib/lichess/opponentFeatures";
  
 
 type GameData = CachedGameDataShape;
-type OpponentPrototypeProfile = { username: string; games: string[][] };
+type OpponentPrototypeProfile = { username: string; games: string[][]; styleGames: ParsedGame[] };
 type EvalPushPayload = {
   gameId: string;
   gameEval: GameEval;
@@ -467,8 +469,9 @@ export default function GamePanel({
           rated: true,
           perfType: "rapid",
         });
+        const parsedOpponentGames = parseGames(rawGames, opponentName);
         const profile = buildPrototypeMoveProfile(
-          parseGames(rawGames, opponentName),
+          parsedOpponentGames,
           50,
         );
         if (profile.invalidGames > 0) {
@@ -481,6 +484,7 @@ export default function GamePanel({
           setOpponentPrototypeProfile({
             username: opponentName,
             games: profile.games,
+            styleGames: parsedOpponentGames,
           });
         }
       } catch (error) {
@@ -831,6 +835,25 @@ export default function GamePanel({
 
       const { selfRating, oppRating } = maiaRatingsFor(g);
       const inferenceFen = chess.fen();
+      const matchingOpeningTree = sameUser(opponentOpeningTree?.username, g.opponentUsername)
+        ? opponentOpeningTree
+        : null;
+      const openingMove = chess.history().length < 12
+        ? openingTreeMove(matchingOpeningTree, inferenceFen)
+        : null;
+      if (openingMove && tryPlayUci(chess, openingMove)) {
+        setTurnMode("mimic");
+        console.info("Maia replay choice", {
+          gameId: g.id,
+          usedOpeningTree: true,
+          openingMove,
+          inferenceSkipped: true,
+        });
+        setReplayFen(chess.fen());
+        setLastMove([openingMove.slice(0, 2) as Key, openingMove.slice(2, 4) as Key]);
+        if (!checkGameOver(chess, g)) setReplayStatus("your-turn");
+        return;
+      }
       const currentOpponentProfile = opponentPrototypeProfile;
       const prototypeGames =
         currentOpponentProfile &&
@@ -851,18 +874,18 @@ export default function GamePanel({
       const matchingOpponentFeatures = sameUser(opponentFeatures?.username, g.opponentUsername)
         ? opponentFeatures!
         : NEUTRAL_OPPONENT_FEATURES;
-      const openingTree = sameUser(opponentOpeningTree?.username, g.opponentUsername)
-        ? opponentOpeningTree
-        : null;
       const result = await rerankMoves({
         fen: inferenceFen,
         logitsMaia,
         opponentFeatures: matchingOpponentFeatures,
-        openingTree,
+        openingTree: null,
+        opponentProfile: currentOpponentProfile && sameUser(currentOpponentProfile.username, g.opponentUsername)
+          ? buildOpponentProfile(currentOpponentProfile.styleGames)
+          : null,
       });
       if (stale()) return;
 
-      const profileInfluencedTurn = result.openingBoostApplied || prototypeMatch !== null;
+      const profileInfluencedTurn = prototypeMatch !== null;
       setTurnMode(profileInfluencedTurn ? "mimic" : "base");
 
       console.info("Maia replay choice", {
@@ -873,7 +896,7 @@ export default function GamePanel({
         oppRating,
         prototypeId: prototypeMatch?.playerId ?? null,
         prototypeConfidence: prototypeMatch?.confidence ?? null,
-        usedOpeningTree: !!openingTree,
+        usedOpeningTree: false,
         baseTopMove: result.baseTopMove?.uci,
         adjustedTopMove: result.topMove?.uci,
         safetyChecked: result.safetyChecked,

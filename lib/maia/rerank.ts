@@ -26,6 +26,7 @@ import { openingBookPosition, MIN_OCCURRENCES, OPENING_BOOST_CAP } from "../prof
 import { evalFen } from "../eval/stockfishEngine";
 import type { OpponentFeatures } from "../lichess/opponentFeatures";
 import type { OpeningTree } from "@/types";
+import type { OpponentProfile } from "../profile/opponentStyleProfile";
 
 export interface RerankedMove {
   uci: string;
@@ -71,6 +72,29 @@ const FULL_MATERIAL = 78;
 const OPENING_END_MOVE = 12;
 const PIECE_VALUES: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 };
 
+export function styleAdjustedProbabilities<T extends {
+  probability: number;
+  isCheck: boolean;
+  isCapture: boolean;
+  isQueenCapture: boolean;
+  isQuiet: boolean;
+  offersMaterial?: boolean;
+}>(candidates: T[], profile: OpponentProfile, strength = 0.5): Array<T & { probability: number }> {
+  const weights = candidates.map((candidate) => candidate.probability * styleMoveBoost(candidate, profile, strength));
+  const total = weights.reduce((sum, weight) => sum + weight, 0) || 1;
+  return candidates.map((candidate, index) => ({ ...candidate, probability: weights[index] / total }));
+}
+
+function styleMoveBoost(candidate: {
+  isCheck: boolean; isCapture: boolean; isQueenCapture: boolean; isQuiet: boolean; offersMaterial?: boolean;
+}, profile: OpponentProfile, strength = 0.5): number {
+    const match = profile.aggression * (candidate.isCheck ? 1 : candidate.isCapture ? 0.45 : 0) +
+      profile.sacrifice * (candidate.offersMaterial && candidate.isCheck ? 1 : 0) +
+      profile.pragmatism * (candidate.isQueenCapture ? 1 : 0) +
+      profile.theory * (candidate.isQuiet ? 1 : 0.35);
+  return 1 + Math.min(3, match * strength);
+}
+
 export function gamePhaseFromFen(chess: Chess): "opening" | "middlegame" | "endgame" {
   let material = 0;
   for (const row of chess.board()) {
@@ -89,8 +113,9 @@ export async function rerankMoves(params: {
   logitsMaia: Float32Array;
   opponentFeatures: OpponentFeatures;
   openingTree?: OpeningTree | null;
+  opponentProfile?: OpponentProfile | null;
 }): Promise<RerankResult> {
-  const { fen, logitsMaia, opponentFeatures, openingTree } = params;
+  const { fen, logitsMaia, opponentFeatures, openingTree, opponentProfile } = params;
 
   const vocab = await loadMoveVocab(); // throws if not exactly 1880 entries, per moveVocab.ts
   if (logitsMaia.length !== vocab.length) {
@@ -101,6 +126,9 @@ export async function rerankMoves(params: {
   }
 
   const chess = new Chess(fen);
+  const positionPhase = gamePhaseFromFen(chess);
+  const fullmoveNumber = Number.parseInt(fen.split(" ")[5] ?? "1", 10) || 1;
+  const shouldUseStyleProfile = positionPhase === "middlegame" && fullmoveNumber <= 20;
   const mirrorMoves = chess.turn() === "b";
   const legalMoves = chess.moves({ verbose: true });
   const openingPosition = openingBookPosition(openingTree, fen);
@@ -169,14 +197,31 @@ export async function rerankMoves(params: {
 
     let boost = 1;
 
+    // Small, interpretable preference adjustment using style rates derived
+    // from the opponent's own post-opening moves. Keep each candidate's
+    // multiplier bounded so sparse/noisy profiles cannot dominate Maia.
+    if (shouldUseStyleProfile && opponentProfile && opponentProfile.movesAnalyzed > 0) {
+      const candidate = new Chess(fen);
+      candidate.move(m.san);
+      const isQuiet = !isCapture && !isCheck;
+      const givesMaterial = (m.piece === "q" || m.piece === "r") && isCapture === false;
+      boost *= styleMoveBoost({
+        isCheck,
+        isCapture,
+        isQueenCapture,
+        isQuiet,
+        offersMaterial: givesMaterial && candidate.isCheck(),
+      }, opponentProfile);
+    }
+
     // Opponent-level rates are weak priors, not move-conditioned evidence;
     // shrink and cap them. Piece-usage shares are omitted because global
     // piece frequency does not establish a preference between legal moves.
-    if (opponentFeatures.gamesAnalyzed >= 5 && (isCapture || isCheck)) {
+    if (shouldUseStyleProfile && opponentFeatures.gamesAnalyzed >= 5 && (isCapture || isCheck)) {
       const aggression = Math.max(0, Math.min(1, opponentFeatures.aggressionIndex));
       boost *= 1 + (aggression - 0.35) * AGGRESSION_BOOST_STRENGTH * profileReliability;
     }
-    if (opponentFeatures.gamesAnalyzed >= 5 && isQueenCapture) {
+    if (shouldUseStyleProfile && opponentFeatures.gamesAnalyzed >= 5 && isQueenCapture) {
       const queenTradeRate = Math.max(0, Math.min(1, opponentFeatures.queenTradeRate));
       boost *= 1 + (queenTradeRate - 0.5) * QUEEN_TRADE_BOOST_STRENGTH * profileReliability;
     }

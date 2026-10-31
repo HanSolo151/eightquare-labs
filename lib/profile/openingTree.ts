@@ -56,6 +56,14 @@ export function openingBookPosition(
   return total > 0 ? { byUci, total } : null;
 }
 
+/** Most frequently observed opponent move at this exact position. */
+export function openingTreeMove(tree: OpeningTree | null | undefined, fen: string): string | null {
+  const position = openingBookPosition(tree, fen);
+  if (!position) return null;
+  return Object.entries(position.byUci)
+    .sort(([uciA, countA], [uciB, countB]) => countB - countA || uciA.localeCompare(uciB))[0]?.[0] ?? null;
+}
+
 export function openingBookEntryFor(
   tree: OpeningTree | null | undefined,
   fen: string,

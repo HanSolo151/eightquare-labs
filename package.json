@@ -13,6 +13,8 @@
     "test:matching-gates": "tsx scripts/test-matching-gates.ts",
     "test:flag-engine": "tsx scripts/testFlagEngine.ts",
     "test:sacrifice-detector": "tsx scripts/testSacrificeDetector.ts",
+    "test:reranker": "tsx scripts/test-reranker.ts",
+    "evaluate:hybrid": "tsx scripts/evaluate-hybrid.ts",
     "rebuild:flags": "tsx scripts/rebuildFlags.ts",
     "test:sync-verify": "tsx --tsconfig scripts/sync-verify/tsconfig.json scripts/sync-verify/test.ts",
     "start": "next start",
