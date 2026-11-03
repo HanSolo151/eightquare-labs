@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { fetchGames } from "@/lib/lichess/fetchGames";
+import { fetchGames, LichessFetchError } from "@/lib/lichess/fetchGames";
 import { parseGames } from "@/lib/lichess/parseGame";
 import { isVanityEvaluationEligible } from "@/lib/matching/vanityEligibility";
 
@@ -13,7 +13,7 @@ export type SyncResult =
       historyBackfillComplete: boolean;
       skipped: boolean;
     }
-  | { ok: false; error: string };
+  | { ok: false; error: string; status?: number };
 
 // Passive page loads are throttled so repeated dashboard visits don't
 // repeatedly call Lichess. Explicit sync requests can bypass this interval.
@@ -184,6 +184,9 @@ export async function runSync(
     };
   } catch (err) {
     console.error("Game sync failed:", err);
+    if (err instanceof LichessFetchError && err.isCloudflareChallenge) {
+      return { ok: false, error: err.message, status: 502 };
+    }
     return { ok: false, error: "sync failed" };
   }
 }

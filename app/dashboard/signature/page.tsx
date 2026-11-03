@@ -88,7 +88,7 @@ async function SignaturePageContent() {
         </div>
       </section>
 
-      <SyncPanel initialTotalGames={totalGames} autoSyncOnMount />
+      <SyncPanel initialTotalGames={totalGames} />
 
       {!data ? (
         <section className="rounded-xl border border-white/10 bg-black/40 p-6 text-sm text-neutral-400">

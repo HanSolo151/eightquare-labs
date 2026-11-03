@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface SyncPanelProps {
   initialTotalGames: number;
-  autoSyncOnMount?: boolean;
 }
 
 interface SyncResponse {
@@ -17,7 +16,7 @@ interface SyncResponse {
   error?: string;
 }
 
-export function SyncPanel({ initialTotalGames, autoSyncOnMount }: SyncPanelProps) {
+export function SyncPanel({ initialTotalGames }: SyncPanelProps) {
   const router = useRouter();
   const [synced, setSynced] = useState(0);
   const [totalGames, setTotalGames] = useState(initialTotalGames);
@@ -27,18 +26,6 @@ export function SyncPanel({ initialTotalGames, autoSyncOnMount }: SyncPanelProps
   const [busy, setBusy] = useState(false);
   const [batchNumber, setBatchNumber] = useState(0);
   const [historyBackfillComplete, setHistoryBackfillComplete] = useState(false);
-  const hasAutoSynced = useRef(false);
-
-  useEffect(() => {
-    if (autoSyncOnMount && !hasAutoSynced.current) {
-      hasAutoSynced.current = true;
-      // A page visit may refresh stale data, but it should not bypass the
-      // server's passive-sync throttle. The button remains an explicit force sync.
-      void syncNow(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   async function syncNow(force = true) {
     setBusy(true);
     setError(null);

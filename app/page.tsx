@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import GamePanel from "@/components/board/GamePanel";
 import { auth } from "@/lib/auth";
 import { getSessionUserId } from "@/lib/auth/session";
@@ -5,6 +6,7 @@ import { getSessionUserId } from "@/lib/auth/session";
 export const instant = false;
 
 export default async function Page() {
+  await connection();
   const session = await auth();
   return (
     <GamePanel
