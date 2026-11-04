@@ -8,7 +8,7 @@ export default function BlunderHour({ data }: { data: BlunderHourStats }) {
   if (!data.worstHour || !data.bestHour || data.worstHour.hour === data.bestHour.hour) return null;
 
   return (
-    <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
+    <section className="border-l border-amber-300/30 py-1 pl-4">
       <p className="text-[10px] uppercase tracking-[0.2em] text-amber-300/80">Blunder hour</p>
       <h2 className="mt-2 text-lg font-medium">Your flagged-move rate is highest around {formatUtcHour(data.worstHour.hour)}</h2>
       <p className="mt-1 text-xs leading-5 text-neutral-400">

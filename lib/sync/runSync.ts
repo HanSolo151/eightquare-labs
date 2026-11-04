@@ -20,7 +20,6 @@ export type SyncResult =
 const MIN_SYNC_INTERVAL_MS = 60 * 1000;
 const SYNC_PAGE_SIZE = 200;
 const HISTORY_BACKFILL_BATCH_SIZE = 100;
-const USER_HISTORY_TARGET = 500;
 
 async function fetchGamePages(opts: {
   username: string;
@@ -87,25 +86,19 @@ export async function runSync(
     }
 
     if (!backfillComplete) {
-      const remainingHistory = Math.max(0, USER_HISTORY_TARGET - existingGameCount - raw.length);
-      if (remainingHistory === 0) {
-        backfillComplete = true;
-      } else {
-        const batchSize = Math.min(HISTORY_BACKFILL_BATCH_SIZE, remainingHistory);
-        const oldestStoredGame = existingGameCount > 0 ? await prisma.game.findFirst({
-          where: { userId: user.id, lichessCreatedAt: { not: null } },
-          orderBy: { lichessCreatedAt: "asc" },
-          select: { lichessCreatedAt: true },
-        }) : null;
-        const until = oldestStoredGame?.lichessCreatedAt?.getTime();
-        const history = await fetchGamePages({
-          username: user.username,
-          maxGames: batchSize,
-          until: until === undefined ? undefined : until - 1,
-        });
-        raw.push(...history);
-        backfillComplete = history.length < batchSize || existingGameCount + raw.length >= USER_HISTORY_TARGET;
-      }
+      const oldestStoredGame = existingGameCount > 0 ? await prisma.game.findFirst({
+        where: { userId: user.id, lichessCreatedAt: { not: null } },
+        orderBy: { lichessCreatedAt: "asc" },
+        select: { lichessCreatedAt: true },
+      }) : null;
+      const until = oldestStoredGame?.lichessCreatedAt?.getTime();
+      const history = await fetchGamePages({
+        username: user.username,
+        maxGames: HISTORY_BACKFILL_BATCH_SIZE,
+        until: until === undefined ? undefined : until - 1,
+      });
+      raw.push(...history);
+      backfillComplete = history.length < HISTORY_BACKFILL_BATCH_SIZE;
     }
     const games = parseGames(raw, user.username);
 

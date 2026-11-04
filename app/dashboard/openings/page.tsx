@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getOpeningsData } from "@/lib/openings/getOpeningsData";
-import OpeningGambit from "@/components/dashboard/OpeningGambit";
+import { getOpeningBreadth } from "@/lib/dashboard/getSignatureSignals";
 import DashboardPageFallback from "@/components/dashboard/DashboardPageFallback";
 
 const badgeClass = {
@@ -19,16 +19,21 @@ export default function OpeningsPage() {
 async function OpeningsPageContent() {
   const userId = getSessionUserId(await auth());
   if (!userId) return <p className="text-sm text-neutral-400">Sign in to see your openings.</p>;
-  const openings = await getOpeningsData(userId);
+  const [openings, breadth] = await Promise.all([
+    getOpeningsData(userId),
+    getOpeningBreadth(userId),
+  ]);
+  const strongest = openings.find((opening) => opening.badge === "safe");
 
   return (
     <div className="space-y-6 pb-12">
       <header className="border-b border-white/10 pb-6">
-        <p className="text-xs uppercase tracking-[0.28em] text-emerald-300">Opening danger / 03</p>
+        <p className="text-xs uppercase tracking-[0.28em] text-emerald-300">Opening repertoire</p>
         <h1 className="mt-3 text-2xl font-semibold sm:text-3xl">Opening Danger Score</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">A relative ranking within your openings, combining cp loss per move, loss rate, and flagged move density. It is descriptive, not a prediction.</p>
       </header>
-      <OpeningGambit openings={openings} />
+      {breadth.distinctEcoCount > 0 && <p className="text-xs text-neutral-500">{breadth.distinctEcoCount} distinct openings across {breadth.gamesWithEco} games{breadth.gamesWithoutEco > 0 ? ` · ${breadth.gamesWithoutEco} without a recorded ECO` : ""}.</p>}
+      {strongest && <p className="border-l border-sky-300/40 py-1 pl-3 text-xs text-neutral-400"><span className="text-sky-200">Strongest relative result:</span> {strongest.name} · {Math.round(strongest.winRate * 100)}% wins across {strongest.gamesPlayed} games.</p>}
       {openings.length === 0 ? (
         <p className="rounded-lg border border-dashed border-white/10 px-4 py-5 text-xs text-neutral-500">Not enough games per opening yet (minimum 2) to rank anything.</p>
       ) : (
@@ -39,7 +44,7 @@ async function OpeningsPageContent() {
                 <span className={`rounded border px-2 py-1 text-[10px] uppercase tracking-wider ${badgeClass[opening.badge]}`}>{opening.badge}</span>
                 <div className="min-w-0 flex-1">
                   {opening.eco ? <Link className="truncate text-sm text-neutral-100 hover:text-emerald-200" href={`/dashboard/openings/${encodeURIComponent(opening.eco)}`}>{opening.name}</Link> : <p className="truncate text-sm text-neutral-100">{opening.name}</p>}
-                  <p className="mt-1 text-xs text-neutral-500">{opening.eco ?? "ECO unavailable · drill-down unavailable"} · {opening.gamesPlayed} games</p>
+                  <p className="mt-1 text-xs text-neutral-500">{opening.eco ?? "ECO unavailable · drill-down unavailable"} · {opening.gamesPlayed} games · {Math.round(opening.winRate * 100)}% wins · {Math.round(opening.lossRate * 100)}% losses</p>
                 </div>
                 <div className="text-right text-xs text-neutral-400">
                   <p>{opening.avgCpLoss.toFixed(1)} cp loss / move</p>

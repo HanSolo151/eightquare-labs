@@ -1,4 +1,5 @@
 import { Suspense, type ReactNode } from "react";
+import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
@@ -6,7 +7,7 @@ import { DashboardNav } from "@/components/dashboard/DashboardNav";
 export default function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   return (
     <div className="bg-math-grid min-h-screen font-mono text-white">
-      <div className="mx-auto max-w-6xl space-y-8 px-6 py-8">
+      <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
         <Suspense fallback={<DashboardLoading />}>
           <AuthenticatedDashboard>{children}</AuthenticatedDashboard>
         </Suspense>
@@ -21,8 +22,11 @@ async function AuthenticatedDashboard({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <header className="space-y-5">
-        <p className="text-sm text-neutral-400">logged in as {session.user.name}</p>
+      <header className="space-y-2">
+        <div className="flex items-center justify-between gap-3 text-xs">
+          <Link href="/dashboard" className="font-semibold tracking-wide text-neutral-200 hover:text-white">EIGHTSQUARE</Link>
+          <p className="truncate text-neutral-500">{session.user.name}</p>
+        </div>
         <DashboardNav />
       </header>
       <main>{children}</main>

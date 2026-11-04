@@ -35,10 +35,10 @@ async function DashboardPageContent() {
   ]);
   const moment = recentGame ? await getGhostMoment(userId, recentGame.id) : null;
 
-  return <div className="space-y-8 pb-12">
+  return <div className="space-y-6 pb-12">
     <header className="border-b border-white/10 pb-6">
-      <h1 className="text-2xl font-semibold sm:text-3xl">The moment it went wrong</h1>
-      <p className="mt-2 text-sm text-neutral-400">Review a recent flagged position, then play it against Maia or an available opponent mimic.</p>
+      <h1 className="text-2xl font-semibold sm:text-3xl">Practice queue</h1>
+      <p className="mt-2 text-sm text-neutral-400">Review unresolved flagged positions, then play them against Maia or an available opponent mimic.</p>
     </header>
 
     {moment ? <section>
@@ -50,7 +50,7 @@ async function DashboardPageContent() {
       </div>
     </section> : <p className="rounded-lg border border-dashed border-white/10 px-4 py-5 text-xs text-neutral-500">No flagged moments yet. Sync and analyze some games first.</p>}
 
-    <section className="rounded-xl border border-white/10 bg-black/35 p-4 sm:p-5">
+    <section className="border-y border-white/10 py-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-widest text-neutral-500">Your practice progress</p>
@@ -80,9 +80,9 @@ async function DashboardPageContent() {
       {progress.total > progress.items.length && <p className="mt-2 text-xs text-neutral-500">Showing {progress.items.length} of {progress.total} positions to revisit.</p>}
     </section>}
 
-    <section className="grid gap-3 sm:grid-cols-2">
-      <Link href="/dashboard/signature" className="rounded-xl border border-white/10 bg-black/35 p-4 text-sm text-neutral-300 hover:bg-white/[0.03]">Your playing signature →</Link>
-      <Link href="/dashboard/daily" className="rounded-xl border border-white/10 bg-black/35 p-4 text-sm text-neutral-300 hover:bg-white/[0.03]">Today’s puzzle →</Link>
-    </section>
+    <p className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-neutral-500">
+      <Link href="/dashboard/daily" className="hover:text-white">Try today&apos;s puzzle →</Link>
+      <Link href="/dashboard/signature" className="hover:text-white">View your dossier →</Link>
+    </p>
   </div>;
 }

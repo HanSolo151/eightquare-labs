@@ -75,12 +75,12 @@ export default function PatternProgress({ items }: { items: PatternProgressDelta
   const ranked = [...items].sort((a, b) => b.beforeAvgCp - a.beforeAvgCp);
   const [featured, ...secondary] = ranked;
 
-  return <section className="rounded-xl border border-white/10 bg-black/35 px-5 py-6 sm:px-6 sm:py-8">
+  return <section className="border-y border-white/10 py-5">
     <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-300/80">After spar practice</p>
     <h2 className="mt-2 text-lg font-medium">Pattern progress</h2>
     <p className="mt-1 text-xs leading-5 text-neutral-500">Review the games behind your biggest recurring mistakes, then practice from the exact position.</p>
     {featured ? <div className="mt-5">
-      <article className="rounded-xl border border-amber-200/15 bg-amber-200/[0.035] p-4 sm:p-5">
+      <article className="border-l border-amber-200/30 pl-4">
         <PhaseEvidence item={featured} featured />
       </article>
       {secondary.length > 0 && <div className="mt-3 divide-y divide-white/10 border-t border-white/10">

@@ -2,6 +2,7 @@
 import * as ort from "onnxruntime-web";
 import { boardToTensor, mirrorUci } from "../../lib/maia/boardToTensor";
 import { eloToBucket } from "../../lib/maia/eloBuckets";
+import { normalizeMaiaLogits } from "../../lib/maia/float16Logits";
 import { indexToUci, loadMoveVocab } from "../../lib/maia/moveVocab";
 
 type InferenceRequest = {
@@ -182,8 +183,8 @@ async function infer(request: InferenceRequest): Promise<WorkerResponse> {
   }
 
   const results = await session.run(feeds);
-  const logitsMaia = results["logits_maia"]?.data;
-  if (!(logitsMaia instanceof Float32Array) || logitsMaia.length === 0) {
+  const logitsMaia = normalizeMaiaLogits(results["logits_maia"]?.data);
+  if (!logitsMaia || logitsMaia.length === 0) {
     throw new Error("Maia ONNX returned invalid move logits.");
   }
 

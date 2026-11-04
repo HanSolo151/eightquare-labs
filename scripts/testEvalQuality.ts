@@ -46,6 +46,21 @@ const blackMatePoint = normalizeEvalPoint(
 );
 assert(blackMatePoint.mateBefore === 4 && blackMatePoint.mateAfter === 1, "Black mate distance is also stored from the mover's POV");
 
+const terminalMatePoint = normalizeEvalPoint(
+  0,
+  { cp: 120, mate: null, depth: 16, bestMoveUci: "g6g7" },
+  { cp: null, mate: 0, depth: 0, bestMoveUci: null }
+);
+assert(terminalMatePoint.mateAfter === 0 && terminalMatePoint.depth === 16,
+  "a checkmate reached by the move retains full confidence from the searched pre-move position");
+const terminalStalematePoint = normalizeEvalPoint(
+  0,
+  { cp: 120, mate: null, depth: 16, bestMoveUci: "g6g7" },
+  { cp: 0, mate: null, depth: 0, bestMoveUci: null }
+);
+assert(terminalStalematePoint.cpAfter === 0 && terminalStalematePoint.depth === 16,
+  "a stalemate reached by the move keeps its exact draw score without failing depth validation");
+
 const complete: GameEval = {
   gameId: "quality-test",
   points: [whitePoint, blackPoint],
@@ -101,6 +116,19 @@ async function testMoveSequence(): Promise<void> {
     inspectGameEval({ ...complete, points: sequencePoints }, 3).cpComparablePlies.length === 3,
     "all sequence plies are usable by the centipawn-delta flag rule"
   );
+
+  let terminalSearches = 0;
+  const mateSequence = await evaluateMoveSequence(
+    ["f3", "e5", "g4", "Qh4#"],
+    async () => {
+      terminalSearches++;
+      return terminalSearches === 5
+        ? { cp: null, mate: 0, depth: 0, bestMoveUci: null }
+        : { cp: 0, mate: null, depth: 16, bestMoveUci: "e2e4" };
+    },
+  );
+  assert(mateSequence.at(-1)?.depth === 16 && mateSequence.at(-1)?.mateAfter === 0,
+    "a checkmate-ending sequence remains complete at the searched pre-move depth");
 
   let invalidSanRejected = false;
   try {

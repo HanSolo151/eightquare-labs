@@ -80,7 +80,7 @@ async function GamesPageContent({ searchParams }: GamesPageProps) {
       </section>
 
       {data.games.length === 0 ? (
-        <EmptyState title="No saved games yet" detail="Run a Lichess sync from the Signature screen. Games appear here after they are stored in your account archive." />
+        <EmptyState title="No saved games yet" detail="Run a Lichess sync from the Dossier. Games appear here after they are stored in your account archive." />
       ) : (
         <div className="space-y-3">
           {data.games.map((game) => {
@@ -100,6 +100,7 @@ async function GamesPageContent({ searchParams }: GamesPageProps) {
                 <div className="flex shrink-0 items-center gap-2 self-start">
                   <span className={`rounded-full border px-2.5 py-1 text-[10px] ${game.evaluated ? "border-emerald-300/20 text-emerald-200" : "border-white/10 text-neutral-500"}`}>{game.evaluated ? "evaluated" : "pending eval"}</span>
                   <span className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] text-neutral-400">{game.flags.length} flag{game.flags.length === 1 ? "" : "s"}</span>
+                  {game.flags.length > 0 && <Link href={`/dashboard/games/${encodeURIComponent(game.id)}/ghost?ply=${game.flags[0]!.ply}`} className="rounded border border-amber-300/20 px-2.5 py-1 text-[10px] text-amber-200 hover:border-amber-300/50">Ghost →</Link>}
                   <Link href={`/dashboard/games/${encodeURIComponent(game.id)}${occurrencePlysByGame.has(game.id) ? `?ply=${occurrencePlysByGame.get(game.id)![0]}&spar=1` : ""}`} className="rounded border border-white/10 px-2.5 py-1 text-[10px] text-neutral-300 hover:border-emerald-300/40 hover:text-white">{occurrencePlysByGame.has(game.id) ? "Drill position →" : "Review →"}</Link>
                 </div>
               </div>

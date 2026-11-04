@@ -1,41 +1,12 @@
-/** Signature overview: account metrics, tempo, openings, patterns, and recent flags. */
 import Link from "next/link";
 import { Suspense } from "react";
 import { auth } from "@/lib/auth";
-import { getSessionUserId, getSessionPlan } from "@/lib/auth/session";
+import { getSessionUserId } from "@/lib/auth/session";
 import { getDashboardData } from "@/lib/dashboard/getDashboardData";
 import { prisma } from "@/lib/prisma";
 import { SyncPanel } from "@/components/dashboard/SyncPanel";
-import { getBiasData } from "@/lib/bias/getBiasData";
-import BlindSpotHeatmap from "@/components/dashboard/BlindSpotHeatmap";
-import PatternProgress from "@/components/dashboard/PatternProgress";
 import SignatureShareCard from "@/components/dashboard/SignatureShareCard";
-import OpeningFingerprint from "@/components/dashboard/OpeningFingerprint";
-import EarlyRead from "@/components/dashboard/EarlyRead";
-import NemesisSquare from "@/components/dashboard/NemesisSquare";
-import MostExpensiveMove from "@/components/dashboard/MostExpensiveMove";
-import PersonalRecords from "@/components/dashboard/PersonalRecords";
-import ComebackIndex from "@/components/dashboard/ComebackIndex";
-import BlunderHour from "@/components/dashboard/BlunderHour";
-import OpeningBreadth from "@/components/dashboard/OpeningBreadth";
 import DashboardPageFallback from "@/components/dashboard/DashboardPageFallback";
-import { getAmbientPaceAggregate, getBlunderHourStats, getComebackIndex, getMostExpensiveMove, getOpeningBreadth, getPatternProgressDeltas, getPersonalRecords, getSelfCpLossTrend } from "@/lib/dashboard/getSignatureSignals";
-
-const PHASES = ["opening", "middlegame", "endgame"] as const;
-const severityClass: Record<string, string> = {
-  high: "border-rose-400/30 bg-rose-400/10 text-rose-200",
-  medium: "border-amber-300/30 bg-amber-300/10 text-amber-100",
-  low: "border-sky-300/20 bg-sky-300/10 text-sky-100",
-};
-
-function pct(value: number) {
-  return `${Math.round(value * 100)}%`;
-}
-
-function formatDate(date: Date | null) {
-  if (!date) return "Never";
-  return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(date);
-}
 
 export default function SignaturePage() {
   return <Suspense fallback={<DashboardPageFallback />}><SignaturePageContent /></Suspense>;
@@ -44,179 +15,62 @@ export default function SignaturePage() {
 async function SignaturePageContent() {
   const session = await auth();
   const userId = getSessionUserId(session);
-  const [data, totalGames, openingGames, biasData, patternProgress, ambientPace, cpLossTrend, mostExpensiveMove, personalRecords, comebackIndex, blunderHour, openingBreadth] = await Promise.all([
+  const [data, totalGames] = await Promise.all([
     userId ? getDashboardData(userId) : Promise.resolve(null),
     userId ? prisma.game.count({ where: { userId } }) : Promise.resolve(0),
-    userId ? prisma.game.count({ where: { userId, openingName: { not: null } } }) : Promise.resolve(0),
-    userId ? getBiasData(userId) : Promise.resolve(null),
-    userId ? getPatternProgressDeltas(userId) : Promise.resolve([]),
-    userId ? getAmbientPaceAggregate(userId) : Promise.resolve(null),
-    userId ? getSelfCpLossTrend(userId) : Promise.resolve(null),
-    userId ? getMostExpensiveMove(userId) : Promise.resolve(null),
-    userId ? getPersonalRecords(userId) : Promise.resolve({ biggestComeback: null, longestWin: null, bestWinVsHigherRated: null }),
-    userId ? getComebackIndex(userId) : Promise.resolve({ comebackWinCount: 0, totalWinCount: 0, evaluatedWinCount: 0, comebackShare: 0 }),
-    userId ? getBlunderHourStats(userId) : Promise.resolve({ byHour: [], worstHour: null, bestHour: null, overallFlagsPerGame: 0 }),
-    userId ? getOpeningBreadth(userId) : Promise.resolve({ distinctEcoCount: 0, gamesWithEco: 0, gamesWithoutEco: 0 }),
   ]);
-  const hasNemesisSignal = Boolean(
-    biasData?.meetsThreshold && biasData.squares.blunderDensity.some((square) => square.flaggedCount >= 3)
-  );
 
-  return (
-    <div className="space-y-8 pb-12">
-      <section className="flex flex-col justify-between gap-5 border-b border-white/10 pb-7 sm:flex-row sm:items-end">
-        <div>
-          <p className="text-xs uppercase tracking-[0.28em] text-emerald-300">Player dossier / 01</p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Your playing signature</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">
-            A record of your decisions, timing, and recurring patterns, built from games you have synced and evaluated.
-          </p>
-        </div>
-        <div className="flex items-end justify-between gap-4 sm:flex-col sm:items-end">
-          {data && <SignatureShareCard
-            username={data.username}
-            games={data.totalGames}
-            evaluatedGames={data.evaluatedGames}
-            patternCount={data.weaknessSummary.patternCount}
-            topOpenings={(data.playerProfile?.mostCommonOpenings ?? []).slice(0, 3)}
-            tempo={PHASES.map((phase) => ({ phase, seconds: data.playerProfile?.avgMoveTimeSecByPhase[phase] ?? null }))}
-          />}
-          <div className="text-left sm:text-right">
-            <p className="text-xs uppercase tracking-widest text-neutral-500">Plan</p>
-            <p className="mt-1 text-sm capitalize text-neutral-200">{getSessionPlan(session)}</p>
-          </div>
-        </div>
-      </section>
+  if (!data) {
+    return <p className="text-sm text-neutral-400">Your account record is not available yet. Try refreshing after signing in.</p>;
+  }
 
-      <SyncPanel initialTotalGames={totalGames} />
+  const cards = [
+    { href: "/dashboard/patterns", title: "Blind spots", detail: "Recurring patterns and where flagged moves cluster" },
+    { href: "/dashboard/openings", title: "Openings", detail: "Your repertoire, results, and Danger Score" },
+    { href: "/dashboard/form", title: "Form", detail: "Trends, tempo, and personal records" },
+    { href: "/dashboard/wins", title: "Style match", detail: "Compare your wins with the historical style library" },
+  ];
 
-      {!data ? (
-        <section className="rounded-xl border border-white/10 bg-black/40 p-6 text-sm text-neutral-400">
-          Your account record is not available yet. Try refreshing after signing in.
-        </section>
-      ) : (
-        <>
-          {biasData && <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
-            <h2 className="mb-4 text-lg font-medium">Blind spot heatmap</h2>
-            <BlindSpotHeatmap data={biasData} />
-          </section>}
-          {(hasNemesisSignal || mostExpensiveMove) && <div className={`grid gap-5 ${hasNemesisSignal && mostExpensiveMove ? "xl:grid-cols-2" : ""}`}>
-            {hasNemesisSignal && biasData && <NemesisSquare data={biasData} />}
-            <MostExpensiveMove move={mostExpensiveMove} />
-          </div>}
-          <PersonalRecords records={personalRecords} />
-          <div className="grid gap-5 xl:grid-cols-2">
-            <ComebackIndex data={comebackIndex} />
-            <BlunderHour data={blunderHour} />
-          </div>
-          <OpeningBreadth data={openingBreadth} />
-          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Metric label="Games in archive" value={data.totalGames.toLocaleString()} note="Synced to your account" />
-            <Metric label="Evaluated" value={data.evaluatedGames.toLocaleString()} note={`${data.unevaluatedGames} waiting for analysis`} />
-            <Metric label="Premove rate" value={data.playerProfile ? pct(data.playerProfile.premoveRate) : "—"} note="Estimated from clock data" />
-            <Metric label="Average opponent" value={data.playerProfile?.avgOpponentRating?.toLocaleString() ?? "—"} note="Rating at game time" />
-          </section>
+  return <div className="space-y-7 pb-12">
+    <header className="flex flex-col justify-between gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-end">
+      <div>
+        <p className="text-xs uppercase tracking-[0.28em] text-emerald-300">Player dossier</p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Your playing signature</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">A snapshot of your saved games and analysis.</p>
+      </div>
+      <div className="flex items-center gap-4">
+        <SignatureShareCard
+          username={data.username}
+          games={data.totalGames}
+          evaluatedGames={data.evaluatedGames}
+          patternCount={data.weaknessSummary.patternCount}
+          topOpenings={(data.playerProfile?.mostCommonOpenings ?? []).slice(0, 3)}
+          tempo={(["opening", "middlegame", "endgame"] as const).map((phase) => ({ phase, seconds: data.playerProfile?.avgMoveTimeSecByPhase[phase] ?? null }))}
+        />
+      </div>
+    </header>
 
-          <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
-            <SectionHeading eyebrow="Move quality history" title="Flagged move CP-loss trend" detail="Compares your most recent flagged moves with the preceding flagged moves. Three moves per period are required; differences under 25 cp are labeled steady. This is descriptive history, not a rating estimate." />
-            {cpLossTrend ? <div className="mt-4 flex flex-wrap items-center gap-3">
-              <span className={`rounded-full border px-3 py-1 text-xs ${cpLossTrend.trend === "improving" ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-200" : cpLossTrend.trend === "worsening" ? "border-amber-300/25 bg-amber-300/10 text-amber-200" : "border-white/10 text-neutral-300"}`}>{cpLossTrend.trend === "improving" ? "↓ Improving" : cpLossTrend.trend === "worsening" ? "↑ Worsening" : "→ Steady"}</span>
-              <p className="text-xs text-neutral-400">Previous {cpLossTrend.previousAvgCp} cp ({cpLossTrend.previousCount} moves) → recent {cpLossTrend.recentAvgCp} cp ({cpLossTrend.recentCount} moves)</p>
-            </div> : <p className="mt-4 text-xs text-neutral-500">At least three recent and three preceding flagged player moves are needed to show a trend.</p>}
-          </section>
+    <SyncPanel initialTotalGames={totalGames} />
 
-          <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-            <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
-              <SectionHeading eyebrow="Tempo profile" title="Time by phase" detail="Average time spent per move, where clock data is available." />
-              <div className="mt-7 space-y-5">
-                {PHASES.map((phase) => {
-                  const seconds = data.playerProfile?.avgMoveTimeSecByPhase[phase] ?? null;
-                  const max = Math.max(...PHASES.map((p) => data.playerProfile?.avgMoveTimeSecByPhase[p] ?? 0), 1);
-                  return <div key={phase}>
-                    <div className="mb-2 flex justify-between text-xs">
-                      <span className="capitalize text-neutral-300">{phase}</span>
-                      <span className="tabular-nums text-neutral-400">{seconds === null ? "No sample" : `${seconds.toFixed(1)} sec / move`}</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                      <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-300" style={{ width: `${seconds === null ? 0 : Math.max(4, seconds / max * 100)}%` }} />
-                    </div>
-                  </div>;
-                })}
-              </div>
-              <p className="mt-5 text-xs text-neutral-500">Profile coverage: {data.playerProfile?.gamesAnalyzed ?? 0} games. Timing is descriptive, not a rating of move quality.</p>
-            </section>
+    <p className="text-xs text-neutral-500">
+      <span className="text-neutral-200">{data.totalGames.toLocaleString()}</span> games
+      <span className="mx-2 text-neutral-700">·</span>
+      <span className="text-neutral-200">{data.evaluatedGames.toLocaleString()}</span> evaluated
+      <span className="mx-2 text-neutral-700">·</span>
+      <span className="text-neutral-200">{data.unevaluatedGames.toLocaleString()}</span> awaiting analysis
+    </p>
 
-            <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
-              <SectionHeading eyebrow="Opening repertoire" title="Most played" detail="Your most frequent recorded openings." />
-              <OpeningFingerprint openings={data.playerProfile?.mostCommonOpenings ?? []} games={openingGames} />
-              {!data.playerProfile?.mostCommonOpenings.length ? <Empty>No opening profile yet. Sync games and let analysis finish to build this section.</Empty> : (
-                <ol className="mt-5 divide-y divide-white/10">
-                  {data.playerProfile.mostCommonOpenings.slice(0, 5).map((opening, index) => (
-                    <li key={`${opening.eco}-${opening.name}`} className="flex items-center gap-4 py-3 first:pt-0">
-                      <span className="font-mono text-xs text-emerald-300">0{index + 1}</span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm text-neutral-100">{opening.name}</p>
-                        <p className="mt-1 text-xs text-neutral-500">{opening.eco || "ECO unavailable"}</p>
-                      </div>
-                      <span className="text-sm tabular-nums text-neutral-300">{opening.count}<span className="ml-1 text-xs text-neutral-500">games</span></span>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </section>
-          </div>
-
-          <div className="grid gap-5 xl:grid-cols-[0.8fr_1.2fr]">
-            <EarlyRead
-              flags={data.recentFlags.map((flag) => ({ gameId: flag.gameId, phase: flag.phase, cpLoss: flag.cpLoss }))}
-              evaluatedGames={data.evaluatedGames}
-              totalGames={data.totalGames}
-            />
-
-            <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
-              <div className="flex items-start justify-between gap-4">
-                <SectionHeading eyebrow="Recent analysis" title="Flagged moments" detail={`Last sync: ${formatDate(data.lastSyncedAt)}`} />
-                <Link href="/dashboard/games" className="shrink-0 text-xs text-neutral-400 hover:text-white">All games →</Link>
-              </div>
-              {data.recentFlags.length === 0 ? <Empty>No flagged moments stored yet. This becomes informative after game evaluation is persisted.</Empty> : (
-                <ul className="mt-5 divide-y divide-white/10">
-                  {data.recentFlags.slice(0, 5).map((flag, index) => (
-                    <li key={`${flag.gameId}-${flag.ply}-${flag.flagType}-${index}`} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3 first:pt-0">
-                      <span className={`rounded border px-2 py-1 text-[10px] uppercase tracking-wider ${severityClass[flag.severity] ?? "border-white/10 text-neutral-300"}`}>{flag.severity}</span>
-                      <span className="font-mono text-sm text-white">{flag.san}</span>
-                      <span className="text-xs text-neutral-400">move {flag.moveNumber} · vs {flag.opponentUsername}</span>
-                      <span className="ml-auto font-mono text-xs tabular-nums text-neutral-300">−{Math.round(flag.cpLoss)} cp</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          </div>
-
-          <PatternProgress items={patternProgress} />
-
-          {ambientPace && <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
-            <SectionHeading eyebrow="Evaluation runs · this month (UTC)" title="Recurring multi-move evaluation losses" detail="Retrospective signal from evaluated games, grouped by opening and phase. It does not infer tilt or decision-making from the clock." />
-            <p className="mt-4 text-sm text-neutral-200">Seen in <strong className="font-semibold text-emerald-200">{ambientPace.gameCount} games</strong>, most often in {ambientPace.openingName} during the {ambientPace.phase}.</p>
-          </section>}
-        </>
-      )}
-    </div>
-  );
-}
-
-function Metric({ label, value, note }: { label: string; value: string; note: string }) {
-  return <article className="rounded-xl border border-white/10 bg-white/[0.035] p-5">
-    <p className="text-[10px] uppercase tracking-[0.2em] text-neutral-500">{label}</p>
-    <p className="mt-3 text-3xl font-semibold tracking-tight tabular-nums">{value}</p>
-    <p className="mt-2 text-xs text-neutral-500">{note}</p>
-  </article>;
-}
-
-function SectionHeading({ eyebrow, title, detail }: { eyebrow: string; title: string; detail: string }) {
-  return <div><p className="text-[10px] uppercase tracking-[0.2em] text-emerald-300/80">{eyebrow}</p><h2 className="mt-2 text-lg font-medium">{title}</h2><p className="mt-1 text-xs leading-5 text-neutral-500">{detail}</p></div>;
-}
-
-function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="mt-5 rounded-lg border border-dashed border-white/10 px-4 py-5 text-xs leading-5 text-neutral-500">{children}</p>;
+    <section aria-label="Explore your analysis">
+      <h2 className="mb-1 text-xs font-medium uppercase tracking-widest text-neutral-500">Explore your analysis</h2>
+      <div className="divide-y divide-white/[0.07]">
+        {cards.map((item) => <Link key={item.href} href={item.href} className="group flex items-center gap-4 py-4 transition-colors hover:text-white">
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm text-neutral-200 group-hover:text-white">{item.title}</span>
+            <span className="mt-1 block text-xs text-neutral-500">{item.detail}</span>
+          </span>
+          <span aria-hidden="true" className="text-neutral-600 transition group-hover:translate-x-1 group-hover:text-emerald-200">→</span>
+        </Link>)}
+      </div>
+    </section>
+  </div>;
 }

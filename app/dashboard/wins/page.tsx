@@ -103,9 +103,9 @@ async function WinsPageContent({ searchParams }: { searchParams: Promise<{ page?
   return <div className="space-y-7 pb-12">
     <header className="flex flex-col justify-between gap-4 border-b border-white/10 pb-6 sm:flex-row sm:items-end">
       <div>
-        <p className="text-xs uppercase tracking-[0.28em] text-emerald-300">Your analysis / 03</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Wins</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">Choose a win to compare your opening, middlegame, and endgame style with the 30-player library. The comparison runs in your browser using the saved moves and evaluation.</p>
+        <p className="text-xs uppercase tracking-[0.28em] text-emerald-300">Style analysis</p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Style Match</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">Choose a win to compare your opening, middlegame, and endgame style with the 30-player library. This view is wins-only; the comparison runs in your browser using saved moves and evaluation.</p>
       </div>
       <span className="text-xs tabular-nums text-neutral-400">{totalWins.toLocaleString()} saved wins</span>
     </header>
@@ -113,8 +113,8 @@ async function WinsPageContent({ searchParams }: { searchParams: Promise<{ page?
     {!profileReady && <p role="status" className="rounded-lg border border-amber-200/20 bg-amber-200/[0.04] p-3 text-xs text-amber-100">The style library is not available right now.</p>}
     {totalWins === 0 ? <section className="rounded-xl border border-dashed border-white/15 bg-black/30 px-6 py-12 text-center">
       <p className="text-lg">No wins in your archive yet</p>
-      <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-neutral-500">Sync your Lichess games from the Signature screen. New wins will appear here as they are saved.</p>
-      <Link href="/dashboard/signature" className="mt-5 inline-flex text-sm text-emerald-200 hover:text-white">Open Signature →</Link>
+      <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-neutral-500">Sync your Lichess games from the Dossier. New wins will appear here as they are saved.</p>
+      <Link href="/dashboard/signature" className="mt-5 inline-flex text-sm text-emerald-200 hover:text-white">Open Dossier →</Link>
     </section> : <>
       <WinsAnalysis games={games} profiles={profiles} calibration={profileReady ? calibration : null} />
       {pages > 1 && <nav aria-label="Win pages" className="flex items-center justify-between border-t border-white/10 pt-4 text-sm">

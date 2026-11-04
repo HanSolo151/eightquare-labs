@@ -16,7 +16,7 @@ export default function PersonalRecords({ records }: { records: PersonalRecordsD
   if (!biggestComeback && !longestWin && !bestWinVsHigherRated) return null;
 
   return (
-    <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
+    <section className="border-y border-white/10 py-5">
       <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-300/80">Personal records</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {biggestComeback && (

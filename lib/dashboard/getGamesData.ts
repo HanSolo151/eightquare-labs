@@ -24,6 +24,11 @@ export interface DashboardGame {
   rated: boolean;
   createdAt: Date | null;
   moveCount: number;
+  moves?: string[];
+  clocks?: number[] | null;
+  clockInitialSec?: number | null;
+  clockIncrementSec?: number | null;
+  evaluationDepth16?: boolean;
   evaluated: boolean;
   flags: DashboardGameFlag[];
 }
@@ -41,7 +46,8 @@ export interface DashboardGamesData {
 export async function getGamesData(
   userId: string,
   requestedPage = 1,
-  filter?: { openingEco?: string; severity?: "low" | "medium" | "high"; phase?: "opening" | "middlegame" | "endgame"; gameIds?: string[] }
+  filter?: { openingEco?: string; severity?: "low" | "medium" | "high"; phase?: "opening" | "middlegame" | "endgame"; gameIds?: string[] },
+  includeMoves = false,
 ): Promise<DashboardGamesData> {
   const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
   const where = {
@@ -80,7 +86,10 @@ export async function getGamesData(
       rated: true,
       lichessCreatedAt: true,
       moves: true,
-      eval: { select: { gameId: true } },
+      clocks: true,
+      clockInitialSec: true,
+      clockIncrementSec: true,
+      eval: { select: { gameId: true, engineVersion: true, points: true } },
       flags: {
         orderBy: { ply: "asc" },
         select: { ply: true, san: true, flagType: true, severity: true, cpLoss: true },
@@ -102,6 +111,27 @@ export async function getGamesData(
     rated: row.rated,
     createdAt: row.lichessCreatedAt,
     moveCount: Array.isArray(row.moves) ? row.moves.length : 0,
+    ...(includeMoves
+      ? {
+          moves: Array.isArray(row.moves) ? row.moves.filter((move): move is string => typeof move === "string") : [],
+          clocks: Array.isArray(row.clocks) && row.clocks.every((clock) => typeof clock === "number" && Number.isFinite(clock))
+            ? row.clocks as number[]
+            : null,
+          clockInitialSec: row.clockInitialSec,
+          clockIncrementSec: row.clockIncrementSec,
+          evaluationDepth16: row.eval?.engineVersion === "stockfish-19-lite-single-depth16-target-v3" &&
+            Array.isArray(row.eval.points) &&
+            row.eval.points.length === (Array.isArray(row.moves) ? row.moves.length : -1) &&
+            row.eval.points.every((point) =>
+              typeof point === "object" &&
+              point !== null &&
+              !Array.isArray(point) &&
+              "depth" in point &&
+              typeof point.depth === "number" &&
+              Number.isFinite(point.depth) &&
+              point.depth >= 16),
+        }
+      : {}),
     evaluated: row.eval !== null,
     flags: row.flags,
   }));

@@ -92,8 +92,16 @@ function SquareDetails({ square, flagOnly }: { square: SquareView; flagOnly: boo
   </div>;
 }
 
-export default function BlindSpotHeatmap({ data }: { data: BiasData }) {
-  const [theme, setTheme] = useState<HeatmapTheme>("blunderDensity");
+export default function BlindSpotHeatmap({
+  data,
+  initialTheme = "blunderDensity",
+  showThemeControls = true,
+}: {
+  data: BiasData;
+  initialTheme?: HeatmapTheme;
+  showThemeControls?: boolean;
+}) {
+  const [theme, setTheme] = useState<HeatmapTheme>(initialTheme);
   const [hovered, setHovered] = useState<SquareView | null>(null);
   const [selectedSquareName, setSelectedSquareName] = useState<string | null>(null);
   const visibleThemes = THEMES.filter((item) => (data.availableThemes ?? THEMES.map((entry) => entry.id)).includes(item.id));
@@ -116,7 +124,7 @@ export default function BlindSpotHeatmap({ data }: { data: BiasData }) {
   }
 
   return <div>
-    {visibleThemes.length > 1 && <div role="group" aria-label="Heatmap view" className="mb-5 inline-flex gap-1 rounded-lg border border-white/10 bg-black/30 p-1 text-xs">
+    {showThemeControls && visibleThemes.length > 1 && <div role="group" aria-label="Heatmap view" className="mb-5 inline-flex gap-1 rounded-lg border border-white/10 bg-black/30 p-1 text-xs">
       {visibleThemes.map((item) => <button key={item.id} type="button" onClick={() => { setTheme(item.id); setHovered(null); setSelectedSquareName(null); }} aria-pressed={activeTheme === item.id}
         className={`rounded px-3 py-2 transition ${activeTheme === item.id ? "bg-white/10 text-white" : "text-neutral-400 hover:text-white"}`}>{item.label}</button>)}
     </div>}

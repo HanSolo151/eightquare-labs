@@ -69,26 +69,29 @@ export function SyncPanel({ initialTotalGames }: SyncPanelProps) {
   }
 
   return (
-    <section id="game-sync" className="mt-8 max-w-xl space-y-3 rounded border border-neutral-700 p-5">
-      <h2 className="text-sm">Lichess game sync</h2>
-      <p className="text-sm text-neutral-300">
-        {busy ? `Syncing batch ${batchNumber} of 5 · ${synced} new games so far` : `${synced} new games synced · ${totalGames} games stored`}
-      </p>
-      {busy && <p className="text-xs text-neutral-400" role="status">Saving each batch as it arrives; you can keep using the page.</p>}
-      {!busy && historyBackfillComplete && totalGames > 0 && <p className="text-xs text-neutral-500">Recent game history is up to date.</p>}
-      {skipped && <p className="text-xs text-neutral-400">Sync skipped; the account was synced recently.</p>}
-      <p className="text-xs text-neutral-400">
-        Last sync: {lastSyncedAt ? new Date(lastSyncedAt).toLocaleString() : "never"}
-      </p>
-      {error && <p className="text-sm text-red-400">{error}</p>}
-      <button
-        type="button"
-        onClick={() => void syncNow()}
-        disabled={busy}
-        className="rounded border border-white px-3 py-2 text-sm hover:bg-white hover:text-black disabled:opacity-50"
-      >
-        {busy ? "Syncing…" : "Sync now"}
-      </button>
+    <section id="game-sync" className="space-y-2 border-y border-white/10 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-neutral-400">
+          {busy
+            ? `Syncing batch ${batchNumber} of 5 · ${synced} new`
+            : skipped
+              ? "Your archive was synced recently."
+              : historyBackfillComplete && totalGames > 0
+                ? `${totalGames.toLocaleString()} games in your archive · up to date`
+                : `${totalGames.toLocaleString()} games in your archive`}
+        </p>
+        <button
+          type="button"
+          onClick={() => void syncNow()}
+          disabled={busy}
+          className="shrink-0 rounded px-2 py-1 text-xs text-emerald-200 transition hover:bg-emerald-300/10 hover:text-white disabled:cursor-wait disabled:opacity-50"
+        >
+          {busy ? "Syncing…" : "Sync Lichess"}
+        </button>
+      </div>
+      {busy && <p className="text-[11px] text-neutral-500" role="status">Saving each batch as it arrives; you can keep using the page.</p>}
+      {error && <p className="text-xs text-red-300" role="alert">{error}</p>}
+      {!busy && lastSyncedAt && <p className="text-[10px] text-neutral-600">Last synced {new Date(lastSyncedAt).toLocaleString()}</p>}
     </section>
   );
 }

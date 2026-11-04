@@ -276,7 +276,9 @@ export default function GhostReplay({ moment, nearMisses }: { moment: GhostMomen
       const maiaMove = lineFromUci(currentFen, maia?.uci ?? null);
       const issues = [
         stockfishResult.status === "rejected" ? "Stockfish unavailable" : null,
-        maiaResult.status === "rejected" ? "Maia unavailable" : null,
+        maiaResult.status === "rejected"
+          ? `Maia unavailable: ${maiaResult.reason instanceof Error ? maiaResult.reason.message : String(maiaResult.reason)}`
+          : null,
       ].filter(Boolean).join("; ");
       const positionFens = [playedFen, sfMove?.fen ?? null, maiaMove?.fen ?? null];
       const positionEvals = await Promise.allSettled([
