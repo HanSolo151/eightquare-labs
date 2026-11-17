@@ -5,7 +5,7 @@ export default function ComebackIndex({ data }: { data: ComebackIndexData }) {
   const pct = Math.round(data.comebackShare * 100);
 
   return (
-    <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
+    <section className="border-l border-emerald-300/30 py-1 pl-4">
       <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-300/80">Comeback index</p>
       <h2 className="mt-2 text-lg font-medium">{pct}% of your evaluated wins were comebacks</h2>
       <p className="mt-1 text-xs leading-5 text-neutral-400">

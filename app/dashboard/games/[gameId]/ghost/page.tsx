@@ -36,7 +36,7 @@ async function GhostReplayPageContent({ params, searchParams }: GhostReplayPageP
     <header className="border-b border-white/10 pb-6">
       <p className="text-xs uppercase tracking-[0.25em] text-emerald-300">Ghost replay</p>
       <h1 className="mt-3 text-2xl font-semibold sm:text-3xl">The moment it went wrong</h1>
-      <p className="mt-2 text-sm text-neutral-400">Move {Math.floor(moment.ply / 2) + 1}, vs {moment.opponentUsername} · {Math.round(moment.cpLoss)} cp loss</p>
+      <p className="mt-2 text-sm text-neutral-400">Move {Math.floor(moment.ply / 2) + 1}, vs {moment.opponentUsername} · {moment.cpLoss === null ? "forced-mate evaluation" : `${Math.round(moment.cpLoss)} cp loss`}</p>
     </header>
     <GhostReplay key={`${moment.gameId}:${moment.ply}`} moment={moment} nearMisses={nearMisses} />
   </div>;

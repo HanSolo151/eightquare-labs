@@ -127,7 +127,7 @@ export interface OpeningTree {
 
 export interface CausalityVerdict {
   heldToEnd: boolean;        // candidate loss was not recovered near its pre-move evaluation before game end
-  worstFollowingCpLoss: number; // lowest player-perspective evaluation observed after the candidate
+  worstFollowingCpLoss: number | null; // null when mate scores prevent a real cp-only value
   recoveredAtPly: number | null; // if it DID recover, where
   plyChecked: number;        // how far forward the check walked (may be < game end if game ended early)
 }
@@ -169,7 +169,9 @@ export interface FlaggedMove {
   clockRemainingSec: number;
   gamePhase: MoveFeature["gamePhase"];
 
-  cpLoss: number;                 // mover-perspective evaluation swing; mate scores use a synthetic scale
+  cpLoss: number | null;          // null when the evaluation is represented by mate scores
+  mateBefore: number | null;      // signed from the mover's perspective
+  mateAfter: number | null;       // signed from the mover's perspective
   causality: CausalityVerdict;
   matchedWeaknessId: string | null; // set only for pattern_repeat
   styleDeviationScore: number;     // 0-1, how far this move sits from the player's OWN baseline
@@ -178,12 +180,11 @@ export interface FlaggedMove {
   // Stored severity bucket. UI components (VerdictCard etc.) branch on this
   // string today — keep it a plain "low"|"medium"|"high", don't restructure.
   severity: "low" | "medium" | "high";
-  // Inspectable inputs behind `severity`. Phase 1 adds the field; Phase 2's
-  // multi-factor formula is what actually populates patternMatchBonus/rushBonus/
-  // tiltBonus with non-zero values. Until then this just mirrors cpLoss so the
-  // shape is already in place for Phase 2 to write into.
+  // Inspectable inputs behind `severity`. Mate-backed flags use the explicit
+  // mateTransition signal and keep evalLoss at zero rather than inventing cp.
   severityBreakdown: {
     evalLoss: number;
+    mateTransition: boolean;
     patternMatchBonus: number;
     rushBonus: number;
     tiltBonus: number;
@@ -196,9 +197,8 @@ export interface FlaggedMove {
   // null for every flag that isn't flagType "tilt_cascade").
   cascadeMeta: { sequenceLength: number; depthCp: number; startPly: number } | null;
 
-  // How much to trust the evaluation backing this flag. Mate-backed losses
-  // use a synthetic mate-distance scale; searches below depth 10 are marked
-  // degraded. Partial games are rejected before flagging.
+  // How much to trust the evaluation backing this flag. Searches below depth
+  // 16 are marked degraded. Partial games are rejected before flagging.
   evalConfidence: "full" | "mate_only" | "degraded" | "degraded_mate_only";
 
   explanation: string;            // human-readable, built from the above (feeds VerdictCard)

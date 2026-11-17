@@ -16,7 +16,7 @@ export default function PatternsByOpening({ openings }: { openings: OpeningRow[]
             <li key={opening.eco ?? opening.name} className="flex flex-wrap items-center gap-x-5 gap-y-2 py-4">
               <div className="min-w-56 flex-1">
                 {opening.eco
-                  ? <Link className="text-sm text-neutral-100 transition-colors duration-150 hover:text-white" href={`/dashboard/openings/${encodeURIComponent(opening.eco)}`}>{opening.name}</Link>
+                  ? <Link className="text-sm text-neutral-100 transition-colors duration-150 hover:text-white" href={`/dashboard/practice/openings/${encodeURIComponent(opening.eco)}`}>{opening.name}</Link>
                   : <p className="text-sm text-neutral-100">{opening.name}</p>}
                 <p className="mt-1 text-xs text-neutral-500">{opening.eco ?? "ECO unavailable"} · {opening.gamesPlayed} games</p>
               </div>

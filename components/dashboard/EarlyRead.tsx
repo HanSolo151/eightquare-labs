@@ -1,7 +1,9 @@
+import ClaimCard from "@/components/dashboard/ClaimCard";
+
 type ObservedFlag = {
   gameId: string;
   phase: string | null;
-  cpLoss: number;
+  cpLoss: number | null;
 };
 
 const PHASE_ORDER = ["opening", "middlegame", "endgame"] as const;
@@ -13,14 +15,14 @@ export default function EarlyRead({ flags, evaluatedGames, totalGames }: {
   totalGames: number;
 }) {
   const phaseRows = PHASE_ORDER.map((phase) => {
-    const rows = flags.filter((flag) => flag.phase === phase && Number.isFinite(flag.cpLoss));
-    const avgCp = rows.length ? Math.round(rows.reduce((sum, row) => sum + row.cpLoss, 0) / rows.length) : 0;
+    const rows = flags.filter((flag) => flag.phase === phase && flag.cpLoss !== null && Number.isFinite(flag.cpLoss));
+    const avgCp = rows.length ? Math.round(rows.reduce((sum, row) => sum + (row.cpLoss ?? 0), 0) / rows.length) : 0;
     return { phase, rows, avgCp, gameCount: new Set(rows.map((row) => row.gameId)).size };
   }).filter((row) => row.rows.length > 0).sort((a, b) => b.avgCp - a.avgCp);
   const leading = phaseRows[0];
   const recurring = leading ? leading.gameCount >= 3 : false;
 
-  return <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
+  return <section className="border-y border-white/10 py-5">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-300/80">Early read · from saved analysis</p>
@@ -33,24 +35,15 @@ export default function EarlyRead({ flags, evaluatedGames, totalGames }: {
     </div>
 
     {leading ? <>
-      <div className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-3">
-        <article className="rounded-lg border border-white/10 bg-white/[0.025] p-4">
-          <p className="text-[10px] uppercase tracking-widest text-neutral-500">Largest average flagged drop</p>
-          <p className="mt-2 text-xl font-medium capitalize">{leading.phase}</p>
-          <p className="mt-1 text-xs text-neutral-400">{leading.avgCp} cp across {leading.rows.length} flagged {leading.rows.length === 1 ? "move" : "moves"}</p>
-        </article>
-        <article className="rounded-lg border border-white/10 bg-white/[0.025] p-4">
-          <p className="text-[10px] uppercase tracking-widest text-neutral-500">Coverage</p>
-          <p className="mt-2 text-xl font-medium">{evaluatedGames} <span className="text-sm font-normal text-neutral-400">/ {totalGames}</span></p>
-          <p className="mt-1 text-xs text-neutral-400">games evaluated / synced</p>
-        </article>
-        <article className="rounded-lg border border-white/10 bg-white/[0.025] p-4">
-          <p className="text-[10px] uppercase tracking-widest text-neutral-500">Evidence spread</p>
-          <p className="mt-2 text-xl font-medium">{leading.gameCount} {leading.gameCount === 1 ? "game" : "games"}</p>
-          <p className="mt-1 text-xs text-neutral-400">with a flagged drop in this phase</p>
-        </article>
+      <div className="mt-4 grid gap-5 sm:grid-cols-2">
+        <ClaimCard
+          stat={`${leading.avgCp} cp`}
+          claim={`Your largest average flagged drops are in the ${leading.phase}.`}
+          context={`${leading.rows.length} moves across ${leading.gameCount} ${leading.gameCount === 1 ? "game" : "games"}.`}
+        />
+        <ClaimCard stat={`${evaluatedGames}/${totalGames}`} claim="Games with saved evaluations." context="Coverage may change as more games are analyzed." />
       </div>
-      <p className="mt-4 text-xs leading-5 text-neutral-500">
+      <p className="mt-2 text-xs leading-5 text-neutral-500">
         {recurring
           ? `This phase has appeared in ${leading.gameCount} different games. Treat it as a recurring area to review, not a complete verdict on your play.`
           : `So far this is based on ${leading.gameCount} ${leading.gameCount === 1 ? "game" : "games"}. More evaluated games may change which phase stands out.`}

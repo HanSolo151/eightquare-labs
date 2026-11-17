@@ -19,8 +19,9 @@ export async function GET(request: Request) {
 
   const rawPage = new URL(request.url).searchParams.get("page");
   const page = rawPage && /^\d+$/.test(rawPage) ? Number.parseInt(rawPage, 10) : 1;
+  const includeMoves = new URL(request.url).searchParams.get("includeMoves") === "true";
   try {
-    return NextResponse.json(await getGamesData(userId, page));
+    return NextResponse.json(await getGamesData(userId, page, undefined, includeMoves));
   } catch (err) {
     console.error("DB read failed in /api/dashboard/games:", err);
     return NextResponse.json({ error: "games data unavailable" }, { status: 500 });

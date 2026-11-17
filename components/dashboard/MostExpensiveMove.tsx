@@ -9,7 +9,7 @@ export default function MostExpensiveMove({ move }: { move: MostExpensiveMoveDat
     : null;
 
   return (
-    <section className="rounded-xl border border-white/10 bg-black/35 p-5 sm:p-6">
+    <section className="border-b border-white/10 pb-5">
       <p className="text-[10px] uppercase tracking-[0.2em] text-amber-300/80">Largest recorded evaluation drop</p>
       <h2 className="mt-2 text-lg font-medium">
         {date ? `${date} · ` : ""}vs {move.opponentUsername}, move {move.moveNumber}

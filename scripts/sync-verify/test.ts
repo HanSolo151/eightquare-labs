@@ -205,7 +205,7 @@ async function scenarioSequentialHistoryBatches() {
   __reset();
   __resetSpy();
   __seedUser({ id: "u6", username: "maverick151", lastSyncedAt: null, lastGameCreatedAt: null, historyBackfillComplete: false });
-  __setNextBatch(Array.from({ length: 500 }, (_, index) => ratedWin(`history-${index + 1}`, 5000 - index)));
+  __setNextBatch(Array.from({ length: 600 }, (_, index) => ratedWin(`history-${index + 1}`, 5000 - index)));
 
   let result = await runSync("u6", { force: true });
   check("first batch stores 100 and reports more history", result.ok && result.synced === 100 && !result.historyBackfillComplete, JSON.stringify(result));
@@ -214,14 +214,14 @@ async function scenarioSequentialHistoryBatches() {
 
   // Simulate the page closing after batch one; the next page visit resumes
   // from the oldest stored timestamp and completes the remaining batches.
-  for (let visitBatch = 0; visitBatch < 5 && result.ok && !result.historyBackfillComplete; visitBatch++) {
+  for (let visitBatch = 0; visitBatch < 6 && result.ok && !result.historyBackfillComplete; visitBatch++) {
     result = await runSync("u6", { force: true, skipIncremental: true });
   }
-  check("history completes at 500 stored games", result.ok && result.historyBackfillComplete && result.totalGames === 500, JSON.stringify(result));
+  check("history completes beyond 500 stored games", result.ok && result.historyBackfillComplete && result.totalGames === 600, JSON.stringify(result));
   const historyCalls = fetchGamesCallLog.filter((call) => call.since === undefined);
-  check("all five history batches were requested sequentially", historyCalls.length === 5, `got ${historyCalls.length}`);
-  check("follow-up batches avoid redundant incremental requests", fetchGamesCallCount === 5, `got ${fetchGamesCallCount}`);
-  check("stored history spans newest through oldest game", JSON.stringify(__gameCreatedAtRange("u6")) === JSON.stringify({ oldest: 4501, newest: 5000 }), JSON.stringify(__gameCreatedAtRange("u6")));
+  check("six full history batches and the terminal request were sequential", historyCalls.length === 7, `got ${historyCalls.length}`);
+  check("follow-up batches avoid redundant incremental requests", fetchGamesCallCount === 7, `got ${fetchGamesCallCount}`);
+  check("stored history spans newest through oldest game", JSON.stringify(__gameCreatedAtRange("u6")) === JSON.stringify({ oldest: 4401, newest: 5000 }), JSON.stringify(__gameCreatedAtRange("u6")));
   check("history requests remain within 100 games", historyCalls.every((call) => call.max === 100), JSON.stringify(historyCalls.map((call) => call.max)));
 }
 

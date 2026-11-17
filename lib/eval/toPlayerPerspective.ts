@@ -1,4 +1,4 @@
-/** Shared centipawn equivalent used when Stockfish reports a forced mate. */
+/** Internal comparison anchor for mate-aware causality; never a displayed or persisted cp score. */
 export const MATE_EQUIVALENT_CP = 10_000;
 
 /** Convert an EvalPoint score from the mover's POV to the account player's POV. */

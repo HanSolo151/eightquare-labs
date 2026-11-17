@@ -15,11 +15,20 @@ export type LichessRawGame = Record<string, unknown>;
  * Docs: https://lichess.org/api#tag/Games/operation/apiGamesUser
  */
 export class LichessFetchError extends Error {
+  public readonly isCloudflareChallenge: boolean;
+
   constructor(
     public readonly status: number,
-    statusText: string
+    statusText: string,
+    responseBody?: string
   ) {
-    super(`Lichess fetch failed: ${status} ${statusText}`);
+    const isCloudflareChallenge =
+      status === 403 &&
+      /<title>\s*just a moment|cf-chl-|cloudflare/i.test(responseBody ?? "");
+    super(isCloudflareChallenge
+      ? "Lichess is temporarily blocking API requests from this network (Cloudflare 403). Wait and try again later."
+      : `Lichess fetch failed: ${status} ${statusText}`);
+    this.isCloudflareChallenge = isCloudflareChallenge;
     this.name = "LichessFetchError";
   }
 
@@ -84,7 +93,12 @@ async function fetchGamesRequest(opts: FetchGamesOptions): Promise<LichessRawGam
   }
 
   if (!res || !res.ok) {
-    throw new LichessFetchError(res?.status ?? 0, res?.statusText ?? "No response");
+    const responseBody = res ? await res.text() : undefined;
+    throw new LichessFetchError(
+      res?.status ?? 0,
+      res?.statusText ?? "No response",
+      responseBody
+    );
   }
   if (!res.body) {
     throw new Error("Lichess response had no body (streaming not supported)");

@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
         }
 
         flagged = flagRows
-          .filter((f) => f.cpLoss < 100 || f.cpLoss >= 150 ||
+          .filter((f) => f.cpLoss === null || f.cpLoss < 100 || f.cpLoss >= 150 ||
             hasConfirmedLowTierDepth(f.game.eval?.points, f.ply))
           .map((f) => ({
           gameId: f.game.lichessGameId,
@@ -99,6 +99,8 @@ export async function GET(req: NextRequest) {
           clockRemainingSec: f.clockRemainingSec,
           gamePhase: f.gamePhase as FlaggedMove["gamePhase"],
           cpLoss: f.cpLoss,
+          mateBefore: f.mateBefore,
+          mateAfter: f.mateAfter,
           causality: f.causality as unknown as FlaggedMove["causality"],
           matchedWeaknessId: f.matchedWeaknessId,
           styleDeviationScore: f.styleDeviationScore,

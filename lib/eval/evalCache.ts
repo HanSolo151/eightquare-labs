@@ -1,6 +1,6 @@
 import type { GameEval, EvalPoint } from "@/types";
 import { evalFen, type EvalResult } from "./stockfishEngine";
-import { evaluateMoveSequenceWith } from "./moveSequence";
+import { evaluateMoveSequenceWith, normalizeEvalPoint as normalizeSequencePoint } from "./moveSequence";
 
 // Phase 2e: SEARCH_DEPTH in stockfishEngine.ts bumped 14 -> 16, so this must
 // change too to invalidate every depth-14 cached eval (same cache-busting
@@ -109,15 +109,7 @@ export function inspectGameEval(gameEval: GameEval, expectedPlyCount: number): E
 
 /** Convert two raw UCI scores into the mover's POV; score values are centipawns. */
 export function normalizeEvalPoint(ply: number, before: EvalResult, after: EvalResult): EvalPoint {
-  return {
-    ply,
-    cpBefore: before.cp,
-    cpAfter: after.cp !== null ? -after.cp : null,
-    mateBefore: before.mate,
-    mateAfter: after.mate !== null ? -after.mate : null,
-    depth: Math.min(before.depth, after.depth),
-    bestMoveUci: before.bestMoveUci,
-  };
+  return normalizeSequencePoint(ply, before, after);
 }
 
 /** Evaluate the initial position and each successive move position exactly once. */

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { PatternProgressDelta } from "@/lib/dashboard/getSignatureSignals";
+import ClaimCard from "@/components/dashboard/ClaimCard";
 
 const TREND_STYLE = {
   improving: "text-emerald-200",
@@ -43,10 +44,12 @@ function PhaseEvidence({ item, featured = false }: { item: PatternProgressDelta;
 
   return <div className={featured ? "" : "pt-2"}>
     {featured ? <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-100">{title}</h3> : <h3 className="text-sm font-medium text-neutral-100">{phaseLabel(item.phase)} moments</h3>}
-    <p className={`${featured ? "mt-3 text-base" : "mt-2 text-sm"} leading-6 text-neutral-200`}>
-      Average flagged drop: <strong className="font-semibold text-white">{lossInPawns(item.beforeAvgCp)}</strong>
-      <span className="ml-2 text-xs text-neutral-500">{item.beforeCount} moments across {item.beforeGameCount} {item.beforeGameCount === 1 ? "game" : "games"}</span>
-    </p>
+    {featured
+      ? <div className="mt-3"><ClaimCard stat={lossInPawns(item.beforeAvgCp)} claim={`${title}.`} context={`Average flagged drop across ${item.beforeCount} moments in ${item.beforeGameCount} ${item.beforeGameCount === 1 ? "game" : "games"}.`} /></div>
+      : <p className="mt-2 text-sm leading-6 text-neutral-200">
+        Average flagged drop: <strong className="font-semibold text-white">{lossInPawns(item.beforeAvgCp)}</strong>
+        <span className="ml-2 text-xs text-neutral-500">{item.beforeCount} moments across {item.beforeGameCount} {item.beforeGameCount === 1 ? "game" : "games"}</span>
+      </p>}
     {item.trend === "baseline" || item.trend === "untrained" ? <p className="mt-1 text-xs text-neutral-400">{item.trend === "baseline" ? "Your baseline is set. We’ll compare the next similar flagged moment." : "Practice a position below to set your baseline for future games."}</p> : <p className={`mt-1 text-xs ${TREND_STYLE[item.trend]}`}>
       Since practice, average flagged drops are {cpChange > 0 ? `down ${lossInPawns(cpChange)}` : cpChange < 0 ? `up ${lossInPawns(Math.abs(cpChange))}` : "about the same"} across {item.afterCount} later {item.afterCount === 1 ? "moment" : "moments"}.
     </p>}
@@ -75,12 +78,12 @@ export default function PatternProgress({ items }: { items: PatternProgressDelta
   const ranked = [...items].sort((a, b) => b.beforeAvgCp - a.beforeAvgCp);
   const [featured, ...secondary] = ranked;
 
-  return <section className="rounded-xl border border-white/10 bg-black/35 px-5 py-6 sm:px-6 sm:py-8">
+  return <section className="border-y border-white/10 py-5">
     <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-300/80">After spar practice</p>
     <h2 className="mt-2 text-lg font-medium">Pattern progress</h2>
     <p className="mt-1 text-xs leading-5 text-neutral-500">Review the games behind your biggest recurring mistakes, then practice from the exact position.</p>
     {featured ? <div className="mt-5">
-      <article className="rounded-xl border border-amber-200/15 bg-amber-200/[0.035] p-4 sm:p-5">
+      <article className="border-l border-amber-200/30 pl-4">
         <PhaseEvidence item={featured} featured />
       </article>
       {secondary.length > 0 && <div className="mt-3 divide-y divide-white/10 border-t border-white/10">

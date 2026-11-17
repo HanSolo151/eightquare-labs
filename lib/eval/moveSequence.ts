@@ -7,6 +7,22 @@ export interface EvalSequenceCheckpoint {
   evalBefore: EvalResult;
 }
 
+export function normalizeEvalPoint(ply: number, before: EvalResult, after: EvalResult): EvalPoint {
+  const isTerminalAfterMove = after.depth === 0 &&
+    after.bestMoveUci === null &&
+    ((after.cp === 0 && after.mate === null) || (after.cp === null && after.mate === 0));
+
+  return {
+    ply,
+    cpBefore: before.cp,
+    cpAfter: after.cp !== null ? -after.cp : null,
+    mateBefore: before.mate,
+    mateAfter: after.mate !== null ? -after.mate : null,
+    depth: isTerminalAfterMove ? before.depth : Math.min(before.depth, after.depth),
+    bestMoveUci: before.bestMoveUci,
+  };
+}
+
 /** Pure SAN/evaluation sequence shared by browser and server Stockfish callers. */
 export async function evaluateMoveSequenceWith(
   moves: string[],
@@ -26,15 +42,7 @@ export async function evaluateMoveSequenceWith(
     const move = chess.move(moves[ply]);
     if (!move) throw new Error(`Invalid SAN "${moves[ply]}" at ply ${ply}`);
     const evalAfter = await evaluatePosition(chess.fen());
-    points.push({
-      ply,
-      cpBefore: evalBefore.cp,
-      cpAfter: evalAfter.cp !== null ? -evalAfter.cp : null,
-      mateBefore: evalBefore.mate,
-      mateAfter: evalAfter.mate !== null ? -evalAfter.mate : null,
-      depth: Math.min(evalBefore.depth, evalAfter.depth),
-      bestMoveUci: evalBefore.bestMoveUci,
-    });
+    points.push(normalizeEvalPoint(ply, evalBefore, evalAfter));
     evalBefore = evalAfter;
     await onPlyComplete?.(points, evalBefore);
   }

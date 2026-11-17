@@ -22,7 +22,7 @@ export default function OpeningGambit({ openings }: { openings: OpeningRow[] }) 
       </p>
       {best.eco && (
         <Link
-          href={`/dashboard/openings/${encodeURIComponent(best.eco)}`}
+          href={`/dashboard/practice/openings/${encodeURIComponent(best.eco)}`}
           className="mt-4 inline-block rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-neutral-300 hover:border-sky-300/30 hover:text-sky-200"
         >
           See the games

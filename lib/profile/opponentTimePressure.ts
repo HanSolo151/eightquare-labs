@@ -54,7 +54,7 @@ export async function buildOpponentTimePressureProfile(
         const timeRatio = move.timeSpentSec / phaseAvg;
         const bucket = profile.byPhase[move.gamePhase];
         bucket.sampleSize++;
-        if (timeRatio < TIME_RATIO_COLLAPSE_THRESHOLD && resolved.cpLoss >= MIN_CP_LOSS) bucket.collapseCount++;
+        if (timeRatio < TIME_RATIO_COLLAPSE_THRESHOLD && resolved.cpLoss !== null && resolved.cpLoss >= MIN_CP_LOSS) bucket.collapseCount++;
       }
       profile.evaluatedGameIds.push(game.id);
     } catch (err) {

@@ -72,8 +72,9 @@ export async function getOpeningDrilldown(userId: string, eco: string): Promise<
       }
       entry.occurrences++;
       const moveFlags = flagsByPly.get(ply) ?? [];
-      if (moveFlags.length) {
-        const cpLoss = Math.max(...moveFlags.map((flag) => flag.cpLoss));
+      const cpFlags = moveFlags.filter((flag) => flag.cpLoss !== null);
+      if (cpFlags.length) {
+        const cpLoss = Math.max(...cpFlags.map((flag) => flag.cpLoss ?? 0));
         entry.flaggedPositions.set(`${game.id}:${ply}`, { gameId: game.id, ply, cpLoss, fenBefore });
       }
     }

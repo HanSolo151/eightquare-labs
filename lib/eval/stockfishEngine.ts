@@ -231,7 +231,13 @@ async function runEvaluation(slot: EngineSlot, fen: string): Promise<EvalResult>
       const line: string = e.data;
       if (line.startsWith("bestmove")) {
         const bestMoveMatch = line.match(/^bestmove (\S+)/);
-        best = { ...best, bestMoveUci: bestMoveMatch ? bestMoveMatch[1] : null };
+        const bestMoveUci = bestMoveMatch?.[1];
+        best = {
+          ...best,
+          bestMoveUci: bestMoveUci && bestMoveUci !== "(none)" && bestMoveUci !== "0000"
+            ? bestMoveUci
+            : null,
+        };
         cleanup();
         resolve(best);
         return;

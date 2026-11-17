@@ -14,7 +14,7 @@ export default function PatternsGameLog({ data, openings, selectedOpening, selec
         <h2 className="text-xl font-medium">Game log</h2>
         <p className="mt-1 text-sm text-neutral-400">Saved games and their persisted analysis. Newest games first.</p>
       </div>
-      <form action="/dashboard/patterns" className="flex flex-wrap items-end gap-3 rounded-xl bg-[#17161A] p-4">
+      <form action="/dashboard/signature/patterns" className="flex flex-wrap items-end gap-3 rounded-xl bg-[#17161A] p-4">
         <label className="grid gap-1 text-xs text-neutral-400">Opening
           <select name="opening" defaultValue={selectedOpening ?? ""} className="min-w-44 rounded-md border border-white/10 bg-[#0D0C0E] px-3 py-2 text-sm text-neutral-200">
             <option value="">All openings</option>
@@ -27,7 +27,7 @@ export default function PatternsGameLog({ data, openings, selectedOpening, selec
           </select>
         </label>
         <button type="submit" className="rounded-md bg-white/10 px-4 py-2 text-sm text-neutral-200 transition-colors duration-150 hover:bg-white/15">Filter</button>
-        {(selectedOpening || selectedSeverity) && <Link href="/dashboard/patterns" className="px-2 py-2 text-sm text-neutral-400 transition-colors duration-150 hover:text-white">Clear</Link>}
+        {(selectedOpening || selectedSeverity) && <Link href="/dashboard/signature/patterns" className="px-2 py-2 text-sm text-neutral-400 transition-colors duration-150 hover:text-white">Clear</Link>}
       </form>
 
       {data.games.length === 0 ? (
@@ -61,5 +61,5 @@ function pageHref(page: number, opening?: string, severity?: string) {
   const params = new URLSearchParams({ page: String(page) });
   if (opening) params.set("opening", opening);
   if (severity) params.set("severity", severity);
-  return `/dashboard/patterns?${params.toString()}`;
+  return `/dashboard/signature/patterns?${params.toString()}`;
 }

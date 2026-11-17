@@ -39,7 +39,8 @@ export async function getOpponentSquareBias(userId: string, opponentUsername: st
       };
       // Each source ply contributes once even when multiple flag types overlap.
       square.flaggedCount++;
-      square.totalCpLoss += Math.max(...flags.map((flag) => flag.cpLoss));
+      const cpLosses = flags.flatMap((flag) => flag.cpLoss === null ? [] : [flag.cpLoss]);
+      square.totalCpLoss += cpLosses.length ? Math.max(...cpLosses) : 0;
       for (const flag of flags) square.flagTypeCounts[flag.flagType] = (square.flagTypeCounts[flag.flagType] ?? 0) + 1;
       sampleSize++;
     }

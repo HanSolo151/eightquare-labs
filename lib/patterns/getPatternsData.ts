@@ -46,7 +46,7 @@ export interface PatternsOpening {
 }
 
 export function openingDrilldownHref(eco: string | null): string | null {
-  return eco ? `/dashboard/openings/${encodeURIComponent(eco)}` : null;
+  return eco ? `/dashboard/practice/openings/${encodeURIComponent(eco)}` : null;
 }
 
 export type PatternsHeatmap = Record<GamePhase, Record<Severity, number>>;
@@ -142,7 +142,7 @@ export async function getPatternsData(userId: string): Promise<PatternsData> {
   }
   for (const flag of flags) {
     const name = flag.game.openingName;
-    if (!name) continue;
+    if (!name || flag.cpLoss === null) continue;
     const agg = openingAgg.get(name);
     if (!agg) continue; // shouldn't happen — flag's game wasn't in `games`
     agg.flagCount += 1;

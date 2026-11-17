@@ -81,12 +81,15 @@ function pushBodyValidationError(value: unknown): string | null {
     if (!Number.isInteger(feature.ply)) return `moveFeatures[${index}].ply must be an integer`;
   }
 
-  const numericFlagFields = ["cpLoss", "timeSpentSec", "phaseAvgSec", "timeRatio", "ratio", "clockRemainingSec"] as const;
+  const numericFlagFields = ["timeSpentSec", "phaseAvgSec", "timeRatio", "ratio", "clockRemainingSec"] as const;
   for (let index = 0; index < value.flags.length; index++) {
     const flag = value.flags[index];
     if (!isRecord(flag)) return `flags[${index}] must be an object`;
     if (flag.gameId !== value.gameId) return `flags[${index}].gameId must match gameId`;
     if (!Number.isInteger(flag.ply)) return `flags[${index}].ply must be an integer`;
+    if (!(flag.cpLoss === null || isFiniteNumber(flag.cpLoss))) {
+      return `flags[${index}].cpLoss must be finite or null`;
+    }
     for (const field of numericFlagFields) {
       if (!isFiniteNumber(flag[field])) return `flags[${index}].${field} must be finite`;
     }
@@ -218,6 +221,8 @@ export async function POST(req: NextRequest) {
           clockRemainingSec: f.clockRemainingSec,
           gamePhase: f.gamePhase,
           cpLoss: f.cpLoss,
+          mateBefore: f.mateBefore,
+          mateAfter: f.mateAfter,
           causality: f.causality as unknown as Prisma.InputJsonValue,
           matchedWeaknessId: f.matchedWeaknessId,
           styleDeviationScore: f.styleDeviationScore,

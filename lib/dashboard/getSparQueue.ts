@@ -57,7 +57,7 @@ export async function getSparQueue(userId: string, limit = 8): Promise<SparQueue
   const playerFlags = flags.filter((flag) => flag.color === flag.game.playerColor);
   playerFlags.sort((a, b) =>
     (SEVERITY_RANK[b.severity] ?? 0) - (SEVERITY_RANK[a.severity] ?? 0) ||
-    b.cpLoss - a.cpLoss || a.ply - b.ply
+    (b.cpLoss ?? -1) - (a.cpLoss ?? -1) || a.ply - b.ply
   );
 
   // A single move may carry more than one diagnostic flag. Queue/progress

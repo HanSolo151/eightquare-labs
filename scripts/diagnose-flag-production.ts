@@ -113,7 +113,7 @@ async function main() {
       const loss = point ? resolveCpLoss(point) : null;
       if (!loss) continue;
       stats.resolvableLosses++;
-      if (loss.cpLoss >= 100) stats.lossesAtLeast100Cp++;
+      if (loss.cpLoss !== null && loss.cpLoss >= 100) stats.lossesAtLeast100Cp++;
     }
     const fresh = flagMoves(features, profile, weakness, evaluation, parsed.playerColor);
     stats.recomputedFlags += fresh.length;
@@ -130,7 +130,7 @@ async function main() {
     for (const [id, expected] of freshByKey) {
       const stored = storedByKey.get(id);
       if (!stored) continue;
-      if (Math.round(stored.cpLoss) !== expected.cpLoss || stored.severity !== expected.severity ||
+      if ((stored.cpLoss === null ? null : Math.round(stored.cpLoss)) !== expected.cpLoss || stored.severity !== expected.severity ||
           stored.san !== expected.san || stored.color !== expected.color || stored.evalConfidence !== expected.evalConfidence) {
         stats.fieldMismatches++;
       }
@@ -139,7 +139,7 @@ async function main() {
       stats.bySeverity[flag.severity] = (stats.bySeverity[flag.severity] ?? 0) + 1;
       stats.byType[flag.flagType] = (stats.byType[flag.flagType] ?? 0) + 1;
       stats.byConfidence[flag.evalConfidence] = (stats.byConfidence[flag.evalConfidence] ?? 0) + 1;
-      stats.flagCpLoss.push(flag.cpLoss);
+      if (flag.cpLoss !== null) stats.flagCpLoss.push(flag.cpLoss);
     }
     stats.causalityHeld += fresh.filter((flag) => flag.causality.heldToEnd).length;
   }

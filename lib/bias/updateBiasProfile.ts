@@ -59,7 +59,8 @@ export function foldGameIntoSquareBias(
     const flagsAtPly = flagsByPly.get(ply) ?? [];
     if (flagsAtPly.length > 0) {
       stats.flaggedCount++;
-      stats.totalCpLoss += Math.max(...flagsAtPly.map((flag) => flag.cpLoss));
+      const cpLosses = flagsAtPly.flatMap((flag) => flag.cpLoss === null ? [] : [flag.cpLoss]);
+      stats.totalCpLoss += cpLosses.length ? Math.max(...cpLosses) : 0;
       for (const flag of flagsAtPly) stats.flagTypeCounts[flag.flagType] = (stats.flagTypeCounts[flag.flagType] ?? 0) + 1;
       stats.flaggedPositions?.push({ gameId: flagsAtPly[0]!.gameId, ply });
     }
