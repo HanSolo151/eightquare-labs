@@ -14,7 +14,7 @@ type PersistedFlag = {
   ply: number;
   flagType: string;
   severity: string;
-  cpLoss: number;
+  cpLoss: number | null;
   cascadeMeta: unknown;
 };
 
@@ -56,7 +56,7 @@ function outcomeForFlag(
 
   if (!isCascade(original)) {
     const loss = resolveCpLoss(freshPoints[original.ply]);
-    if (loss && loss.cpLoss < 100) return "fellBelow100cp";
+    if (loss?.cpLoss !== null && loss !== null && loss.cpLoss < 100) return "fellBelow100cp";
   }
   return "noLongerEmitted";
 }

@@ -10,7 +10,9 @@ export interface DailyPuzzle {
   fenBefore: string;
   playerColor: "white" | "black";
   opponentUsername: string;
-  cpLoss: number;
+  cpLoss: number | null;
+  mateBefore: number | null;
+  mateAfter: number | null;
   severity: string;
 }
 
@@ -27,9 +29,9 @@ export async function getDailyPuzzle(userId: string): Promise<DailyPuzzleSnapsho
   const [flags, statesResult, resolvedResult] = await Promise.all([
     prisma.flaggedMove.findMany({
       where: { game: { userId } },
-      orderBy: { cpLoss: "desc" },
+      orderBy: { cpLoss: { sort: "desc", nulls: "first" } },
       select: {
-        ply: true, cpLoss: true, severity: true, color: true,
+        ply: true, cpLoss: true, mateBefore: true, mateAfter: true, severity: true, color: true,
         game: { select: { id: true, moves: true, playerColor: true, opponentUsername: true } },
       },
     }),
@@ -52,7 +54,7 @@ export async function getDailyPuzzle(userId: string): Promise<DailyPuzzleSnapsho
   const states = statesResult.items;
   const resolved = resolvedResult.items;
   const severityRank: Record<string, number> = { high: 3, medium: 2, low: 1 };
-  flags.sort((a, b) => (severityRank[b.severity] ?? 0) - (severityRank[a.severity] ?? 0) || b.cpLoss - a.cpLoss);
+  flags.sort((a, b) => (severityRank[b.severity] ?? 0) - (severityRank[a.severity] ?? 0) || (b.cpLoss ?? -1) - (a.cpLoss ?? -1));
 
   const stateByKey = new Map(states.map((state) => [`${state.gameId}:${state.ply}`, state]));
   const resolvedKeys = new Set(resolved.map((item) => `${item.gameId}:${item.ply}`));
@@ -84,7 +86,8 @@ export async function getDailyPuzzle(userId: string): Promise<DailyPuzzleSnapsho
       puzzle: {
         gameId: game.id, ply: flag.ply, fenBefore: chess.fen(),
         playerColor: game.playerColor === "black" ? "black" : "white",
-        opponentUsername: game.opponentUsername, cpLoss: flag.cpLoss, severity: flag.severity,
+        opponentUsername: game.opponentUsername, cpLoss: flag.cpLoss,
+        mateBefore: flag.mateBefore, mateAfter: flag.mateAfter, severity: flag.severity,
       },
       trackingAvailable: true,
     };

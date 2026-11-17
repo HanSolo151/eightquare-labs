@@ -1,7 +1,9 @@
+import ClaimCard from "@/components/dashboard/ClaimCard";
+
 type ObservedFlag = {
   gameId: string;
   phase: string | null;
-  cpLoss: number;
+  cpLoss: number | null;
 };
 
 const PHASE_ORDER = ["opening", "middlegame", "endgame"] as const;
@@ -13,8 +15,8 @@ export default function EarlyRead({ flags, evaluatedGames, totalGames }: {
   totalGames: number;
 }) {
   const phaseRows = PHASE_ORDER.map((phase) => {
-    const rows = flags.filter((flag) => flag.phase === phase && Number.isFinite(flag.cpLoss));
-    const avgCp = rows.length ? Math.round(rows.reduce((sum, row) => sum + row.cpLoss, 0) / rows.length) : 0;
+    const rows = flags.filter((flag) => flag.phase === phase && flag.cpLoss !== null && Number.isFinite(flag.cpLoss));
+    const avgCp = rows.length ? Math.round(rows.reduce((sum, row) => sum + (row.cpLoss ?? 0), 0) / rows.length) : 0;
     return { phase, rows, avgCp, gameCount: new Set(rows.map((row) => row.gameId)).size };
   }).filter((row) => row.rows.length > 0).sort((a, b) => b.avgCp - a.avgCp);
   const leading = phaseRows[0];
@@ -33,11 +35,14 @@ export default function EarlyRead({ flags, evaluatedGames, totalGames }: {
     </div>
 
     {leading ? <>
-      <p className="mt-4 text-sm leading-6 text-neutral-300">
-        The largest average flagged drops are in the <span className="capitalize text-white">{leading.phase}</span>
-        {" "}({leading.avgCp} cp across {leading.rows.length} moves in {leading.gameCount} {leading.gameCount === 1 ? "game" : "games"}).
-        {" "}<span className="text-neutral-500">Coverage: {evaluatedGames} of {totalGames} games evaluated.</span>
-      </p>
+      <div className="mt-4 grid gap-5 sm:grid-cols-2">
+        <ClaimCard
+          stat={`${leading.avgCp} cp`}
+          claim={`Your largest average flagged drops are in the ${leading.phase}.`}
+          context={`${leading.rows.length} moves across ${leading.gameCount} ${leading.gameCount === 1 ? "game" : "games"}.`}
+        />
+        <ClaimCard stat={`${evaluatedGames}/${totalGames}`} claim="Games with saved evaluations." context="Coverage may change as more games are analyzed." />
+      </div>
       <p className="mt-2 text-xs leading-5 text-neutral-500">
         {recurring
           ? `This phase has appeared in ${leading.gameCount} different games. Treat it as a recurring area to review, not a complete verdict on your play.`

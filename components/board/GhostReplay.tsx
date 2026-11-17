@@ -298,7 +298,7 @@ export default function GhostReplay({ moment, nearMisses }: { moment: GhostMomen
       const stockfishEval = scoreAt(1);
       const maiaEval = scoreAt(2);
       setLines([
-        { label: "You", san: currentSan, fen: playedFen, playerEval: playedEval, detail: `Stockfish after move: ${formatPlayerEval(playedEval)}.${currentPly === moment.ply ? ` Saved analysis recorded ${Math.round(moment.cpLoss)} cp loss.` : ""}`, from: playedMove?.from, to: playedMove?.to },
+        { label: "You", san: currentSan, fen: playedFen, playerEval: playedEval, detail: `Stockfish after move: ${formatPlayerEval(playedEval)}.${currentPly === moment.ply ? ` ${moment.cpLoss === null ? "Saved analysis recorded a forced-mate evaluation change." : `Saved analysis recorded ${Math.round(moment.cpLoss)} cp loss.`}` : ""}`, from: playedMove?.from, to: playedMove?.to },
         { label: "Stockfish", san: sfMove?.san ?? null, fen: sfMove?.fen ?? null, playerEval: stockfishEval, detail: `Stockfish after move: ${formatPlayerEval(stockfishEval)}.`, from: sfMove?.from, to: sfMove?.to },
         { label: `A typical ${maiaRating ?? "unknown"}-rated player`, san: maiaMove?.san ?? null, fen: maiaMove?.fen ?? null, playerEval: maiaEval, detail: maia ? `Base Maia predicts this move; Stockfish after the predicted move: ${formatPlayerEval(maiaEval)}.` : issues || "No legal Maia choice available", from: maiaMove?.from, to: maiaMove?.to },
       ]);
@@ -374,7 +374,13 @@ export default function GhostReplay({ moment, nearMisses }: { moment: GhostMomen
                 <p className="text-xs text-neutral-500">Played move</p>
                 <p className="mt-1 font-mono text-xl">{moment.playedSan}</p>
                 <p className="mt-4 text-xs text-neutral-500">Saved evaluation loss</p>
-                <p className="mt-1 text-2xl font-semibold text-amber-200">{Math.round(moment.cpLoss)} cp</p>
+                <p className="mt-1 text-2xl font-semibold text-amber-200">{moment.cpLoss === null
+                  ? moment.mateAfter !== null && moment.mateAfter < 0
+                    ? `Mate in ${Math.abs(moment.mateAfter)} against you`
+                    : moment.mateBefore !== null && moment.mateBefore > 0
+                      ? `Missed mate in ${moment.mateBefore}`
+                      : "Mate evaluation changed"
+                  : `${Math.round(moment.cpLoss)} cp`}</p>
                 <p className="mt-4 text-xs text-sky-200">Stockfish: {lines?.[1]?.san ?? "Unavailable"}</p>
                 <p className="mt-1 text-xs text-pink-200">Maia: {lines?.[2]?.san ?? "Unavailable"} <span className="text-neutral-500">(behavior prediction)</span></p>
               </div>

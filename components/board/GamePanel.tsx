@@ -605,7 +605,7 @@ export default function GamePanel({
         }
 
         if (cancelled) return;
-        flagged.sort((a, b) => b.cpLoss - a.cpLoss);
+        flagged.sort((a, b) => (b.cpLoss ?? -1) - (a.cpLoss ?? -1));
         setData((current) => {
           if (!current || current.games !== games) return current;
           const updated = { ...current, flagged };
@@ -1029,7 +1029,7 @@ export default function GamePanel({
                 <span className="text-xs text-neutral-500">Move {activeFlag.moveNumber} · {activeFlag.san} · {activeFlag.severity} severity</span>
               </div>
               <p className="mt-2 text-sm leading-5 text-neutral-300">{activeFlag.explanation}</p>
-              <p className="mt-2 text-xs text-neutral-500">{activeFlag.evalConfidence === "mate_only" || activeFlag.evalConfidence === "degraded_mate_only" ? "Forced-mate evaluation change" : `Eval loss: ${(activeFlag.cpLoss / 100).toFixed(1)} pawns`}{activeFlag.evalConfidence === "degraded" || activeFlag.evalConfidence === "degraded_mate_only" ? " · lower-depth estimate; review with caution" : ""}{activeFlag.timeSpentSec > 0 ? ` · played in ${activeFlag.timeSpentSec.toFixed(1)}s` : ""}</p>
+              <p className="mt-2 text-xs text-neutral-500">{activeFlag.cpLoss === null ? "Forced-mate evaluation" : `Eval loss: ${(activeFlag.cpLoss / 100).toFixed(1)} pawns`}{activeFlag.evalConfidence === "degraded" || activeFlag.evalConfidence === "degraded_mate_only" ? " · lower-depth estimate; review with caution" : ""}{activeFlag.timeSpentSec > 0 ? ` · played in ${activeFlag.timeSpentSec.toFixed(1)}s` : ""}</p>
             </div>}
             <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-neutral-400" aria-live="polite">
               {turnMode === null ? <span className="text-neutral-500">Choosing Maia’s move…</span> : (

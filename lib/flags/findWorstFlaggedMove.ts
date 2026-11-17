@@ -22,7 +22,7 @@ export async function findWorstFlaggedMove(gameWhere: Prisma.GameWhereInput): Pr
       id: true, moves: true, playerColor: true, opponentUsername: true,
       opponentRating: true, playerRating: true,
       flags: {
-        where: { severity: "high" },
+        where: { severity: "high", cpLoss: { not: null } },
         orderBy: [{ cpLoss: "desc" }, { ply: "asc" }],
         take: 1,
         select: { ply: true, san: true, cpLoss: true },
@@ -30,8 +30,16 @@ export async function findWorstFlaggedMove(gameWhere: Prisma.GameWhereInput): Pr
     },
   });
 
-  const candidates = games.flatMap((game) => game.flags[0] ? [{ game, flag: game.flags[0] }] : [])
-    .sort((a, b) => b.flag.cpLoss - a.flag.cpLoss || a.flag.ply - b.flag.ply);
+  const candidates: Array<{
+    game: (typeof games)[number];
+    flag: { ply: number; san: string; cpLoss: number };
+  }> = [];
+  for (const game of games) {
+    const flag = game.flags[0];
+    if (flag?.cpLoss === null || !flag) continue;
+    candidates.push({ game, flag: { ply: flag.ply, san: flag.san, cpLoss: flag.cpLoss } });
+  }
+  candidates.sort((a, b) => b.flag.cpLoss - a.flag.cpLoss || a.flag.ply - b.flag.ply);
 
   for (const { game, flag } of candidates) {
     const moves = Array.isArray(game.moves)

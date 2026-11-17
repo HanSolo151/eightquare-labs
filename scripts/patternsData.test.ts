@@ -27,7 +27,7 @@ test("bias data stays unavailable below the profile sample threshold", () => {
 });
 
 test("opening ECO produces the existing drilldown URL; missing ECO remains non-interactive", () => {
-  assert.equal(openingDrilldownHref("B07"), "/dashboard/openings/B07");
+  assert.equal(openingDrilldownHref("B07"), "/dashboard/practice/openings/B07");
   assert.equal(openingDrilldownHref(null), null);
 });
 

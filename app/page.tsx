@@ -9,7 +9,7 @@ export const instant = false;
 export default async function Page() {
   await connection();
   const session = await auth();
-  if (session?.user) redirect("/dashboard");
+  if (session?.user) redirect("/dashboard/home");
   return (
     <GamePanel
       authenticatedUsername={session?.user?.name ?? null}

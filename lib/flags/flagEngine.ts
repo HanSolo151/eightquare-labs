@@ -1,6 +1,5 @@
 import type { MoveFeature, PlayerProfile, WeaknessProfile, GameEval, EvalPoint, FlaggedMove } from "@/types";
 import { checkCausality } from "./causality";
-import { MATE_EQUIVALENT_CP } from "@/lib/eval/toPlayerPerspective";
 
 // Used by opponent timing analytics; it is deliberately not a gate for
 // flagging this account's own objective evaluation losses.
@@ -9,10 +8,6 @@ export const MIN_CP_LOSS = 100;
 export const MEDIUM_SEVERITY_MIN_CP_LOSS = 150;
 export const FULL_CONFIDENCE_MIN_DEPTH = 16;
 
-// Phase 2: same synthetic "getting mated" cp value used in causality.ts's
-// own mate handling (see that file's comment — magnitude needs to match,
-// not the exact number). Large enough to always read as catastrophic
-// relative to any real cp score.
 // Phase 2b: tilt cascade — a run of 2 to 4 consecutive own moves, each
 // losing at least CASCADE_PER_MOVE_MIN_CP_LOSS, that together add up to a
 // real decline (CASCADE_TOTAL_MIN_CP_LOSS). The per-move bar is
@@ -50,11 +45,12 @@ export function flagMoves(
     if (!evalPoint) continue;
     const resolved = resolveCpLoss(evalPoint);
     if (!resolved) continue;
-    const { cpLoss, evalConfidence } = resolved;
-    if (cpLoss < MIN_CP_LOSS) continue;
+    const { cpLoss, evalConfidence, mateBefore, mateAfter, mateLoss } = resolved;
+    if (cpLoss !== null && cpLoss < MIN_CP_LOSS) continue;
+    if (cpLoss === null && !mateLoss) continue;
     // Borderline losses are too unstable at shallow search to present as findings.
     // Keep them eligible after the configured full-depth target is reached.
-    if (cpLoss < MEDIUM_SEVERITY_MIN_CP_LOSS &&
+    if (cpLoss !== null && cpLoss < MEDIUM_SEVERITY_MIN_CP_LOSS &&
         (evalConfidence === "degraded" || evalConfidence === "degraded_mate_only")) continue;
 
     const causality = checkCausality(gameEval, move.ply, playerColor);
@@ -64,7 +60,7 @@ export function flagMoves(
     // about the player's mental state. A flagged move stays flaggable when
     // clocks are absent, the profile is sparse, or the move was very fast.
     individualFlags.push(buildFlag(
-      move, 1, 0, cpLoss, causality, "decision_error", null, evalConfidence,
+      move, 1, 0, cpLoss, causality, "decision_error", null, evalConfidence, mateBefore, mateAfter,
     ));
   }
 
@@ -75,37 +71,47 @@ export function flagMoves(
   const standalone = individualFlags.filter((flag) => !cascadeRanges.some((range) =>
     flag.ply >= range.startPly && flag.ply <= range.startPly + range.sequenceLength * 2 - 2
   ));
-  return [...standalone, ...cascades].sort((a, b) => b.cpLoss - a.cpLoss);
+  return [...standalone, ...cascades].sort((a, b) => (b.cpLoss ?? 0) - (a.cpLoss ?? 0));
 }
 
 /**
- * Phase 0/2 gap: resolves a move's cpLoss, now including the mate-only case
- * that used to be invisible to the flagger entirely (continue'd past
- * silently in flagMoves before this change). Returns null when there's no
- * usable comparison — same exclusion as before for that case.
+ * Resolves real centipawn loss or preserves the raw mate scores separately.
+ * Mate-backed evaluations never receive a fabricated centipawn magnitude.
  */
-export function resolveCpLoss(evalPoint: EvalPoint): { cpLoss: number; evalConfidence: FlaggedMove["evalConfidence"] } | null {
+export function resolveCpLoss(evalPoint: EvalPoint): {
+  cpLoss: number | null;
+  mateBefore: number | null;
+  mateAfter: number | null;
+  mateLoss: boolean;
+  evalConfidence: FlaggedMove["evalConfidence"];
+} | null {
   if (!Number.isFinite(evalPoint.depth) || evalPoint.depth < 8) return null;
   if ((evalPoint.cpBefore !== null && evalPoint.mateBefore !== null) ||
       (evalPoint.cpAfter !== null && evalPoint.mateAfter !== null)) return null;
-  const before = scoreFromEval(evalPoint.cpBefore, evalPoint.mateBefore);
-  const after = scoreFromEval(evalPoint.cpAfter, evalPoint.mateAfter);
-  if (before === null || after === null) return null;
+  const beforeHasScore = evalPoint.cpBefore !== null
+    ? Number.isFinite(evalPoint.cpBefore)
+    : evalPoint.mateBefore !== null && Number.isFinite(evalPoint.mateBefore);
+  const afterHasScore = evalPoint.cpAfter !== null
+    ? Number.isFinite(evalPoint.cpAfter)
+    : evalPoint.mateAfter !== null && Number.isFinite(evalPoint.mateAfter);
+  if (!beforeHasScore || !afterHasScore) return null;
   const hasMateScore = evalPoint.mateBefore !== null || evalPoint.mateAfter !== null;
   const isDegraded = evalPoint.depth < FULL_CONFIDENCE_MIN_DEPTH;
   return {
-    cpLoss: before - after,
+    cpLoss: hasMateScore ? null : evalPoint.cpBefore! - evalPoint.cpAfter!,
+    mateBefore: evalPoint.mateBefore,
+    mateAfter: evalPoint.mateAfter,
+    mateLoss: hasMateScore && isMateLoss(evalPoint),
     evalConfidence: hasMateScore
       ? isDegraded ? "degraded_mate_only" : "mate_only"
       : isDegraded ? "degraded" : "full",
   };
 }
 
-function scoreFromEval(cp: number | null, mate: number | null): number | null {
-  if (cp !== null && Number.isFinite(cp)) return cp;
-  if (mate === null || !Number.isFinite(mate)) return null;
-  const distance = Math.min(Math.abs(mate), 999);
-  return mate > 0 ? MATE_EQUIVALENT_CP - distance : -MATE_EQUIVALENT_CP + distance;
+function isMateLoss(point: EvalPoint): boolean {
+  const { mateBefore, mateAfter, cpAfter } = point;
+  if (mateAfter !== null && mateAfter < 0) return mateBefore === null || mateBefore > 0;
+  return mateBefore !== null && mateBefore > 0 && mateAfter === null && cpAfter !== null;
 }
 
 /**
@@ -142,6 +148,7 @@ function detectTiltCascades(
       const resolved = resolveCpLoss(evalPoint);
       if (!resolved || resolved.evalConfidence !== "full") break;
       const cpLoss = resolved.cpLoss;
+      if (cpLoss === null) break;
       if (cpLoss < CASCADE_PER_MOVE_MIN_CP_LOSS) break;
       totalLoss += cpLoss;
       runEnd++;
@@ -186,6 +193,7 @@ function buildCascadeFlag(
     ratio: Number(timeRatio.toFixed(2)), clockRemainingSec: lastMove.clockRemainingSec ?? 0, gamePhase: lastMove.gamePhase,
     flagType: "evaluation_cascade", timeSpentSec, phaseAvgSec: 0, timeRatio: Number(timeRatio.toFixed(2)),
     cpLoss: totalLossCp, causality, matchedWeaknessId: null,
+    mateBefore: null, mateAfter: null,
     styleDeviationScore: 0,
     absoluteAnomalyScore: Math.min(1, totalLossCp / 500),
     severity: severityFromBreakdown(severityBreakdown),
@@ -198,25 +206,26 @@ function buildCascadeFlag(
 }
 
 function buildFlag(
-  move: MoveFeature, timeRatio: number, phaseAvg: number, cpLoss: number,
+  move: MoveFeature, timeRatio: number, phaseAvg: number, cpLoss: number | null,
   causality: ReturnType<typeof checkCausality>, flagType: FlaggedMove["flagType"], weaknessId: string | null,
-  evalConfidence: FlaggedMove["evalConfidence"]
+  evalConfidence: FlaggedMove["evalConfidence"], mateBefore: number | null, mateAfter: number | null
 ): FlaggedMove {
-  const roundedCpLoss = Math.round(cpLoss);
-  const severityBreakdown = computeSeverityBreakdown({ cpLoss: roundedCpLoss, flagType, timeRatio });
+  const roundedCpLoss = cpLoss === null ? null : Math.round(cpLoss);
+  const mateTransition = roundedCpLoss === null;
+  const severityBreakdown = computeSeverityBreakdown({ cpLoss: roundedCpLoss ?? 0, flagType, timeRatio, mateTransition });
   return {
     gameId: move.gameId, ply: move.ply, moveNumber: move.moveNumber, san: move.san, color: move.color,
     ratio: Number(timeRatio.toFixed(2)), clockRemainingSec: move.clockRemainingSec ?? 0, gamePhase: move.gamePhase,
     flagType, timeSpentSec: move.timeSpentSec ?? 0, phaseAvgSec: phaseAvg, timeRatio: Number(timeRatio.toFixed(2)),
-    cpLoss: roundedCpLoss, causality, matchedWeaknessId: weaknessId,
+    cpLoss: roundedCpLoss, mateBefore, mateAfter, causality, matchedWeaknessId: weaknessId,
     styleDeviationScore: Math.min(1, Math.abs(1 - timeRatio)),
-    absoluteAnomalyScore: Math.min(1, cpLoss / 500),
+    absoluteAnomalyScore: mateTransition ? 1 : Math.min(1, (cpLoss ?? 0) / 500),
     severity: severityFromBreakdown(severityBreakdown),
     severityBreakdown,
     pivotMove: null, // Phase 3
     cascadeMeta: null, // only tilt_cascade flags (built via buildCascadeFlag) carry this
     evalConfidence,
-    explanation: explain(flagType, cpLoss, evalConfidence),
+    explanation: explain(flagType, cpLoss, evalConfidence, mateBefore, mateAfter),
   };
 }
 
@@ -231,24 +240,39 @@ function computeSeverityBreakdown(opts: {
   cpLoss: number;
   flagType: FlaggedMove["flagType"];
   timeRatio?: number;
+  mateTransition?: boolean;
 }): FlaggedMove["severityBreakdown"] {
   const evalLoss = Math.round(opts.cpLoss);
-  return { evalLoss, patternMatchBonus: 0, rushBonus: 0, tiltBonus: 0 };
+  return { evalLoss, mateTransition: opts.mateTransition ?? false, patternMatchBonus: 0, rushBonus: 0, tiltBonus: 0 };
 }
 
 function severityFromBreakdown(b: FlaggedMove["severityBreakdown"]): "low" | "medium" | "high" {
+  if (b.mateTransition) return "high";
   const score = b.evalLoss + b.patternMatchBonus + b.rushBonus + b.tiltBonus;
   if (score > 200) return "high";
   if (score >= MEDIUM_SEVERITY_MIN_CP_LOSS) return "medium";
   return "low";
 }
 
-function explain(flagType: FlaggedMove["flagType"], cpLoss: number, evalConfidence: FlaggedMove["evalConfidence"]): string {
+function explain(
+  flagType: FlaggedMove["flagType"],
+  cpLoss: number | null,
+  evalConfidence: FlaggedMove["evalConfidence"],
+  mateBefore: number | null,
+  mateAfter: number | null,
+): string {
   if (evalConfidence === "mate_only" || evalConfidence === "degraded_mate_only") {
     const caution = evalConfidence === "degraded_mate_only" ? " This is a lower-depth estimate." : "";
-    return `The engine's evaluation crossed or changed a forced-mate line. The stored loss uses a synthetic mate scale, not centipawns.${caution}`;
+    if (mateAfter !== null && mateAfter < 0) return `This move allows a forced mate against you in ${Math.abs(mateAfter)}. The position did not recover by the end of the game.${caution}`;
+    if (mateBefore !== null && mateBefore > 0 && mateAfter === null) return `This move gives up a forced mate in ${mateBefore}.${caution}`;
+    if (mateBefore !== null && mateAfter !== null) return `The forced-mate distance changed from ${mateLabel(mateBefore)} to ${mateLabel(mateAfter)}.${caution}`;
+    return `The engine reported a forced-mate evaluation change.${caution}`;
   }
-  const loss = `${(cpLoss / 100).toFixed(1)} pawns`;
+  const loss = `${((cpLoss ?? 0) / 100).toFixed(1)} pawns`;
   if (flagType === "tilt_cascade" || flagType === "evaluation_cascade") return `The position evaluation fell by ${loss} across a run of consecutive moves and did not recover.`;
   return `This move lost about ${loss} of engine evaluation, and the position did not recover to within half a pawn of its pre-move evaluation by the end of the game.`;
+}
+
+function mateLabel(mate: number): string {
+  return mate > 0 ? `mate in ${mate} for you` : `mate in ${Math.abs(mate)} against you`;
 }

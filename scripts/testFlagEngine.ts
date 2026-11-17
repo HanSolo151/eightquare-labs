@@ -63,14 +63,27 @@ assert(premoveBlunder.length === 1,
   "premove timing does not hide an objectively large unrecovered evaluation loss");
 
 const cpToMate = resolveCpLoss(point(0, 100, null, null, -3));
-assert(cpToMate?.evalConfidence === "mate_only" && (cpToMate.cpLoss ?? 0) > 10_000,
-  "a cp-to-forced-mate loss is scored and marked as mate-backed");
+assert(cpToMate?.evalConfidence === "mate_only" && cpToMate.cpLoss === null &&
+  cpToMate.mateBefore === null && cpToMate.mateAfter === -3 && cpToMate.mateLoss,
+  "a cp-to-forced-mate loss stores signed mate data without a fabricated cp value");
 const mateToCp = resolveCpLoss(point(0, null, 100, 3, null));
-assert(mateToCp?.evalConfidence === "mate_only" && (mateToCp.cpLoss ?? 0) > 9_000,
-  "losing a forced mate is detected when the resulting position returns to a cp score");
+assert(mateToCp?.evalConfidence === "mate_only" && mateToCp.cpLoss === null &&
+  mateToCp.mateBefore === 3 && mateToCp.mateAfter === null && mateToCp.mateLoss,
+  "giving up a forced mate stores the original mate distance separately from centipawns");
 const mateDistance = resolveCpLoss(point(0, null, null, 3, 8));
-assert(mateDistance?.cpLoss === 5,
-  "mate-distance changes preserve direction and distance without pretending to be ordinary cp confidence");
+assert(mateDistance?.cpLoss === null && !mateDistance.mateLoss,
+  "mate-distance-only changes are not promoted to centipawn loss flags");
+const mateFlagEval = gameEval([point(0, 100, null, null, -3), point(1, null, null, 3, 3)]);
+const mateFlag = flagMoves([feature(0, "white"), feature(1, "black")], profile, weaknesses, mateFlagEval, "white")[0];
+assert(mateFlag?.cpLoss === null && mateFlag.mateAfter === -3 && mateFlag.severity === "high" &&
+  mateFlag.explanation.includes("mate against you in 3") && mateFlag.severityBreakdown.mateTransition,
+  "mate-loss flags use a distinct high-severity signal and human-readable mate label");
+assert(mateFlag?.causality.worstFollowingCpLoss === null,
+  "mate-backed causality does not persist a synthetic centipawn figure");
+const missedMateEval = gameEval([point(0, null, 100, 3, null), point(1, -100, -100)]);
+const missedMateFlag = flagMoves([feature(0, "white"), feature(1, "black")], profile, weaknesses, missedMateEval, "white")[0];
+assert(missedMateFlag?.cpLoss === null && missedMateFlag.explanation.includes("gives up a forced mate in 3"),
+  "a missed winning mate is described by its mate distance rather than a cp equivalent");
 
 const cascade = gameEval([
   point(0, 500, 400), point(1, -400, -400),
@@ -101,6 +114,8 @@ assert(flagForLoss(201)?.severity === "high", "an unrecovered loss above 2.0 paw
 
 assert(resolveCpLoss({ ...point(0, 200, 100), depth: 7 }) === null,
   "depth below 8 is unusable for move-loss resolution");
+assert(resolveCpLoss(point(0, Number.POSITIVE_INFINITY, 100)) === null,
+  "non-finite scores cannot become stored loss values");
 assert(resolveCpLoss({ ...point(0, 200, 100), depth: 8 })?.evalConfidence === "degraded",
   "depth 8 is accepted but marked degraded");
 assert(resolveCpLoss({ ...point(0, 200, 100), depth: 9 })?.evalConfidence === "degraded",

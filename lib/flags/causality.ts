@@ -37,28 +37,39 @@ export function checkCausality(
   const baseline = scoreForPlayer(atCandidate, "before", candidatePly, playerColor);
   const afterCandidate = scoreForPlayer(atCandidate, "after", candidatePly, playerColor);
   if (baseline === null || afterCandidate === null) {
-    return { heldToEnd: false, worstFollowingCpLoss: 0, recoveredAtPly: null, plyChecked: candidatePly };
+    return {
+      heldToEnd: false,
+      worstFollowingCpLoss: hasMateScore(atCandidate) ? null : 0,
+      recoveredAtPly: null,
+      plyChecked: candidatePly,
+    };
   }
 
+  let containsMateScore = hasMateScore(atCandidate);
   let worst = afterCandidate;
   let plyChecked = candidatePly;
   let expectedPly = candidatePly + 1;
   for (const point of points) {
     if (point.ply <= candidatePly) continue;
     if (point.ply !== expectedPly) {
-      return { heldToEnd: false, worstFollowingCpLoss: worst, recoveredAtPly: null, plyChecked };
+      return { heldToEnd: false, worstFollowingCpLoss: containsMateScore ? null : worst, recoveredAtPly: null, plyChecked };
     }
     expectedPly++;
+    containsMateScore ||= hasMateScore(point);
     const ownScore = scoreForPlayer(point, "after", point.ply, playerColor);
     if (ownScore === null) {
-      return { heldToEnd: false, worstFollowingCpLoss: worst, recoveredAtPly: null, plyChecked };
+      return { heldToEnd: false, worstFollowingCpLoss: containsMateScore ? null : worst, recoveredAtPly: null, plyChecked };
     }
     plyChecked = point.ply;
     worst = Math.min(worst, ownScore);
     if (ownScore >= baseline - RECOVERY_TOLERANCE_CP) {
-      return { heldToEnd: false, worstFollowingCpLoss: worst, recoveredAtPly: point.ply, plyChecked };
+      return { heldToEnd: false, worstFollowingCpLoss: containsMateScore ? null : worst, recoveredAtPly: point.ply, plyChecked };
     }
   }
 
-  return { heldToEnd: true, worstFollowingCpLoss: worst, recoveredAtPly: null, plyChecked };
+  return { heldToEnd: true, worstFollowingCpLoss: containsMateScore ? null : worst, recoveredAtPly: null, plyChecked };
+}
+
+function hasMateScore(point: EvalPoint): boolean {
+  return point.mateBefore !== null || point.mateAfter !== null;
 }

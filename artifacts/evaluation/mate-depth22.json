@@ -1,0 +1,730 @@
+{
+  "generatedAt": "2026-11-05T04:26:10.105Z",
+  "source": "full census of persisted flags and saved game evaluations",
+  "census": true,
+  "requestedSearchDepth": 22,
+  "engine": "Stockfish 19 full single-threaded WASM",
+  "population": 13,
+  "evaluated": 13,
+  "groups": {
+    "depth:depth16": {
+      "total": 13,
+      "confirmed": 11,
+      "downgraded": 2,
+      "reversed": 0
+    },
+    "depth:depth8-9": {
+      "total": 0,
+      "confirmed": 0,
+      "downgraded": 0,
+      "reversed": 0
+    },
+    "depth:other": {
+      "total": 0,
+      "confirmed": 0,
+      "downgraded": 0,
+      "reversed": 0
+    },
+    "overall": {
+      "total": 13,
+      "confirmed": 11,
+      "downgraded": 2,
+      "reversed": 0
+    },
+    "exact-depth:16": {
+      "total": 13,
+      "confirmed": 11,
+      "downgraded": 2,
+      "reversed": 0
+    },
+    "stratum:high": {
+      "total": 13,
+      "confirmed": 11,
+      "downgraded": 2,
+      "reversed": 0
+    },
+    "phase:middlegame": {
+      "total": 4,
+      "confirmed": 4,
+      "downgraded": 0,
+      "reversed": 0
+    },
+    "phase:endgame": {
+      "total": 9,
+      "confirmed": 7,
+      "downgraded": 2,
+      "reversed": 0
+    }
+  },
+  "rows": [
+    {
+      "flagId": "cmvwfretk0023vveo56t1312w",
+      "sample": 1,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-v2",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": null,
+      "higherDepthCpLoss": null,
+      "deltaCp": null,
+      "originalMateBefore": null,
+      "originalMateAfter": -8,
+      "higherDepthMateBefore": null,
+      "higherDepthMateAfter": -7,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": true,
+      "bestSecondGapCp": 6,
+      "top3Lines": [
+        {
+          "uci": "f8h8",
+          "san": "Rh8",
+          "scoreCp": -999,
+          "mate": null
+        },
+        {
+          "uci": "h7g7",
+          "san": "Kg7",
+          "scoreCp": -1005,
+          "mate": null
+        },
+        {
+          "uci": "f8g8",
+          "san": "Rg8",
+          "scoreCp": -1414,
+          "mate": null
+        }
+      ],
+      "fenBefore": "1r1q1r2/2pn3k/1p1p1pp1/p2B2PP/3QPP2/8/PPP5/2KR3R b - - 0 20",
+      "san": "gxh5",
+      "uci": "g6h5",
+      "sequenceSan": "gxh5",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwrnprm0003vvio6jn2vf71",
+      "sample": 2,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": null,
+      "higherDepthCpLoss": null,
+      "deltaCp": null,
+      "originalMateBefore": 3,
+      "originalMateAfter": null,
+      "higherDepthMateBefore": 3,
+      "higherDepthMateAfter": 10,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "downgraded",
+      "forcedish": null,
+      "bestSecondGapCp": null,
+      "top3Lines": [
+        {
+          "uci": "c1d2",
+          "san": "Qd2",
+          "scoreCp": null,
+          "mate": 3
+        },
+        {
+          "uci": "c1b2",
+          "san": "Qb2",
+          "scoreCp": null,
+          "mate": 3
+        },
+        {
+          "uci": "c1c2",
+          "san": "Qc2",
+          "scoreCp": null,
+          "mate": 3
+        }
+      ],
+      "fenBefore": "2b5/2p5/p1k1p3/7p/8/6P1/r6P/2q1RK2 b - - 1 40",
+      "san": "Qxe1+",
+      "uci": "c1e1",
+      "sequenceSan": "Qxe1+",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwrokjz0004vvio9yzjzyoz",
+      "sample": 3,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": null,
+      "higherDepthCpLoss": null,
+      "deltaCp": null,
+      "originalMateBefore": 9,
+      "originalMateAfter": null,
+      "higherDepthMateBefore": 11,
+      "higherDepthMateAfter": null,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": null,
+      "bestSecondGapCp": null,
+      "top3Lines": [
+        {
+          "uci": "c7c8q",
+          "san": "c8=Q",
+          "scoreCp": null,
+          "mate": 11
+        },
+        {
+          "uci": "b6b5",
+          "san": "Kb5",
+          "scoreCp": null,
+          "mate": 12
+        },
+        {
+          "uci": "b6b7",
+          "san": "Kb7",
+          "scoreCp": null,
+          "mate": 12
+        }
+      ],
+      "fenBefore": "8/2P5/1K6/3k4/8/8/8/8 w - - 1 62",
+      "san": "c8=R",
+      "uci": "c7c8r",
+      "sequenceSan": "c8=R",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwrred80006vvio5qt6rssf",
+      "sample": 4,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": null,
+      "higherDepthCpLoss": null,
+      "deltaCp": null,
+      "originalMateBefore": null,
+      "originalMateAfter": -3,
+      "higherDepthMateBefore": null,
+      "higherDepthMateAfter": -3,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": false,
+      "bestSecondGapCp": 105,
+      "top3Lines": [
+        {
+          "uci": "c4d3",
+          "san": "Bd3",
+          "scoreCp": -775,
+          "mate": null
+        },
+        {
+          "uci": "f1f3",
+          "san": "Rf3",
+          "scoreCp": -880,
+          "mate": null
+        },
+        {
+          "uci": "f1f2",
+          "san": "Rf2",
+          "scoreCp": -923,
+          "mate": null
+        }
+      ],
+      "fenBefore": "5r2/p5pk/3b2pp/2p5/P1B1QPPq/1Pr5/2P3K1/4RR2 w - - 5 34",
+      "san": "g5",
+      "uci": "g4g5",
+      "sequenceSan": "g5",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwrvy72000avviouoeb6lvd",
+      "sample": 5,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": null,
+      "higherDepthCpLoss": null,
+      "deltaCp": null,
+      "originalMateBefore": 10,
+      "originalMateAfter": null,
+      "higherDepthMateBefore": 10,
+      "higherDepthMateAfter": null,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": null,
+      "bestSecondGapCp": null,
+      "top3Lines": [
+        {
+          "uci": "b7b8q",
+          "san": "b8=Q",
+          "scoreCp": null,
+          "mate": 10
+        },
+        {
+          "uci": "c7c6",
+          "san": "Kc6",
+          "scoreCp": null,
+          "mate": 10
+        },
+        {
+          "uci": "c7b6",
+          "san": "Kb6",
+          "scoreCp": null,
+          "mate": 11
+        }
+      ],
+      "fenBefore": "8/1PK5/4k3/8/8/8/8/8 w - - 1 78",
+      "san": "b8=R",
+      "uci": "b7b8r",
+      "sequenceSan": "b8=R",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwmjwh0001vvw8suwuhid1",
+      "sample": 6,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": null,
+      "higherDepthCpLoss": null,
+      "deltaCp": null,
+      "originalMateBefore": 1,
+      "originalMateAfter": null,
+      "higherDepthMateBefore": 1,
+      "higherDepthMateAfter": null,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": null,
+      "bestSecondGapCp": null,
+      "top3Lines": [
+        {
+          "uci": "e5h5",
+          "san": "Rh5#",
+          "scoreCp": null,
+          "mate": 1
+        },
+        {
+          "uci": "e5f5",
+          "san": "Rf5",
+          "scoreCp": 765,
+          "mate": null
+        },
+        {
+          "uci": "e5d5",
+          "san": "Red5",
+          "scoreCp": 761,
+          "mate": null
+        }
+      ],
+      "fenBefore": "3R4/1pr2ppk/6n1/1pP1R3/1P6/P7/5PPP/5K2 w - - 1 41",
+      "san": "Red5",
+      "uci": "e5d5",
+      "sequenceSan": "Red5",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwouze0005vvw8iegomwe5",
+      "sample": 7,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": null,
+      "higherDepthCpLoss": null,
+      "deltaCp": null,
+      "originalMateBefore": 5,
+      "originalMateAfter": null,
+      "higherDepthMateBefore": 5,
+      "higherDepthMateAfter": null,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": null,
+      "bestSecondGapCp": null,
+      "top3Lines": [
+        {
+          "uci": "f1f7",
+          "san": "Rf7",
+          "scoreCp": null,
+          "mate": 5
+        },
+        {
+          "uci": "a2b3",
+          "san": "axb3",
+          "scoreCp": 834,
+          "mate": null
+        },
+        {
+          "uci": "a1b1",
+          "san": "Rab1",
+          "scoreCp": 805,
+          "mate": null
+        }
+      ],
+      "fenBefore": "1r2r2k/pp1Q3p/1q4p1/4P3/6P1/1p1P3P/P5B1/R4R1K w - - 1 25",
+      "san": "axb3",
+      "uci": "a2b3",
+      "sequenceSan": "axb3",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwq3gq0007vvw8wuf5rsbc",
+      "sample": 8,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": null,
+      "higherDepthCpLoss": null,
+      "deltaCp": null,
+      "originalMateBefore": 6,
+      "originalMateAfter": null,
+      "higherDepthMateBefore": 6,
+      "higherDepthMateAfter": null,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": null,
+      "bestSecondGapCp": null,
+      "top3Lines": [
+        {
+          "uci": "f6d4",
+          "san": "Bd4+",
+          "scoreCp": null,
+          "mate": 6
+        },
+        {
+          "uci": "d3b1",
+          "san": "Qb1+",
+          "scoreCp": null,
+          "mate": 13
+        },
+        {
+          "uci": "d3d1",
+          "san": "Qd1+",
+          "scoreCp": null,
+          "mate": 13
+        }
+      ],
+      "fenBefore": "r6k/ppp3p1/5b1p/5p2/2P2P2/3q4/PP4QP/6K1 b - - 1 36",
+      "san": "Qf1+",
+      "uci": "d3f1",
+      "sequenceSan": "Qf1+",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwr9zt0008vvw8zg5e31ez",
+      "sample": 9,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": null,
+      "higherDepthCpLoss": null,
+      "deltaCp": null,
+      "originalMateBefore": 1,
+      "originalMateAfter": null,
+      "higherDepthMateBefore": 1,
+      "higherDepthMateAfter": null,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": null,
+      "bestSecondGapCp": null,
+      "top3Lines": [
+        {
+          "uci": "h2h4",
+          "san": "h4#",
+          "scoreCp": null,
+          "mate": 1
+        },
+        {
+          "uci": "e8g8",
+          "san": "Qg8+",
+          "scoreCp": null,
+          "mate": 3
+        },
+        {
+          "uci": "e8f7",
+          "san": "Qf7",
+          "scoreCp": null,
+          "mate": 5
+        }
+      ],
+      "fenBefore": "b3Q3/p7/5p1p/2p2pk1/8/1P1P1PP1/P5KP/8 w - - 3 35",
+      "san": "Qxa8",
+      "uci": "e8a8",
+      "sequenceSan": "Qxa8",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwsxue0009vvw8d6uctany",
+      "sample": 10,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "middlegame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": null,
+      "higherDepthCpLoss": null,
+      "deltaCp": null,
+      "originalMateBefore": 6,
+      "originalMateAfter": null,
+      "higherDepthMateBefore": 6,
+      "higherDepthMateAfter": null,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": null,
+      "bestSecondGapCp": null,
+      "top3Lines": [
+        {
+          "uci": "d1d8",
+          "san": "Rd8+",
+          "scoreCp": null,
+          "mate": 6
+        },
+        {
+          "uci": "g5f4",
+          "san": "Bf4",
+          "scoreCp": 520,
+          "mate": null
+        },
+        {
+          "uci": "g5c1",
+          "san": "Bc1",
+          "scoreCp": 491,
+          "mate": null
+        }
+      ],
+      "fenBefore": "6k1/pbp2pbp/4r1p1/1B4B1/PP6/2P2nN1/2K5/3R2R1 w - - 2 29",
+      "san": "Bc4",
+      "uci": "b5c4",
+      "sequenceSan": "Bc4",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwwzjcp000gvvw8rw1k5kl9",
+      "sample": 11,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": null,
+      "higherDepthCpLoss": null,
+      "deltaCp": null,
+      "originalMateBefore": 7,
+      "originalMateAfter": null,
+      "higherDepthMateBefore": 6,
+      "higherDepthMateAfter": 10,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "downgraded",
+      "forcedish": null,
+      "bestSecondGapCp": null,
+      "top3Lines": [
+        {
+          "uci": "f3g3",
+          "san": "Kxg3",
+          "scoreCp": null,
+          "mate": 6
+        },
+        {
+          "uci": "f3e4",
+          "san": "Ke4",
+          "scoreCp": 1257,
+          "mate": null
+        },
+        {
+          "uci": "f3f4",
+          "san": "Kf4",
+          "scoreCp": 1155,
+          "mate": null
+        }
+      ],
+      "fenBefore": "8/4k3/p1R5/2R1P3/2P5/1P3Kr1/P7/8 w - - 1 55",
+      "san": "Ke4",
+      "uci": "f3e4",
+      "sequenceSan": "Ke4",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwx4br0000hvvw8ol50qbpl",
+      "sample": 12,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": null,
+      "higherDepthCpLoss": null,
+      "deltaCp": null,
+      "originalMateBefore": 2,
+      "originalMateAfter": null,
+      "higherDepthMateBefore": 2,
+      "higherDepthMateAfter": null,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": null,
+      "bestSecondGapCp": null,
+      "top3Lines": [
+        {
+          "uci": "f8d6",
+          "san": "Qd6+",
+          "scoreCp": null,
+          "mate": 2
+        },
+        {
+          "uci": "f8f4",
+          "san": "Qf4+",
+          "scoreCp": null,
+          "mate": 2
+        },
+        {
+          "uci": "f8d8",
+          "san": "Qd8",
+          "scoreCp": null,
+          "mate": 6
+        }
+      ],
+      "fenBefore": "5Q2/6q1/7k/7p/7P/p2BP1P1/P4P2/6K1 w - - 11 55",
+      "san": "Qxg7+",
+      "uci": "f8g7",
+      "sequenceSan": "Qxg7+",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    },
+    {
+      "flagId": "cmvwx9n1y0000vvqcn087c1tb",
+      "sample": 13,
+      "stratum": "high",
+      "originalEngineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "phase": "endgame",
+      "flagType": "decision_error",
+      "severity": "high",
+      "originalDepth": 16,
+      "originalDepthGroup": "depth16",
+      "originalCpLoss": null,
+      "higherDepthCpLoss": null,
+      "deltaCp": null,
+      "originalMateBefore": 2,
+      "originalMateAfter": null,
+      "higherDepthMateBefore": 2,
+      "higherDepthMateAfter": null,
+      "originalContainsMate": true,
+      "higherDepthContainsMate": true,
+      "result": "confirmed",
+      "forcedish": null,
+      "bestSecondGapCp": null,
+      "top3Lines": [
+        {
+          "uci": "e3g5",
+          "san": "Bg5+",
+          "scoreCp": null,
+          "mate": 2
+        },
+        {
+          "uci": "c3c8",
+          "san": "Rxc8+",
+          "scoreCp": 1908,
+          "mate": null
+        },
+        {
+          "uci": "h7h8",
+          "san": "Rh8+",
+          "scoreCp": 1503,
+          "mate": null
+        }
+      ],
+      "fenBefore": "2rk4/pp5R/3p4/8/8/P1RPB3/5PP1/4K3 w - - 1 29",
+      "san": "Rh8+",
+      "uci": "h7h8",
+      "sequenceSan": "Rh8+",
+      "depth": 22,
+      "engine": "Stockfish 19 full single-threaded WASM"
+    }
+  ],
+  "depthInventory": [
+    {
+      "engineVersion": "stockfish-19-lite-single-depth16-target-v3",
+      "depth": 16,
+      "flagCount": 30
+    },
+    {
+      "engineVersion": "stockfish-19-lite-single-depth16-v2",
+      "depth": 16,
+      "flagCount": 34
+    }
+  ],
+  "caveat": "Higher-depth Stockfish agreement is evaluation stability, not human-annotated mistake accuracy. `forcedish` means top-1 vs top-2 MultiPV score gap <30 cp.",
+  "sampledSeverityProjectionAt150Cp": {
+    "low": 0,
+    "medium": 0,
+    "high": 0
+  },
+  "thresholdStabilityByOriginalCpLoss": {
+    "100-149cp": {
+      "total": 0,
+      "confirmed": 0,
+      "downgraded": 0,
+      "reversed": 0
+    },
+    "150-200cp": {
+      "total": 0,
+      "confirmed": 0,
+      "downgraded": 0,
+      "reversed": 0
+    }
+  }
+}

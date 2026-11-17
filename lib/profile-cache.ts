@@ -8,8 +8,8 @@ import type { PgnSessionResult, UserProfileCache } from "@/lib/profile-cache-typ
 
 const PROFILE_DB_NAME = "eightsquare-user-profile-cache";
 const PROFILE_STORE = "profiles";
-const PROFILE_DB_VERSION = 1;
-const PGN_SESSION_KEY = "eightsquare:pgn-session:v1";
+const PROFILE_DB_VERSION = 3;
+const PGN_SESSION_KEY = "eightsquare:pgn-session:v2";
 const PROFILE_CACHE_REFRESH_EVENT = "eightsquare:profile-cache-refreshed";
 const PROFILE_CACHE_ERROR_EVENT = "eightsquare:profile-cache-error";
 const PROFILE_SYNC_ENGINE_VERSION = "stockfish-19-lite-single-depth16-target-v3";
@@ -48,7 +48,10 @@ async function openProfileDb(): Promise<IDBDatabase> {
   requireBrowser();
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(PROFILE_DB_NAME, PROFILE_DB_VERSION);
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
+      if (event.oldVersion < 3 && request.result.objectStoreNames.contains(PROFILE_STORE)) {
+        request.transaction?.objectStore(PROFILE_STORE).clear();
+      }
       if (!request.result.objectStoreNames.contains(PROFILE_STORE)) {
         request.result.createObjectStore(PROFILE_STORE, { keyPath: "userId" });
       }
@@ -323,7 +326,7 @@ async function signedInAccount(): Promise<{ userId: string; username: string }> 
   return { userId: session.user.id, username: session.user.name };
 }
 
-export function connectLichess(callbackUrl = "/dashboard") {
+export function connectLichess(callbackUrl = "/dashboard/home") {
   return signIn("lichess", { callbackUrl });
 }
 
@@ -399,7 +402,7 @@ export async function analyzePgn(pgnText: string): Promise<PgnSessionResult> {
     flagMoves(moveFeatures, neutralProfile, neutralWeakness, gameEval, color),
   );
   const sessionResult: PgnSessionResult = {
-    version: 1,
+    version: 2,
     id,
     pgn: pgnText,
     headers,
@@ -424,7 +427,7 @@ export function loadPgnSession(): PgnSessionResult | null {
   const parsed: unknown = JSON.parse(stored);
   if (
     !isRecord(parsed) ||
-    parsed.version !== 1 ||
+    parsed.version !== 2 ||
     typeof parsed.id !== "string" ||
     typeof parsed.pgn !== "string" ||
     !Array.isArray(parsed.moves) ||

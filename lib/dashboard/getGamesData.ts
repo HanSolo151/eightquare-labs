@@ -7,7 +7,7 @@ export interface DashboardGameFlag {
   san: string;
   flagType: string;
   severity: string;
-  cpLoss: number;
+  cpLoss: number | null;
 }
 
 export interface DashboardGame {

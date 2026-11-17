@@ -36,13 +36,16 @@ function toProfileFlag(flag: {
   color: string;
   flagType: string;
   severity: string;
-  cpLoss: number;
+  cpLoss: number | null;
+  mateBefore: number | null;
+  mateAfter: number | null;
   gamePhase: string;
   explanation: string;
-  game: { lichessGameId: string; opponentUsername: string; openingName: string | null; openingEco: string | null; result: string; lichessCreatedAt: Date | null };
+  game: { id: string; lichessGameId: string; opponentUsername: string; openingName: string | null; openingEco: string | null; result: string; lichessCreatedAt: Date | null };
 }): ProfileFlaggedMoment {
   return {
     gameId: flag.game.lichessGameId,
+    internalGameId: flag.game.id,
     opponentUsername: flag.game.opponentUsername,
     openingName: flag.game.openingName,
     openingEco: flag.game.openingEco,
@@ -55,6 +58,8 @@ function toProfileFlag(flag: {
     flagType: flag.flagType as FlaggedMove["flagType"],
     severity: flag.severity as FlaggedMove["severity"],
     cpLoss: flag.cpLoss,
+    mateBefore: flag.mateBefore,
+    mateAfter: flag.mateAfter,
     gamePhase: flag.gamePhase as FlaggedMove["gamePhase"],
     explanation: flag.explanation,
   };
@@ -73,8 +78,8 @@ export async function readUserProfileCache(userId: string): Promise<UserProfileC
       orderBy: [{ game: { lichessCreatedAt: { sort: "desc", nulls: "last" } } }, { ply: "desc" }],
       select: {
         ply: true, moveNumber: true, san: true, color: true, flagType: true,
-        severity: true, cpLoss: true, gamePhase: true, explanation: true,
-        game: { select: { lichessGameId: true, opponentUsername: true, openingName: true, openingEco: true, result: true, lichessCreatedAt: true } },
+        severity: true, cpLoss: true, mateBefore: true, mateAfter: true, gamePhase: true, explanation: true,
+        game: { select: { id: true, lichessGameId: true, opponentUsername: true, openingName: true, openingEco: true, result: true, lichessCreatedAt: true } },
       },
     }),
     prisma.weaknessProfileRow.findUnique({ where: { userId }, select: { patterns: true } }),

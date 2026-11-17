@@ -2,15 +2,18 @@ import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { DashboardNav } from "@/components/dashboard/DashboardNav";
+import { LeftRail } from "@/components/dashboard/LeftRail";
 
 export default function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   return (
-    <div className="bg-math-grid min-h-screen font-mono text-white">
-      <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
-        <Suspense fallback={<DashboardLoading />}>
-          <AuthenticatedDashboard>{children}</AuthenticatedDashboard>
-        </Suspense>
+    <div className="bg-math-grid min-h-screen font-mono text-white md:flex">
+      <Suspense fallback={null}><LeftRail /></Suspense>
+      <div className="min-w-0 flex-1">
+        <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 pb-24 sm:px-6 sm:py-8 md:pb-8">
+          <Suspense fallback={<DashboardLoading />}>
+            <AuthenticatedDashboard>{children}</AuthenticatedDashboard>
+          </Suspense>
+        </div>
       </div>
     </div>
   );
@@ -22,12 +25,11 @@ async function AuthenticatedDashboard({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <header className="space-y-2">
-        <div className="flex items-center justify-between gap-3 text-xs">
+      <header>
+        <div className="mb-6 flex items-center justify-between gap-3 border-b border-white/10 pb-3 text-xs">
           <Link href="/dashboard" className="font-semibold tracking-wide text-neutral-200 hover:text-white">EIGHTSQUARE</Link>
           <p className="truncate text-neutral-500">{session.user.name}</p>
         </div>
-        <DashboardNav />
       </header>
       <main>{children}</main>
     </>

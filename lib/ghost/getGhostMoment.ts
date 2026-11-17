@@ -9,7 +9,9 @@ export interface GhostMoment {
   fenBefore: string;
   playedSan: string;
   playedUci: string;
-  cpLoss: number;
+  cpLoss: number | null;
+  mateBefore: number | null;
+  mateAfter: number | null;
   playerColor: "white" | "black";
   playerRating: number | null;
   opponentRating: number | null;
@@ -26,8 +28,8 @@ export async function getGhostMoment(userId: string, gameId: string, targetPly?:
       opponentRating: true, opponentUsername: true,
       flags: {
         where: targetPly === undefined ? undefined : { ply: targetPly },
-        orderBy: [{ cpLoss: "desc" }, { ply: "asc" }],
-        select: { ply: true, cpLoss: true, color: true },
+        orderBy: [{ cpLoss: { sort: "desc", nulls: "first" } }, { ply: "asc" }],
+        select: { ply: true, cpLoss: true, mateBefore: true, mateAfter: true, color: true },
       },
     },
   });
@@ -58,6 +60,7 @@ export async function getGhostMoment(userId: string, gameId: string, targetPly?:
   return {
     gameId: game.id, ply: worst.ply, moves, fenBefore, playedSan: played.san,
     playedUci: played.from + played.to + (played.promotion ?? ""), cpLoss: worst.cpLoss,
+    mateBefore: worst.mateBefore, mateAfter: worst.mateAfter,
     playerColor: game.playerColor === "black" ? "black" : "white",
     playerRating: game.playerRating, opponentRating: game.opponentRating,
     opponentUsername: game.opponentUsername,

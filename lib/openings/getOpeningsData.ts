@@ -58,7 +58,7 @@ export async function getOpeningsData(userId: string, opponentUsername?: string)
   for (const aggregate of aggregates.values()) for (const game of aggregate.games) gameToAggregate.set(game.id, aggregate);
   for (const flag of flags) {
     const aggregate = gameToAggregate.get(flag.gameId);
-    if (!aggregate || !Number.isFinite(flag.cpLoss)) continue;
+    if (!aggregate || flag.cpLoss === null || !Number.isFinite(flag.cpLoss)) continue;
     const key = `${flag.gameId}:${flag.ply}`;
     const previous = aggregate.flags.get(key);
     // Several flag types can share a ply. Count that move once and use its

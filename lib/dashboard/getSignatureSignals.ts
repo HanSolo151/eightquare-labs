@@ -309,7 +309,7 @@ export interface MostExpensiveMove {
 export async function getMostExpensiveMove(userId: string): Promise<MostExpensiveMove | null> {
   const [whiteMove, blackMove] = await Promise.all([
     prisma.flaggedMove.findFirst({
-      where: { color: "white", game: { userId, playerColor: "white" } },
+      where: { color: "white", cpLoss: { not: null }, game: { userId, playerColor: "white" } },
       orderBy: { cpLoss: "desc" },
       select: {
         gameId: true,
@@ -321,7 +321,7 @@ export async function getMostExpensiveMove(userId: string): Promise<MostExpensiv
       },
     }),
     prisma.flaggedMove.findFirst({
-      where: { color: "black", game: { userId, playerColor: "black" } },
+      where: { color: "black", cpLoss: { not: null }, game: { userId, playerColor: "black" } },
       orderBy: { cpLoss: "desc" },
       select: {
         gameId: true,
@@ -333,7 +333,9 @@ export async function getMostExpensiveMove(userId: string): Promise<MostExpensiv
       },
     }),
   ]);
-  const row = !whiteMove ? blackMove : !blackMove ? whiteMove : whiteMove.cpLoss >= blackMove.cpLoss ? whiteMove : blackMove;
+  const cpMoves = [whiteMove, blackMove].filter((move): move is NonNullable<typeof move> & { cpLoss: number } =>
+    move !== null && move.cpLoss !== null);
+  const row = cpMoves.sort((a, b) => b.cpLoss - a.cpLoss)[0];
   if (!row) return null;
   return {
     gameId: row.gameId,
@@ -356,10 +358,12 @@ export async function getSelfCpLossTrend(userId: string): Promise<SelfCpLossTren
   });
   const strongestByPosition = new Map<string, { cpLoss: number; gameId: string; ply: number }>();
   for (const row of rows) {
-    if (row.color !== row.game.playerColor) continue;
+    if (row.color !== row.game.playerColor || row.cpLoss === null) continue;
     const key = `${row.gameId}:${row.ply}`;
     const previous = strongestByPosition.get(key);
-    if (!previous || row.cpLoss > previous.cpLoss) strongestByPosition.set(key, row);
+    if (!previous || row.cpLoss > previous.cpLoss) {
+      strongestByPosition.set(key, { gameId: row.gameId, ply: row.ply, cpLoss: row.cpLoss });
+    }
   }
   // Preserve the date order from the query while deduplicating multiple flag
   // types attached to a single move.
@@ -410,7 +414,7 @@ export async function getPatternProgressDeltas(userId: string): Promise<PatternP
   const flagByPosition = new Map<string, { cpLoss: number; playedAt: Date; gameId: string; san: string; opponentUsername: string }>();
   for (const flag of occurrences) {
     const game = gameByInternalId.get(flag.gameId);
-    if (!game?.lichessCreatedAt) continue;
+    if (!game?.lichessCreatedAt || flag.cpLoss === null) continue;
     // Weakness profiles are built before persistence and keyed by Lichess IDs;
     // DB relations use internal Game IDs. Join through the external game ID.
     const key = `${game.lichessGameId}:${flag.ply}`;

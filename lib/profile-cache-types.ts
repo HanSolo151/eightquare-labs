@@ -3,9 +3,12 @@ import type { BiasData } from "@/lib/bias/getBiasData";
 
 export interface ProfileFlaggedMoment extends Pick<
   FlaggedMove,
-  "ply" | "moveNumber" | "san" | "color" | "flagType" | "severity" | "cpLoss" | "gamePhase" | "explanation"
+  "ply" | "moveNumber" | "san" | "color" | "flagType" | "severity" | "cpLoss" | "mateBefore" | "mateAfter" | "gamePhase" | "explanation"
 > {
+  /** Lichess's stable external game identifier. */
   gameId: string;
+  /** Internal database ID used by authenticated dashboard replay routes. */
+  internalGameId: string;
   opponentUsername: string;
   openingName: string | null;
   openingEco: string | null;
@@ -24,7 +27,7 @@ export interface UserProfileCache {
 }
 
 export interface PgnSessionResult {
-  version: 1;
+  version: 2;
   id: string;
   pgn: string;
   headers: Record<string, string>;

@@ -109,7 +109,7 @@ async function GamesPageContent({ searchParams }: GamesPageProps) {
                 {game.moveCount > 0 ? <div className="flex h-3 gap-px overflow-hidden rounded-sm" role="img" aria-label={`${game.moveCount} half-moves; ${game.flags.length} flagged positions`}>
                   {Array.from({ length: game.moveCount }, (_, ply) => {
                     const flag = flagByPly.get(ply);
-                    const description = flag ? `Move ${Math.floor(ply / 2) + 1}, ${flag.san}, ${flag.severity} ${flag.flagType}, ${Math.round(flag.cpLoss)} centipawn loss` : `Move ${Math.floor(ply / 2) + 1}, no stored flag`;
+                    const description = flag ? `Move ${Math.floor(ply / 2) + 1}, ${flag.san}, ${flag.severity} ${flag.flagType}, ${flag.cpLoss === null ? "forced-mate evaluation" : `${Math.round(flag.cpLoss)} centipawn loss`}` : `Move ${Math.floor(ply / 2) + 1}, no stored flag`;
                     return <span key={ply} title={description} aria-label={description} className={`min-w-[2px] flex-1 ${flag ? severityFill[flag.severity] ?? "bg-violet-300" : ply % 2 === 0 ? "bg-white/15" : "bg-white/8"}`} />;
                   })}
                 </div> : <p className="text-xs text-neutral-600">No move list saved.</p>}

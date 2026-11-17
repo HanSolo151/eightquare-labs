@@ -6,11 +6,10 @@ import path from "node:path";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { Chess } from "chess.js";
-import { MATE_EQUIVALENT_CP } from "../lib/eval/toPlayerPerspective";
 
 type RawFlag = {
   flagId: string; flagPly: number; moveNumber: number; san: string; color: string;
-  flagType: string; severity: string; gamePhase: string; originalCpLoss: number;
+  flagType: string; severity: string; gamePhase: string; originalCpLoss: number | null;
   cascadeMeta: { startPly?: number; sequenceLength?: number; depthCp?: number } | null;
   moves: unknown; playerColor: string; points: unknown; engineVersion: string;
 };
@@ -19,7 +18,9 @@ type SampleRow = {
   flagId: string; sample: number; stratum: string; phase: string; flagType: string; severity: string;
   originalEngineVersion: string;
   originalDepth: number | null; originalDepthGroup: "depth16" | "depth8-9" | "other" | "missing";
-  originalCpLoss: number; higherDepthCpLoss: number; deltaCp: number;
+  originalCpLoss: number | null; higherDepthCpLoss: number | null; deltaCp: number | null;
+  originalMateBefore: number | null; originalMateAfter: number | null;
+  higherDepthMateBefore: number | null; higherDepthMateAfter: number | null;
   originalContainsMate: boolean; higherDepthContainsMate: boolean;
   result: "confirmed" | "downgraded" | "reversed"; forcedish: boolean | null;
   bestSecondGapCp: number | null; top3Lines: Array<{ uci: string | null; san: string | null; scoreCp: number | null; mate: number | null }>;
@@ -32,22 +33,17 @@ const SEARCH_TIMEOUT_MS = 60 * 60_000;
 const ROOT = process.cwd();
 const ENGINE_PATH = path.join(ROOT, "node_modules", "stockfish", "bin", "stockfish-19-single.js");
 const REPORT_DIR = path.join(ROOT, "artifacts", "evaluation");
-const REPORT_JSON = path.join(REPORT_DIR, "flag-depth-stability.json");
-const REPORT_MD = path.join(REPORT_DIR, "flag-depth-stability.md");
-const REPORT_CSV = path.join(REPORT_DIR, "flag-depth-stability-full.csv");
-const CHECKPOINT_JSON = path.join(REPORT_DIR, "flag-depth-stability-checkpoint.json");
+const MATE_ONLY = process.argv.includes("--mate-only");
+const REPORT_PREFIX = MATE_ONLY ? "mate-depth22" : "flag-depth-stability-v2";
+const REPORT_JSON = path.join(REPORT_DIR, `${REPORT_PREFIX}.json`);
+const REPORT_MD = path.join(REPORT_DIR, `${REPORT_PREFIX}.md`);
+const REPORT_CSV = path.join(REPORT_DIR, `${REPORT_PREFIX}.csv`);
+const CHECKPOINT_JSON = path.join(REPORT_DIR, `${REPORT_PREFIX}-checkpoint.json`);
 
 function csv(value: unknown): string {
   const text = value === null || value === undefined ? "" :
     typeof value === "object" ? JSON.stringify(value) : String(value);
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
-}
-
-function scoreAsCp(score: Pick<Score, "cp" | "mate">): number | null {
-  if (score.cp !== null && Number.isFinite(score.cp)) return score.cp;
-  if (score.mate === null || !Number.isFinite(score.mate)) return null;
-  const distance = Math.min(Math.abs(score.mate), 999);
-  return score.mate > 0 ? MATE_EQUIVALENT_CP - distance : -MATE_EQUIVALENT_CP + distance;
 }
 
 function originalDepthGroup(depths: number[]): SampleRow["originalDepthGroup"] {
@@ -163,9 +159,23 @@ function fensForPly(moves: string[], ply: number): { before: string; after: stri
   return { before, after: chess.fen(), san: move.san, uci: move.from + move.to + (move.promotion ?? "") };
 }
 
-function classify(loss: number): SampleRow["result"] {
-  if (loss >= 100) return "confirmed";
-  if (loss > 0) return "downgraded";
+function classify(
+  cpLoss: number | null,
+  mateBefore: number | null,
+  mateAfter: number | null,
+): SampleRow["result"] {
+  if (mateBefore !== null || mateAfter !== null) {
+    if (mateAfter !== null && mateAfter < 0 || mateBefore !== null && mateBefore > 0 && mateAfter === null) {
+      return "confirmed";
+    }
+    if (mateBefore !== null && mateBefore > 0 && mateAfter !== null && mateAfter > mateBefore) {
+      return "downgraded";
+    }
+    return "reversed";
+  }
+  if (cpLoss === null) return "reversed";
+  if (cpLoss >= 100) return "confirmed";
+  if (cpLoss > 0) return "downgraded";
   return "reversed";
 }
 
@@ -183,10 +193,13 @@ async function allPersistedFlags(): Promise<RawFlag[]> {
     JOIN "FlaggedMove" f ON f."id" = c.flag_id
     JOIN "Game" g ON g."id" = f."gameId"
     JOIN "GameEval" e ON e."gameId" = g."id"
+    ${MATE_ONLY ? Prisma.sql`WHERE f."evalConfidence" IN ('mate_only', 'degraded_mate_only')` : Prisma.empty}
     ORDER BY f."id"
   `;
   const rows = await prisma.$queryRaw<RawFlag[]>(censusSql);
-  const total = await prisma.flaggedMove.count();
+  const total = await prisma.flaggedMove.count(MATE_ONLY
+    ? { where: { evalConfidence: { in: ["mate_only", "degraded_mate_only"] } } }
+    : undefined);
   if (rows.length !== total) {
     throw new Error(`Full diagnostic census requires every persisted flag to have a saved game evaluation (${rows.length}/${total} joined).`);
   }
@@ -235,7 +248,11 @@ async function main(): Promise<void> {
     for (const [index, flag] of flags.entries()) {
       const cachedRow = completedRows.get(flag.flagId);
       if (cachedRow) {
-        rows.push({ ...cachedRow, sample: index + 1 });
+        rows.push({
+          ...cachedRow,
+          sample: index + 1,
+          result: classify(cachedRow.higherDepthCpLoss, cachedRow.higherDepthMateBefore, cachedRow.higherDepthMateAfter),
+        });
         console.log(`[${index + 1}/${flags.length}] cached ${cachedRow.result} ${cachedRow.stratum} ${cachedRow.phase}`);
         continue;
       }
@@ -261,27 +278,40 @@ async function main(): Promise<void> {
       if (!multi[0] || !afterScores.every(Boolean)) {
         throw new Error(`Stockfish returned incomplete depth-${SEARCH_DEPTH} scores for flag ${flag.flagId}.`);
       }
-      let higherDepthCpLoss = 0;
+      let higherDepthCpLoss: number | null = 0;
       let higherDepthContainsMate = false;
+      let higherDepthMateBefore: number | null = null;
+      let higherDepthMateAfter: number | null = null;
       for (let i = 0; i < positions.length; i++) {
         const beforeScore = i === 0 ? multi[0] : (await evalAt(positions[i].before))[0];
-        const beforeCp = beforeScore ? scoreAsCp(beforeScore) : null;
-        const afterCp = scoreAsCp(afterScores[i]);
-        if (beforeCp === null || afterCp === null) { higherDepthCpLoss = Number.NaN; break; }
-        higherDepthContainsMate ||= beforeScore?.mate !== null || afterScores[i].mate !== null;
+        const afterScore = afterScores[i];
+        higherDepthContainsMate ||= typeof beforeScore?.mate === "number" || typeof afterScore?.mate === "number";
+        if (i === 0) {
+          higherDepthMateBefore = beforeScore?.mate ?? null;
+          higherDepthMateAfter = typeof afterScore?.mate === "number" ? -afterScore.mate : null;
+        }
+        if (beforeScore?.cp === null || beforeScore?.cp === undefined || afterScore?.cp === null || afterScore?.cp === undefined) {
+          higherDepthCpLoss = null;
+          continue;
+        }
         // Scores are side-to-move POV; the post-move score is negated to put both on the mover's POV.
-        higherDepthCpLoss += beforeCp - (-afterCp);
+        if (higherDepthCpLoss !== null) higherDepthCpLoss += beforeScore.cp - (-afterScore.cp);
       }
-      if (!Number.isFinite(higherDepthCpLoss)) {
+      if (!higherDepthContainsMate && higherDepthCpLoss === null) {
         throw new Error(`Stockfish returned an unusable depth-${SEARCH_DEPTH} score for flag ${flag.flagId}.`);
       }
       const pointDepths = plies.map((ply) => Number(points[ply]?.depth)).filter(Number.isFinite);
+      const originalMatePoint = points[flag.flagPly];
+      const originalMateBefore = typeof originalMatePoint?.mateBefore === "number" ? originalMatePoint.mateBefore : null;
+      const originalMateAfter = typeof originalMatePoint?.mateAfter === "number" ? originalMatePoint.mateAfter : null;
       const originalContainsMate = plies.some((ply) => {
         const point = points[ply];
-        return point?.mateBefore !== null || point?.mateAfter !== null;
+        return typeof point?.mateBefore === "number" || typeof point?.mateAfter === "number";
       });
       const currentMove = positions[0];
-      const gap = multi.length >= 2 ? (scoreAsCp(multi[0]) ?? NaN) - (scoreAsCp(multi[1]) ?? NaN) : NaN;
+      const gap = multi.length >= 2 && multi[0].cp !== null && multi[1].cp !== null
+        ? multi[0].cp - multi[1].cp
+        : NaN;
       const top3Lines = multi.map((line) => {
         let san: string | null = null;
         if (line.uci) {
@@ -291,8 +321,10 @@ async function main(): Promise<void> {
             san = move?.san ?? null;
           } catch { san = null; }
         }
-        return { uci: line.uci, san, scoreCp: scoreAsCp(line), mate: line.mate };
+        return { uci: line.uci, san, scoreCp: line.cp, mate: line.mate };
       });
+      const originalCpLoss = originalContainsMate ? null : flag.originalCpLoss;
+      const reportedHigherDepthCpLoss = higherDepthContainsMate ? null : higherDepthCpLoss;
       rows.push({
         flagId: flag.flagId, sample: index + 1,
         stratum: flag.flagType === "evaluation_cascade" || flag.flagType === "tilt_cascade" ? "cascade" : flag.severity,
@@ -300,10 +332,14 @@ async function main(): Promise<void> {
         phase: flag.gamePhase, flagType: flag.flagType, severity: flag.severity,
         originalDepth: pointDepths.length ? Math.min(...pointDepths) : null,
         originalDepthGroup: originalDepthGroup(pointDepths),
-        originalCpLoss: Number(flag.originalCpLoss), higherDepthCpLoss: Math.round(higherDepthCpLoss),
-        deltaCp: Math.round(higherDepthCpLoss - Number(flag.originalCpLoss)),
+        originalCpLoss,
+        higherDepthCpLoss: reportedHigherDepthCpLoss === null ? null : Math.round(reportedHigherDepthCpLoss),
+        deltaCp: originalCpLoss === null || reportedHigherDepthCpLoss === null
+          ? null
+          : Math.round(reportedHigherDepthCpLoss - originalCpLoss),
+        originalMateBefore, originalMateAfter, higherDepthMateBefore, higherDepthMateAfter,
         originalContainsMate, higherDepthContainsMate,
-        result: classify(higherDepthCpLoss),
+        result: classify(higherDepthContainsMate ? null : higherDepthCpLoss, higherDepthMateBefore, higherDepthMateAfter),
         forcedish: Number.isFinite(gap) ? gap < 30 : null,
         bestSecondGapCp: Number.isFinite(gap) ? Math.round(gap) : null,
         top3Lines,
@@ -340,7 +376,7 @@ async function main(): Promise<void> {
     throw new Error(`Incomplete diagnostic census: evaluated ${rows.length}/${flags.length} persisted flags.`);
   }
   await mkdir(REPORT_DIR, { recursive: true });
-  const cols: Array<keyof SampleRow> = ["flagId", "sample", "stratum", "phase", "flagType", "severity", "originalEngineVersion", "originalDepth", "originalDepthGroup", "originalCpLoss", "higherDepthCpLoss", "deltaCp", "originalContainsMate", "higherDepthContainsMate", "result", "forcedish", "bestSecondGapCp", "top3Lines", "fenBefore", "san", "uci", "sequenceSan", "depth", "engine"];
+  const cols: Array<keyof SampleRow> = ["flagId", "sample", "stratum", "phase", "flagType", "severity", "originalEngineVersion", "originalDepth", "originalDepthGroup", "originalCpLoss", "higherDepthCpLoss", "deltaCp", "originalMateBefore", "originalMateAfter", "higherDepthMateBefore", "higherDepthMateAfter", "originalContainsMate", "higherDepthContainsMate", "result", "forcedish", "bestSecondGapCp", "top3Lines", "fenBefore", "san", "uci", "sequenceSan", "depth", "engine"];
   await writeFile(REPORT_CSV, `${cols.join(",")}\n${rows.map((row) => cols.map((column) => csv(row[column])).join(",")).join("\n")}\n`);
   const percentage = (count: number, total: number) => total ? `${(100 * count / total).toFixed(1)}%` : "n/a";
   const table = ["| Group | n | Confirmed | Downgraded | Reversed |", "|---|---:|---:|---:|---:|"];
@@ -348,13 +384,13 @@ async function main(): Promise<void> {
   const forcedCount = rows.filter((row) => row.forcedish === true).length;
   const forcedN = rows.filter((row) => row.forcedish !== null).length;
   const sampledSeverityProjection = {
-    low: rows.filter((row) => row.originalCpLoss >= 100 && row.originalCpLoss < 150).length,
-    medium: rows.filter((row) => row.originalCpLoss >= 150 && row.originalCpLoss <= 200).length,
-    high: rows.filter((row) => row.originalCpLoss > 200).length,
+    low: rows.filter((row) => row.originalCpLoss !== null && row.originalCpLoss >= 100 && row.originalCpLoss < 150).length,
+    medium: rows.filter((row) => row.originalCpLoss !== null && row.originalCpLoss >= 150 && row.originalCpLoss <= 200).length,
+    high: rows.filter((row) => row.originalCpLoss !== null && row.originalCpLoss > 200).length,
   };
   const thresholdGroups: Array<[string, SampleRow[]]> = [
-    ["100-149cp", rows.filter((row) => row.originalCpLoss >= 100 && row.originalCpLoss < 150)],
-    ["150-200cp", rows.filter((row) => row.originalCpLoss >= 150 && row.originalCpLoss <= 200)],
+    ["100-149cp", rows.filter((row) => row.originalCpLoss !== null && row.originalCpLoss >= 100 && row.originalCpLoss < 150)],
+    ["150-200cp", rows.filter((row) => row.originalCpLoss !== null && row.originalCpLoss >= 150 && row.originalCpLoss <= 200)],
   ];
   const thresholdStability = Object.fromEntries(thresholdGroups.map(([key, selected]) => [key, {
     total: selected.length,
@@ -368,7 +404,7 @@ async function main(): Promise<void> {
     const group = value as { total: number; confirmed: number; downgraded: number; reversed: number };
     return `| ${key} | ${group.total} | ${group.confirmed} (${percentage(group.confirmed, group.total)}) | ${group.downgraded} (${percentage(group.downgraded, group.total)}) | ${group.reversed} (${percentage(group.reversed, group.total)}) |`;
   });
-  await writeFile(REPORT_MD, ["# Flag depth-stability diagnostic", "", `Generated ${output.generatedAt}. Full census: ${rows.length}/${flags.length} persisted flags re-evaluated at depth ${SEARCH_DEPTH} using full Stockfish 19 single-threaded WASM.`, "", "This compares search stability, not human-label accuracy. Cascades are re-evaluated as the sum of their constituent own-move eval swings. A position is tagged multiple comparable options when the top-1 versus top-2 MultiPV score gap is below 30 cp. Mate transitions are included on the same synthetic 10,000 cp scale used in production and are marked per row.", "", ...table, "", `Multiple comparable options (<30 cp top-1/top-2 gap): ${forcedCount}/${forcedN} (${percentage(forcedCount, forcedN)}).`, "", `Projected severity labels from the full-census original cpLoss values under the 150cp medium floor (diagnostic only): ${JSON.stringify(sampledSeverityProjection)}.`, "", "### Stability around the low-tier boundary", "", "| Original cpLoss | n | Confirmed at depth 22 | Downgraded | Reversed |", "|---|---:|---:|---:|---:|", ...thresholdRows, "", "## Persisted depth inventory", "", "Actual evaluation depths at each persisted flag ply, grouped by stored engine version:", "", "| Engine version | Actual depth | Flags |", "|---|---:|---:|", ...depthInventory.map((item) => `| ${item.engineVersion} | ${item.depth < 0 ? "missing" : item.depth} | ${item.flagCount} |`), "", `Full census CSV: ${path.basename(REPORT_CSV)}`, ""].join("\n"));
+  await writeFile(REPORT_MD, [`# ${MATE_ONLY ? "Mate-transition" : "Flag"} depth-stability diagnostic`, "", `Generated ${output.generatedAt}. ${MATE_ONLY ? "Mate-backed flags" : "Persisted flags"} re-evaluated: ${rows.length}/${flags.length} at depth ${SEARCH_DEPTH} using full Stockfish 19 single-threaded WASM.`, "", "This compares search stability, not human-label accuracy. Mate scores are reported as signed mate distances, and cp columns are null whenever either evaluation is mate-backed; no mate-to-cp conversion is included in the report.", "", ...table, "", `Multiple comparable options (<30 cp top-1/top-2 gap): ${forcedCount}/${forcedN} (${percentage(forcedCount, forcedN)}).`, "", "### Stability around the low-tier cp boundary", "", "| Original cpLoss | n | Confirmed at depth 22 | Downgraded | Reversed |", "|---|---:|---:|---:|---:|", ...thresholdRows, "", "## Persisted depth inventory", "", "| Engine version | Actual depth | Flags |", "|---|---:|---:|---:|", ...depthInventory.map((item) => `| ${item.engineVersion} | ${item.depth < 0 ? "missing" : item.depth} | ${item.flagCount} |`), "", `Report CSV: ${path.basename(REPORT_CSV)}`, ""].join("\n"));
   if (existsSync(CHECKPOINT_JSON)) await unlink(CHECKPOINT_JSON);
   console.log(`Wrote ${REPORT_MD} and ${REPORT_CSV} (${rows.length} evaluated rows).`);
 }

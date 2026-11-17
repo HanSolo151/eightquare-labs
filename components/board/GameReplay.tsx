@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { Chess } from "chess.js";
 import type { Key } from "chessground/types";
 import PositionSpar from "./PositionSpar";
+import ChessgroundBoard from "./ChessgroundBoard";
+import ComparePanel from "./ComparePanel";
+import LiveGameContext from "./LiveGameContext";
 import type { EvalPoint } from "@/types";
 
 interface ReplayFlag {
@@ -12,7 +14,9 @@ interface ReplayFlag {
   san: string;
   severity: string;
   flagType: string;
-  cpLoss: number;
+  cpLoss: number | null;
+  mateBefore: number | null;
+  mateAfter: number | null;
   evalConfidence: "full" | "mate_only" | "degraded" | "degraded_mate_only";
   explanation: string;
   timeSpentSec: number;
@@ -63,8 +67,10 @@ export default function GameReplay({
     }
   }, [initialFen, moves, pgn]);
   const [ply, setPly] = useState(() => Math.max(0, Math.min(replayMoves.length, initialPly)));
-  const [sparActive, setSparActive] = useState(autoStartSpar);
+  const [activeMode, setActiveMode] = useState<"review" | "compare" | "spar">(autoStartSpar ? "spar" : "review");
   const moveListRef = useRef<HTMLOListElement>(null);
+  const highFlagRef = useRef<HTMLElement>(null);
+  const highPulsesSeen = useRef(new Set<string>());
   const { fen, invalidPly } = useMemo(() => {
     const chess = new Chess(initialFen);
     let invalid: number | null = null;
@@ -116,12 +122,51 @@ export default function GameReplay({
   const currentFlagIndex = flaggedPlies.indexOf(ply);
   const canGoToPreviousFlag = currentFlagIndex > 0 || (currentFlagIndex === -1 && flaggedPlies.some((flagPly) => flagPly < ply));
   const canGoToNextFlag = (currentFlagIndex >= 0 && currentFlagIndex < flaggedPlies.length - 1) || (currentFlagIndex === -1 && flaggedPlies.some((flagPly) => flagPly >= ply));
+  const lastMoveAtPly = lastMove(replayMoves, ply, initialFen);
+
+  useEffect(() => {
+    if (currentFlag?.severity !== "high" || !highFlagRef.current) return;
+    const positionKey = `${gameId}:${currentFlag.ply}`;
+    if (highPulsesSeen.current.has(positionKey)) return;
+    highPulsesSeen.current.add(positionKey);
+    const pulse = highFlagRef.current.animate(
+      [
+        { boxShadow: "0 0 0 0 rgba(251,113,133,0)" },
+        { boxShadow: "0 0 18px 2px rgba(251,113,133,0.28)" },
+        { boxShadow: "0 0 0 0 rgba(251,113,133,0)" },
+      ],
+      { duration: 900, iterations: 1 },
+    );
+    return () => pulse.cancel();
+  }, [gameId, currentFlag?.ply, currentFlag?.severity]);
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,480px)_minmax(280px,1fr)]">
-      <section className="space-y-4">
-        <PositionSpar
-          key={`${gameId}:${currentFlag?.ply ?? "none"}`}
+    <div className="grid gap-5 lg:h-[calc(100vh-12rem)] lg:min-h-[600px] lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)] lg:overflow-hidden">
+      <section className="flex min-h-0 flex-col gap-4">
+        {activeMode === "review" && <>
+          <div className="mx-auto w-full max-w-[560px] rounded-xl border border-white/10 bg-black/35 p-2">
+            <ChessgroundBoard fen={fen} orientation={playerColor} lastMove={lastMoveAtPly} />
+          </div>
+          <div className="mx-auto flex w-full max-w-[560px] items-center justify-between rounded-lg border border-white/10 bg-black/35 px-3 py-2">
+          <button type="button" onClick={() => setPly(0)} disabled={ply === 0} className="rounded px-2 py-1 text-sm text-neutral-300 hover:bg-white/10 disabled:text-neutral-700" aria-label="Go to start">|‹</button>
+          <button type="button" onClick={() => setPly((value) => Math.max(0, value - 1))} disabled={ply === 0} className="rounded px-3 py-1 text-sm text-neutral-300 hover:bg-white/10 disabled:text-neutral-700" aria-label="Previous move">←</button>
+          <span className="font-mono text-xs tabular-nums text-neutral-400">{ply} / {replayMoves.length} ply</span>
+          <button type="button" onClick={() => setPly((value) => Math.min(replayMoves.length, value + 1))} disabled={ply >= replayMoves.length} className="rounded px-3 py-1 text-sm text-neutral-300 hover:bg-white/10 disabled:text-neutral-700" aria-label="Next move">→</button>
+          <button type="button" onClick={() => setPly(replayMoves.length)} disabled={ply >= replayMoves.length} className="rounded px-2 py-1 text-sm text-neutral-300 hover:bg-white/10 disabled:text-neutral-700" aria-label="Go to end">›|</button>
+          </div>
+          {invalidPly !== null && <p role="status" className="text-xs text-amber-200">The saved move list is invalid at ply {invalidPly + 1}; replay stops before that move.</p>}
+        </>}
+        {activeMode === "compare" && <ComparePanel
+          key={`${gameId}:${ply}`}
+          fen={fen}
+          playedSan={replayMoves[ply] ?? null}
+          playerColor={playerColor}
+          maiaRating={maiaRating}
+          humanRating={humanRating}
+          cpLoss={currentFlag?.cpLoss ?? null}
+        />}
+        {activeMode === "spar" && <PositionSpar
+          key={`${gameId}:${currentFlag?.ply ?? ply}:spar`}
           fen={fen}
           humanColor={playerColor}
           maiaRating={maiaRating}
@@ -129,27 +174,23 @@ export default function GameReplay({
           opponentUsername={opponentUsername}
           effectiveRatingFires={effectiveRatingFires}
           resolution={currentFlag ? { gameId, ply: currentFlag.ply } : null}
-          autoStart={autoStartSpar && ply === initialPly}
+          autoStart
           prewarmMaia={showSparControls}
           prewarmMimic={showSparControls}
           showControls={showSparControls}
           inlineSpar
-          onOpenChange={setSparActive}
-          viewLastMove={lastMove(replayMoves, ply, initialFen)}
-        />
-        {!sparActive && <div className="mx-auto flex w-full max-w-[480px] items-center justify-between rounded-lg border border-white/10 bg-black/35 px-3 py-2">
-          <button type="button" onClick={() => setPly(0)} disabled={ply === 0} className="rounded px-2 py-1 text-sm text-neutral-300 hover:bg-white/10 disabled:text-neutral-700" aria-label="Go to start">|‹</button>
-          <button type="button" onClick={() => setPly((value) => Math.max(0, value - 1))} disabled={ply === 0} className="rounded px-3 py-1 text-sm text-neutral-300 hover:bg-white/10 disabled:text-neutral-700" aria-label="Previous move">←</button>
-          <span className="font-mono text-xs tabular-nums text-neutral-400">{ply} / {replayMoves.length} ply</span>
-          <button type="button" onClick={() => setPly((value) => Math.min(replayMoves.length, value + 1))} disabled={ply >= replayMoves.length} className="rounded px-3 py-1 text-sm text-neutral-300 hover:bg-white/10 disabled:text-neutral-700" aria-label="Next move">→</button>
-          <button type="button" onClick={() => setPly(replayMoves.length)} disabled={ply >= replayMoves.length} className="rounded px-2 py-1 text-sm text-neutral-300 hover:bg-white/10 disabled:text-neutral-700" aria-label="Go to end">›|</button>
-        </div>}
-        {!sparActive && invalidPly !== null && <p role="status" className="text-xs text-amber-200">The saved move list is invalid at ply {invalidPly + 1}; replay stops before that move.</p>}
+          onOpenChange={(open) => { if (!open) setActiveMode("review"); }}
+          viewLastMove={lastMoveAtPly}
+        />}
       </section>
 
-      <div className="space-y-4">
-        {!sparActive && <EvalTimeline moves={replayMoves} flags={flags} evalPoints={evalPoints} selectedPly={ply} onJump={setPly} />}
-        {!sparActive && <section className="rounded-xl border border-white/10 bg-black/35 p-4">
+      <div className="min-h-0 space-y-4 lg:overflow-y-auto lg:pr-2">
+        <nav className="sticky top-0 z-20 flex gap-1 rounded-lg border border-white/10 bg-[#10100f]/95 p-1 backdrop-blur" aria-label="Review mode">
+          {(["review", "compare", "spar"] as const).map((mode) => <button key={mode} type="button" aria-pressed={activeMode === mode} onClick={() => setActiveMode(mode)} className={`flex-1 rounded px-3 py-2 text-xs capitalize transition ${activeMode === mode ? "bg-amber-300/15 text-amber-100" : "text-neutral-400 hover:text-white"}`}>{mode === "spar" ? "Spar" : mode}</button>)}
+        </nav>
+        <EvalBar evalPoints={evalPoints} ply={ply} playerColor={playerColor} />
+        {activeMode === "review" && <EvalTimeline moves={replayMoves} flags={flags} evalPoints={evalPoints} selectedPly={ply} onJump={setPly} />}
+        {activeMode === "review" && <section className="rounded-xl border border-white/10 bg-black/35 p-4">
           <div className="flex items-center justify-between gap-3">
             <div><p className="text-xs uppercase tracking-widest text-neutral-500">Move list</p><p className="mt-1 text-xs text-neutral-400">Flagged moves open before the decision so you can play that position.</p></div>
             <div className="flex items-center gap-1.5">
@@ -173,14 +214,14 @@ export default function GameReplay({
           </ol>}
         </section>}
 
-        {currentFlag ? <section className="rounded-xl border border-amber-200/15 bg-amber-200/[0.04] p-4">
-          <p className="text-[10px] uppercase tracking-widest text-amber-100/70">Flagged move · {currentFlag.severity}</p>
+        {currentFlag ? <section ref={highFlagRef} className={`rounded-xl border p-4 ${currentFlag.severity === "high" ? "border-rose-300/20 bg-rose-300/[0.04]" : currentFlag.severity === "medium" ? "border-amber-200/15 bg-amber-200/[0.04]" : "border-sky-200/15 bg-sky-200/[0.03]"}`}>
+          <p className={`text-[10px] uppercase tracking-widest ${currentFlag.severity === "high" ? "text-rose-200/80" : currentFlag.severity === "medium" ? "text-amber-100/70" : "text-sky-100/70"}`}>Flagged move · {currentFlag.severity}</p>
           <h2 className="mt-2 text-lg font-semibold">Move {Math.floor(currentFlag.ply / 2) + 1}: {currentFlag.san}</h2>
-          <p className="mt-1 text-xs capitalize text-amber-100">{currentFlag.severity} · {currentFlag.evalConfidence === "mate_only" || currentFlag.evalConfidence === "degraded_mate_only" ? "forced-mate evaluation change" : `−${(currentFlag.cpLoss / 100).toFixed(1)} eval swing`}{currentFlag.evalConfidence === "degraded" || currentFlag.evalConfidence === "degraded_mate_only" ? " · lower-depth estimate; review with caution" : ""}</p>
+          <p className={`mt-1 text-xs capitalize ${currentFlag.severity === "high" ? "text-rose-100" : currentFlag.severity === "medium" ? "text-amber-100" : "text-sky-100"}`}>{currentFlag.severity} · {currentFlag.cpLoss === null ? "forced-mate evaluation" : `−${(currentFlag.cpLoss / 100).toFixed(1)} eval swing`}{currentFlag.evalConfidence === "degraded" || currentFlag.evalConfidence === "degraded_mate_only" ? " · lower-depth estimate; review with caution" : ""}</p>
           <p className="mt-2 text-xs leading-5 text-neutral-400">{currentFlag.explanation}</p>
-          {currentFlag.timeSpentSec > 0 && currentFlag.phaseAvgSec > 0 && <p className="mt-3 text-xs leading-5 text-neutral-300">You played this in <strong>{currentFlag.timeSpentSec.toFixed(1)}s</strong>. Your {currentFlag.gamePhase} average is <strong>{currentFlag.phaseAvgSec.toFixed(1)}s</strong>.</p>}
+          {currentFlag.timeSpentSec > 0 && currentFlag.phaseAvgSec > 0 && <LiveGameContext phase={currentFlag.gamePhase} timeSpentSec={currentFlag.timeSpentSec} phaseAvgSec={currentFlag.phaseAvgSec} opponentUsername={opponentUsername} />}
           {currentFlag.patternDescription && <p className="mt-2 text-xs leading-5 text-neutral-300">This matches a recurring weakness: <strong>{currentFlag.patternDescription}</strong>.</p>}
-          {!sparActive && <Link href={`/dashboard/games/${encodeURIComponent(gameId)}/ghost?ply=${currentFlag.ply}`} className="mt-4 inline-flex rounded-lg border border-amber-300/30 bg-amber-300/10 px-4 py-2.5 text-xs font-medium text-amber-100 hover:bg-amber-300/15">Replay from here →</Link>}
+          {activeMode === "review" && <button type="button" onClick={() => setActiveMode("compare")} className="mt-4 inline-flex rounded-lg border border-amber-300/30 bg-amber-300/10 px-4 py-2.5 text-xs font-medium text-amber-100 hover:bg-amber-300/15">Compare moves →</button>}
         </section> : <section className="rounded-xl border border-white/10 p-4 text-xs text-neutral-500">{ply === 0 ? "Starting position" : "No stored flag for this move."}</section>}
         <p className="text-[10px] leading-5 text-neutral-600">This replay uses your saved game record and analysis. It does not fetch the game from Lichess.</p>
       </div>
@@ -231,6 +272,30 @@ function EvalTimeline({ moves, flags, evalPoints, selectedPly, onJump }: {
       {selectedPly < moves.length && <span aria-hidden="true" className="absolute inset-y-0 z-[5] w-px bg-white/70" style={{ left: `${moves.length <= 1 ? 0 : selectedPly / (moves.length - 1) * 100}%` }} />}
     </div>
     <div className="mt-1 flex justify-between text-[9px] text-neutral-600"><span>Start</span><span>End</span></div>
+  </section>;
+}
+
+function EvalBar({ evalPoints, ply, playerColor }: {
+  evalPoints: EvalPoint[];
+  ply: number;
+  playerColor: "white" | "black";
+}) {
+  const point = evalPoints.find((entry) => entry.ply === ply);
+  const moverColor = ply % 2 === 0 ? "white" : "black";
+  const sign = moverColor === playerColor ? 1 : -1;
+  const cp = point?.cpAfter === null || point?.cpAfter === undefined
+    ? point?.mateAfter === null || point?.mateAfter === undefined ? null : point.mateAfter > 0 ? 1000 * sign : -1000 * sign
+    : point.cpAfter * sign;
+  const marker = cp === null ? 50 : Math.max(0, Math.min(100, (Math.max(-1000, Math.min(1000, cp)) + 1000) / 20));
+  return <section aria-label="Evaluation bar from your perspective" className="rounded-lg border border-white/10 bg-black/30 p-3">
+    <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-neutral-500">
+      <span>Worse for you</span>
+      <span>{cp === null ? "Evaluation unavailable" : `${cp > 0 ? "+" : ""}${(cp / 100).toFixed(2)} pawns for you`}</span>
+      <span>Better for you</span>
+    </div>
+    <div className="relative mt-2 h-2 rounded-full bg-gradient-to-r from-rose-900 via-neutral-700 to-emerald-800">
+      <span className="absolute -top-1 h-4 w-0.5 bg-white shadow" style={{ left: `${marker}%` }} />
+    </div>
   </section>;
 }
 

@@ -28,6 +28,7 @@
     "@prisma/client": "^6.19.3",
     "chess.js": "^1.4.0",
     "chessground": "^9.2.1",
+    "framer-motion": "^14.9.1",
     "next": "^16.4.1",
     "next-auth": "^5.0.0-beta.32",
     "onnxruntime-web": "^1.30.0",

@@ -69,6 +69,8 @@ async function SavedGamePageContent({ params, searchParams }: SavedGamePageProps
     severity: flag.severity,
     flagType: flag.flagType,
     cpLoss: flag.cpLoss,
+    mateBefore: flag.mateBefore,
+    mateAfter: flag.mateAfter,
     evalConfidence: flag.evalConfidence as "full" | "mate_only" | "degraded" | "degraded_mate_only",
     explanation: flag.explanation,
     timeSpentSec: flag.timeSpentSec,
